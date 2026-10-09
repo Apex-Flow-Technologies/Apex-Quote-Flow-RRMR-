@@ -1,0 +1,118 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // RR Metal Roofing — Sprint 1 Security Rules Foundation
+    // Enforces role-based access (admin / sales) and active user status
+    // Source of Truth: RR Metal Roofing Sprint 1 Brief
+    // =========================================================================
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActiveUser() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().active == true;
+    }
+
+    function isAdmin() {
+      return isActiveUser() && getUserData().role == 'admin';
+    }
+
+    function isSalesOrAdmin() {
+      return isActiveUser() && (getUserData().role == 'sales' || getUserData().role == 'admin');
+    }
+
+    // Default deny for unmapped documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // Users Collection: users/{userId}
+    //
+    // Sprint 1 Access Model:
+    // 1. Only active users can read their own user record. If active == false,
+    //    read access is rejected by Firestore with permission-denied.
+    // 2. If the document does not exist (unprovisioned), get is permitted so
+    //    the client receives snapshot.exists() == false.
+    // 3. Collection listing/querying is strictly restricted to active admins.
+    // 4. Writes (create/update/delete) are strictly restricted to active admins.
+    // =========================================================================
+    match /users/{userId} {
+      allow get: if isSignedIn() && (
+        (request.auth.uid == userId && (resource == null || resource.data.active == true)) ||
+        isAdmin()
+      );
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Products Collection: products/{productId}
+    // All active users can read products.
+    // ONLY admins can create, edit, or deactivate products.
+    // Sales users writing from the browser console are explicitly rejected.
+    match /products/{productId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    // Customers Collection: customers/{customerId}
+    // Active users can read customers and create/update records during quotation.
+    match /customers/{customerId} {
+      allow read: if isActiveUser();
+      allow write: if isSalesOrAdmin();
+    }
+
+    // Quotations Collection: quotations/{quotationId}
+    // Active users (sales/admin) can read and create quotations.
+    match /quotations/{quotationId} {
+      allow read: if isActiveUser();
+      allow create: if isSalesOrAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // =========================================================================
+    // Quotation Counter: counters/quotation
+    //
+    // Guarded atomic counter strictly governed by Sprint 1 Brief:
+    // 1. Read: Active users only.
+    // 2. Create (Bootstrap): Strictly restricted to active admin, requiring valid
+    //    initial schema (next == 1, prefix == 'RR/QT', valid financialYear).
+    // 3. Update: Active sales or admin can increment 'next' by exactly 1 during
+    //    quotation creation, while locking prefix and financialYear.
+    // 4. Delete: Strictly forbidden to prevent counter gaps or resets.
+    // =========================================================================
+    match /counters/{counterId} {
+      allow read: if isActiveUser();
+      allow create: if isAdmin() &&
+        counterId == 'quotation' &&
+        request.resource.data.next == 1 &&
+        request.resource.data.prefix == 'RR/QT' &&
+        request.resource.data.financialYear is string;
+      allow update: if isSalesOrAdmin() &&
+        counterId == 'quotation' &&
+        request.resource.data.next == resource.data.next + 1 &&
+        request.resource.data.prefix == resource.data.prefix &&
+        request.resource.data.financialYear == resource.data.financialYear;
+      allow delete: if false;
+    }
+
+    // Company Settings: settings/company
+    // Active users can read company settings (for quotation header and PDF generation).
+    // ONLY admin can edit company settings.
+    match /settings/{settingId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+  }
+}
