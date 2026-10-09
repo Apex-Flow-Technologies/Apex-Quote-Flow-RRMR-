@@ -70,3 +70,28 @@ export type CreateProductInput =
   | (Omit<OtherProduct, 'createdAt' | 'updatedAt' | 'id'> & { id?: string });
 
 export type CalculationMethod = QuantityMethod;
+
+/**
+ * Human-readable label formatting for product quantity calculation methods
+ * as per CEO review specifications.
+ */
+export function formatQtyMethodLabel(method: QuantityMethod | string): string {
+  switch (method) {
+    case 'SHEET_WEIGHT':
+      return 'Sheet · by weight';
+    case 'SECTION_WEIGHT':
+      return 'Pipe · by weight';
+    case 'PIECE':
+      return 'Per piece';
+    case 'AREA':
+      return 'By area';
+    case 'RUNNING_LENGTH':
+      return 'By running metre';
+    case 'LENGTH_FT':
+      return 'By feet';
+    case 'MANUAL':
+      return 'Manual';
+    default:
+      return method;
+  }
+}

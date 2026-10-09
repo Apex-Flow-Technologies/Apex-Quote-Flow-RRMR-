@@ -5,6 +5,7 @@ import { getQuotationPdfFilename } from '../utils/pdfGenerator';
 import { QuotationPdfDocument } from '../pages/quotations/QuotationPdfDocument';
 import type { Quotation, QuotationLine, QuotationLineSnapshot } from '../types/quotation';
 import { calculateQuotationLine, calculateQuotationTotals, determineTaxMode } from '../engine';
+import { formatQtyMethodLabel } from '../types/product';
 
 describe('Phase 5 — A4 Quotation PDF Generation & Presentation Integrity', () => {
   describe('PDF Filename Generation', () => {
@@ -172,11 +173,10 @@ describe('Phase 5 — A4 Quotation PDF Generation & Presentation Integrity', () 
     });
   });
 
-  describe('TC-05 7-Line Reference Quotation Presentation', () => {
-    // 7 Reference lines matching TC-05 / Sprint 1 Brief
-    const reference7LineInputs = [
-      {
-        snapshot: {
+  // 7 Reference lines matching TC-05 / Sprint 1 Brief
+  const reference7LineInputs = [
+    {
+      snapshot: {
           productId: 'prod_demo_01',
           productName: 'JSW C+ CRIMP SHEET 8+1',
           category: 'Crimp',
@@ -289,6 +289,7 @@ describe('Phase 5 — A4 Quotation PDF Generation & Presentation Integrity', () 
       },
     ];
 
+  describe('TC-05 7-Line Reference Quotation Presentation', () => {
     it('presents physical totals with strict separation between Total Kgs and Total Nos', () => {
       const calculatedLines = reference7LineInputs.map((input) =>
         calculateQuotationLine(input, 'intra')
@@ -442,7 +443,7 @@ describe('Phase 5 — A4 Quotation PDF Generation & Presentation Integrity', () 
       expect(pdfElement.props.quotation.sgstTotal).toBe(0);
     });
 
-    it('successfully renders PDF document to buffer without font resolution errors (Helvetica-Bold italic fix)', async () => {
+    it('successfully renders PDF document to buffer with Noto Sans font and Rupee symbol', async () => {
       const sampleLine: QuotationLine = {
         id: 'line_test_render',
         productName: 'JSW C+ CRIMP SHEET 8+1',
@@ -530,6 +531,7 @@ describe('Phase 5 — A4 Quotation PDF Generation & Presentation Integrity', () 
 
       expect(blob).toBeDefined();
       expect(blob.size).toBeGreaterThan(1000);
+      expect(blob.size).toBeLessThan(500 * 1024);
       expect(blob.type).toBe('application/pdf');
     });
   });
@@ -622,6 +624,165 @@ describe('Phase 5 — A4 Quotation PDF Generation & Presentation Integrity', () 
       expect(blob).toBeDefined();
       expect(blob.size).toBeGreaterThan(1000);
       expect(blob.type).toBe('application/pdf');
+    });
+  });
+
+  describe('Priority 1 Remediation — PDF Font & User-Facing Labels', () => {
+    it('generates real reference quotation PDF under 500 KB with Noto Sans', async () => {
+      const calculatedLines = reference7LineInputs.map((input) =>
+        calculateQuotationLine(input, 'intra')
+      );
+      const totals = calculateQuotationTotals(calculatedLines, 'intra');
+
+      const referenceQuotation: Quotation = {
+        id: 'qt_ref_priority_1',
+        quotationNumber: 'RR/QT/26-27/0001',
+        quotationDate: '2026-10-09',
+        company: {
+          name: 'RR METAL ROOFING',
+          gstin: '33AAAAA0000A1Z5',
+          address: 'Madurai Bypass Road, Madurai, Tamil Nadu - 625001',
+          phones: ['+91 98421 00000'],
+          email: 'sales@rrmetalroofing.com',
+          bankDetails: {
+            bankName: 'State Bank of India',
+            accountNumber: '39001234567',
+            ifscCode: 'SBIN0001234',
+            branch: 'Madurai City',
+          },
+          defaultTerms: ['Prices are valid for 7 days'],
+        },
+        customer: {
+          id: 'cust_01',
+          name: 'Sri Krishna Industrial Builders',
+          gstin: '33ABCDE1234F1Z5',
+          address: '10 Industrial Estate, Madurai',
+        },
+        revision: 1,
+        taxMode: 'intra',
+        lines: calculatedLines,
+        subtotal: totals.subtotal.toNumber(),
+        taxableValue: totals.subtotal.toNumber(),
+        cgstTotal: totals.cgstTotal.toNumber(),
+        sgstTotal: totals.sgstTotal.toNumber(),
+        igstTotal: totals.igstTotal.toNumber(),
+        totalTax: totals.totalTax.toNumber(),
+        taxSummary: totals.taxSummary,
+        grandTotal: totals.grandTotal.toNumber(),
+        roundOff: totals.roundOff.toNumber(),
+        payableAmount: totals.payableAmount.toNumber(),
+        amountInWords: totals.amountInWords,
+        totalKgs: totals.totalKgs.toNumber(),
+        totalNos: totals.totalNos.toNumber(),
+        terms: ['Validity: 7 days'],
+        createdByUid: 'uid_admin',
+        createdByName: 'Sasidaran',
+        createdAt: '2026-10-09T10:00:00.000Z',
+      };
+
+      const doc = React.createElement(QuotationPdfDocument, { quotation: referenceQuotation });
+      const blob = await pdf(doc as any).toBlob();
+
+      expect(blob).toBeDefined();
+      expect(blob.type).toBe('application/pdf');
+      // Must be well under 500 KB limit requested in review
+      expect(blob.size).toBeLessThan(500 * 1024);
+      expect(blob.size).toBeGreaterThan(5000);
+    });
+
+    it('hides piece count summary when totalNos is zero and renders "Qty in Nos" when greater than zero', () => {
+      const quotationZeroNos: Quotation = {
+        id: 'qt_zero_nos',
+        quotationNumber: 'RR/QT/26-27/0002',
+        revision: 1,
+        quotationDate: '2026-10-09',
+        customer: { id: 'c1', name: 'Test' },
+        taxMode: 'intra',
+        lines: [],
+        subtotal: 0,
+        taxableValue: 0,
+        cgstTotal: 0,
+        sgstTotal: 0,
+        igstTotal: 0,
+        totalTax: 0,
+        taxSummary: [],
+        grandTotal: 0,
+        roundOff: 0,
+        payableAmount: 0,
+        amountInWords: 'Zero Rupees Only',
+        totalKgs: 150,
+        totalNos: 0,
+        createdByUid: 'u1',
+        createdByName: 'Staff',
+        createdAt: '2026-10-09T00:00:00.000Z',
+      };
+
+      const renderedTreeZero = QuotationPdfDocument({ quotation: quotationZeroNos });
+      const serializedZero = JSON.stringify(renderedTreeZero);
+      expect(serializedZero).not.toContain('Qty in Nos');
+      expect(serializedZero).not.toContain('Total Pieces');
+
+      const quotationWithNos: Quotation = {
+        ...quotationZeroNos,
+        totalNos: 7,
+      };
+      const renderedTreeWithNos = QuotationPdfDocument({ quotation: quotationWithNos });
+      const serializedWithNos = JSON.stringify(renderedTreeWithNos);
+      expect(serializedWithNos).toContain('Qty in Nos');
+      expect(serializedWithNos).toContain('7');
+      expect(serializedWithNos).toContain('Nos');
+      expect(serializedWithNos).not.toContain('Total Pieces');
+    });
+
+    it('renders "Total Payable:" and "Per piece" in QuotationPdfDocument', () => {
+      const calculatedLines = reference7LineInputs.map((input) =>
+        calculateQuotationLine(input, 'intra')
+      );
+      const totals = calculateQuotationTotals(calculatedLines, 'intra');
+
+      const quotation: Quotation = {
+        id: 'qt_labels_test',
+        quotationNumber: 'RR/QT/26-27/0003',
+        revision: 1,
+        quotationDate: '2026-10-09',
+        customer: { id: 'c1', name: 'Test Client' },
+        taxMode: 'intra',
+        lines: calculatedLines,
+        subtotal: totals.subtotal.toNumber(),
+        taxableValue: totals.subtotal.toNumber(),
+        cgstTotal: totals.cgstTotal.toNumber(),
+        sgstTotal: totals.sgstTotal.toNumber(),
+        igstTotal: totals.igstTotal.toNumber(),
+        totalTax: totals.totalTax.toNumber(),
+        taxSummary: totals.taxSummary,
+        grandTotal: totals.grandTotal.toNumber(),
+        roundOff: totals.roundOff.toNumber(),
+        payableAmount: totals.payableAmount.toNumber(),
+        amountInWords: totals.amountInWords,
+        totalKgs: totals.totalKgs.toNumber(),
+        totalNos: totals.totalNos.toNumber(),
+        createdByUid: 'u1',
+        createdByName: 'Staff',
+        createdAt: '2026-10-09T00:00:00.000Z',
+      };
+
+      const renderedTree = QuotationPdfDocument({ quotation });
+      const serialized = JSON.stringify(renderedTree);
+
+      expect(serialized).toContain('Total Payable:');
+      expect(serialized).toContain('Per piece');
+      expect(serialized).toContain('Rate (₹)');
+      expect(serialized).toContain('Disc (₹)');
+      expect(serialized).toContain('Taxable Value (₹)');
+    });
+
+    it('formats calculation methods accurately matching CEO review table', () => {
+      expect(formatQtyMethodLabel('SHEET_WEIGHT')).toBe('Sheet · by weight');
+      expect(formatQtyMethodLabel('SECTION_WEIGHT')).toBe('Pipe · by weight');
+      expect(formatQtyMethodLabel('PIECE')).toBe('Per piece');
+      expect(formatQtyMethodLabel('AREA')).toBe('By area');
+      expect(formatQtyMethodLabel('RUNNING_LENGTH')).toBe('By running metre');
+      expect(formatQtyMethodLabel('LENGTH_FT')).toBe('By feet');
     });
   });
 });

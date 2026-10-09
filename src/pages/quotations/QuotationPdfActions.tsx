@@ -23,7 +23,6 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
       setGenerating(true);
       setError(null);
 
-      // Generate PDF Blob in browser
       const blob = await pdf(<QuotationPdfDocument quotation={quotation} />).toBlob();
       const filename = getQuotationPdfFilename(quotation.quotationNumber);
 
@@ -61,11 +60,11 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
       <button
         onClick={handleDownload}
         disabled={generating}
-        className="inline-flex items-center gap-1 px-2.5 py-1 text-slate-700 hover:text-[#0f2444] hover:bg-slate-100 rounded-sm transition text-xs font-semibold border border-slate-300 disabled:opacity-50"
+        className="inline-flex items-center gap-1 px-2.5 py-1 text-muted hover:text-ink hover:bg-surface-2 rounded-control transition text-xs font-semibold border border-line-strong disabled:opacity-50"
         title={`Download ${quotation.quotationNumber} PDF`}
       >
         {generating ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0f2444]" />
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-brand" />
         ) : (
           <Download className="w-3.5 h-3.5" />
         )}
@@ -77,7 +76,7 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
   return (
     <div className="flex items-center gap-2">
       {error && (
-        <span className="text-[11px] text-rose-600 font-semibold mr-2">
+        <span className="text-[11px] text-danger font-semibold mr-2">
           {error}
         </span>
       )}
@@ -86,11 +85,11 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
         type="button"
         onClick={handleOpenInNewTab}
         disabled={generating}
-        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-sm border border-slate-300 transition disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 rounded-control border border-line-strong transition disabled:opacity-50"
         title="Open A4 PDF preview in new browser tab"
       >
         {generating ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-600" />
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-muted" />
         ) : (
           <ExternalLink className="w-3.5 h-3.5" />
         )}
@@ -101,7 +100,7 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
         type="button"
         onClick={handleDownload}
         disabled={generating}
-        className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-[#0f2444] hover:bg-[#16335d] rounded-sm shadow-xs transition disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-brand hover:bg-brand-dark rounded-control shadow-xs transition disabled:opacity-50"
         title={`Download ${getQuotationPdfFilename(quotation.quotationNumber)}`}
       >
         {generating ? (

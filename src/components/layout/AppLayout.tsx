@@ -39,89 +39,87 @@ export const AppLayout: React.FC = () => {
   const roleLabel = isAdmin ? 'Administrator' : 'Sales Staff';
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F6F3EE] text-[#222222] font-sans">
-      {/* Traditional Industrial Header */}
-      <header className="w-full sticky top-0 z-30 no-print">
-        {/* Tier 1: Primary Company Brand Strip (Deep Oxide Red) */}
-        <div className="w-full bg-[#8B2E1F] text-white border-b border-[#722417]">
-          <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-11 sm:h-12">
-              {/* Left: Serif Brand Name & Tagline */}
-              <div className="flex items-center gap-2 sm:gap-3">
-                <span className="font-serif font-bold text-sm sm:text-base tracking-wide uppercase text-white">
+    <div className="min-h-screen flex flex-col bg-white text-ink font-sans">
+      {/* Application Header (White, sticky, thin bottom border, subtle blur) */}
+      <header className="w-full sticky top-0 z-30 no-print bg-white/95 backdrop-blur-xs border-b border-line">
+        <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-13">
+            {/* Left: Blue square logo & brand text */}
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 bg-brand rounded-control flex items-center justify-center text-white font-bold text-xs select-none shadow-xs">
+                RR
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span className="font-bold text-sm tracking-tight text-ink">
                   RR Metal Roofing
                 </span>
-                <span className="hidden sm:inline-block text-[#E5C3BC] text-xs font-normal border-l border-[#A84534] pl-3">
-                  Quotation &amp; Billing
+                <span className="hidden sm:inline-block text-faint text-xs font-normal border-l border-line-strong pl-2.5">
+                  Quotations
                 </span>
               </div>
+            </div>
 
-              {/* Right: User identity (name + role), dropdown email, quiet logout */}
-              <div className="flex items-center gap-2 sm:gap-4">
-                {/* User Info with tooltip/dropdown */}
-                <div className="relative" ref={userMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    onMouseEnter={() => setUserDropdownOpen(true)}
-                    className="flex items-center gap-1.5 text-xs text-white hover:text-[#FAF3F1] py-1 px-1.5 rounded-[2px] transition-colors focus:outline-none"
-                    title="Account details"
+            {/* Right: Outlined user profile button & quiet logout */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center gap-1.5 text-xs text-muted hover:text-ink py-1 px-2.5 rounded-control border border-line-strong bg-white hover:bg-surface-2 transition-colors focus:outline-none"
+                  title="Account details"
+                >
+                  <span className="font-medium">{userName}</span>
+                  <span className="text-line-strong">·</span>
+                  <span className="text-muted text-[11px]">{roleLabel}</span>
+                  <ChevronDown className="w-3 h-3 text-faint ml-0.5" />
+                </button>
+
+                {/* Dropdown Menu for Email & Account Details */}
+                {userDropdownOpen && (
+                  <div
+                    onMouseLeave={() => setUserDropdownOpen(false)}
+                    className="absolute right-0 top-full mt-1.5 w-56 bg-white text-ink border border-line-strong rounded-control shadow-sm p-3 z-50 text-xs animate-in fade-in duration-100"
                   >
-                    <span className="font-semibold">{userName}</span>
-                    <span className="text-[#E5C3BC]">·</span>
-                    <span className="text-[#F2DDD9] font-normal">{roleLabel}</span>
-                    <ChevronDown className="w-3 h-3 text-[#E5C3BC] ml-0.5" />
-                  </button>
-
-                  {/* Dropdown Menu for Email & Account Details */}
-                  {userDropdownOpen && (
-                    <div
-                      onMouseLeave={() => setUserDropdownOpen(false)}
-                      className="absolute right-0 top-full mt-1 w-56 bg-white text-[#222222] border border-[#D8D2C8] rounded-[2px] shadow-sm p-3 z-50 text-xs animate-in fade-in duration-100"
-                    >
-                      <div className="text-[10px] font-bold text-[#847E75] uppercase tracking-wider mb-1">
-                        Signed In User
-                      </div>
-                      <div className="font-mono text-xs text-[#222222] break-all mb-2 font-medium">
-                        {user?.email}
-                      </div>
-                      <div className="pt-2 border-t border-[#E8E3DA] flex items-center justify-between text-[11px] text-[#5A554E]">
-                        <span>System Role:</span>
-                        <span className="font-bold text-[#8B2E1F]">{roleLabel}</span>
-                      </div>
+                    <div className="text-[10px] font-bold text-faint uppercase tracking-wider mb-1">
+                      Signed In User
                     </div>
-                  )}
-                </div>
-
-                <span className="h-4 w-px bg-[#A84534] hidden sm:block" />
-
-                {/* Quiet Logout Link / Button */}
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="px-2.5 py-1 text-xs text-white hover:bg-[#722417] border border-[#A84534] rounded-[2px] transition-colors"
-                  title="Sign out of the system"
-                >
-                  <span className="hidden sm:inline">Logout</span>
-                  <LogOut className="w-3.5 h-3.5 sm:hidden inline" />
-                </button>
-
-                {/* Mobile Menu Toggle Button */}
-                <button
-                  type="button"
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="sm:hidden p-1 text-white hover:bg-[#722417] rounded-[2px] ml-1"
-                  aria-label="Toggle navigation menu"
-                >
-                  {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-                </button>
+                    <div className="font-mono text-xs text-ink break-all mb-2 font-medium">
+                      {user?.email}
+                    </div>
+                    <div className="pt-2 border-t border-line flex items-center justify-between text-[11px] text-muted">
+                      <span>System Role:</span>
+                      <span className="font-semibold text-brand">{roleLabel}</span>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Quiet Outlined Logout Button */}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="px-2.5 py-1 text-xs text-muted hover:text-ink border border-line-strong rounded-control bg-white hover:bg-surface-2 transition-colors flex items-center gap-1"
+                title="Sign out of the system"
+              >
+                <LogOut className="w-3.5 h-3.5 text-faint" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+
+              {/* Mobile Menu Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="sm:hidden p-1.5 text-muted hover:text-ink border border-line-strong rounded-control ml-1"
+                aria-label="Toggle navigation menu"
+              >
+                {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4 text-ink" />}
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Tier 2: Horizontal Navigation Strip (Off-White / Paper Surface) */}
-        <div className="w-full bg-[#FFFFFF] border-b border-[#D8D2C8]">
+        {/* Tier 2: Tabs beneath Header */}
+        <div className="w-full bg-white border-t border-line">
           <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
             <nav className="hidden sm:flex items-stretch gap-1">
               {navItems.map((item) => {
@@ -135,8 +133,8 @@ export const AppLayout: React.FC = () => {
                     className={({ isActive }) =>
                       `inline-flex items-center px-4 py-2.5 text-xs font-semibold tracking-wide transition-colors border-b-2 -mb-[1px] ${
                         isActive
-                          ? 'text-[#8B2E1F] border-[#8B2E1F] bg-[#FAF3F1]'
-                          : 'text-[#5A554E] hover:text-[#222222] hover:bg-[#F6F3EE] border-transparent'
+                          ? 'text-brand border-brand'
+                          : 'text-muted hover:text-ink border-transparent hover:border-line-strong'
                       } ${isRestrictedForSales ? 'opacity-35 pointer-events-none' : ''}`
                     }
                   >
@@ -148,7 +146,7 @@ export const AppLayout: React.FC = () => {
 
             {/* Mobile Navigation Dropdown */}
             {mobileMenuOpen && (
-              <nav className="sm:hidden py-2 border-t border-[#E8E3DA] space-y-1">
+              <nav className="sm:hidden py-2 border-t border-line space-y-1">
                 {navItems.map((item) => {
                   const isRestrictedForSales = item.adminOnly && !isAdmin;
 
@@ -159,10 +157,10 @@ export const AppLayout: React.FC = () => {
                       end={item.end}
                       onClick={() => setMobileMenuOpen(false)}
                       className={({ isActive }) =>
-                        `block px-3 py-2 text-xs font-semibold rounded-[2px] ${
+                        `block px-3 py-2 text-xs font-semibold rounded-control ${
                           isActive
-                            ? 'text-[#8B2E1F] bg-[#FAF3F1] font-bold'
-                            : 'text-[#5A554E] hover:text-[#222222] hover:bg-[#F6F3EE]'
+                            ? 'text-brand bg-brand-soft'
+                            : 'text-muted hover:text-ink hover:bg-surface-2'
                         } ${isRestrictedForSales ? 'opacity-35 pointer-events-none' : ''}`
                       }
                     >
@@ -176,13 +174,13 @@ export const AppLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content Workspace - Paper Ground */}
-      <main className="flex-1 w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+      {/* Main Content Workspace */}
+      <main className="flex-1 w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-5">
         <Outlet />
       </main>
 
-      {/* Traditional Business Footer */}
-      <footer className="w-full bg-[#FFFFFF] border-t border-[#D8D2C8] py-2.5 text-center text-xs text-[#847E75] no-print">
+      {/* Application Footer */}
+      <footer className="w-full bg-white border-t border-line py-3.5 text-center text-xs text-muted no-print">
         <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
           RR Metal Roofing · Quotation &amp; Billing System · ApexFlow Technologies
         </div>

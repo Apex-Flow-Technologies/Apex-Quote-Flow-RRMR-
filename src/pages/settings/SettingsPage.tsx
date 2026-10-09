@@ -220,7 +220,7 @@ export const SettingsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-sm border border-slate-300 p-16 text-center shadow-xs">
+      <div className="bg-white rounded-card border border-line p-16 text-center shadow-xs">
         <LoadingSpinner label="Loading company configuration from database..." size="lg" />
       </div>
     );
@@ -229,13 +229,13 @@ export const SettingsPage: React.FC = () => {
   return (
     <div className="space-y-5">
       {/* Page Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-300 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-line pb-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-[#0f2444]" />
+          <h1 className="text-xl font-bold text-ink flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-brand" />
             Company Settings &amp; Business Profile
           </h1>
-          <p className="text-xs text-slate-600 mt-0.5">
+          <p className="text-xs text-muted mt-0.5">
             Legal identity, GSTIN registration, banking coordinates, and standard quotation terms.
           </p>
         </div>
@@ -245,7 +245,7 @@ export const SettingsPage: React.FC = () => {
             type="button"
             onClick={loadSettings}
             disabled={loading || saving}
-            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-sm border border-slate-300 transition"
+            className="p-1.5 text-muted hover:text-ink hover:bg-surface-2 rounded-control border border-line-strong transition"
             title="Reload settings from database"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -255,8 +255,8 @@ export const SettingsPage: React.FC = () => {
 
       {/* Role Notice */}
       {!isAdmin && (
-        <div className="bg-amber-50 border border-amber-300 p-3 rounded-sm flex items-center gap-2 text-xs text-amber-900">
-          <Shield className="w-4 h-4 text-amber-700 shrink-0" />
+        <div className="bg-amber-50 border border-amber-200 p-3 rounded-control flex items-center gap-2 text-xs text-amber-900">
+          <Shield className="w-4 h-4 text-warn shrink-0" />
           <span>
             Read-Only Access: Company profile, GSTIN configuration, and bank details are restricted to Administrators.
           </span>
@@ -266,10 +266,10 @@ export const SettingsPage: React.FC = () => {
       {/* Action Notification */}
       {actionMessage && (
         <div
-          className={`p-3 rounded-sm flex items-center justify-between text-xs font-medium ${
+          className={`p-3 rounded-control flex items-center justify-between text-xs font-medium border ${
             actionMessage.type === 'success'
-              ? 'bg-emerald-50 text-emerald-900 border border-emerald-300'
-              : 'bg-rose-50 text-rose-900 border border-rose-300'
+              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+              : 'bg-rose-50 text-rose-900 border-rose-200'
           }`}
         >
           <div className="flex items-center gap-2">
@@ -282,7 +282,7 @@ export const SettingsPage: React.FC = () => {
           </div>
           <button
             onClick={() => setActionMessage(null)}
-            className="text-slate-400 hover:text-slate-700 p-0.5"
+            className="text-muted hover:text-ink p-0.5"
           >
             <X className="w-4 h-4" />
           </button>
@@ -291,14 +291,14 @@ export const SettingsPage: React.FC = () => {
 
       {/* Error Banner */}
       {error && (
-        <div className="p-3 bg-rose-50 border border-rose-300 rounded-sm text-rose-800 text-xs flex items-center justify-between">
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-control text-rose-800 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-700" />
             <span>{error}</span>
           </div>
           <button
             onClick={loadSettings}
-            className="px-2.5 py-1 bg-rose-700 text-white rounded-sm text-[11px] font-semibold hover:bg-rose-800 transition"
+            className="px-2.5 py-1 bg-danger text-white rounded-control text-[11px] font-semibold hover:bg-red-700 transition"
           >
             Retry
           </button>
@@ -308,9 +308,9 @@ export const SettingsPage: React.FC = () => {
       {/* Settings Form */}
       <form onSubmit={handleSave} className="space-y-5">
         {/* Section 1: Business Identity & Legal Information */}
-        <div className="bg-white rounded-sm border border-slate-300 shadow-2xs overflow-hidden">
-          <div className="p-3.5 bg-slate-100 border-b border-slate-300 flex items-center gap-2 font-bold text-slate-800 text-xs uppercase tracking-wide">
-            <Building2 className="w-4 h-4 text-[#0f2444]" />
+        <div className="bg-white rounded-card border border-line shadow-xs overflow-hidden">
+          <div className="p-3.5 bg-surface-2 border-b border-line flex items-center gap-2 font-semibold text-ink text-xs uppercase tracking-wider">
+            <Building2 className="w-4 h-4 text-brand" />
             <span>Business Identity &amp; Tax Information</span>
           </div>
 
@@ -319,8 +319,8 @@ export const SettingsPage: React.FC = () => {
               {/* LEFT COLUMN */}
               <div className="space-y-4">
                 <div>
-                  <label htmlFor={fieldIdName} className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-                    Company Legal Name <span className="text-rose-600">*</span>
+                  <label htmlFor={fieldIdName} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                    Company Legal Name <span className="text-danger">*</span>
                   </label>
                   <input
                     id={fieldIdName}
@@ -329,18 +329,18 @@ export const SettingsPage: React.FC = () => {
                     value={settings.name}
                     onChange={(e) => setSettings({ ...settings, name: e.target.value })}
                     placeholder="RR METAL ROOFING"
-                    className={`w-full h-9 py-1.5 px-3 rounded-sm border ${
-                      formErrors.name ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'
-                    } focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900 font-medium`}
+                    className={`w-full h-9 py-1.5 px-3 rounded-control border ${
+                      formErrors.name ? 'border-rose-400 bg-rose-50/30' : 'border-line-strong'
+                    } focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink font-semibold`}
                   />
                   {formErrors.name && (
-                    <p className="text-rose-600 text-[11px] mt-0.5">{formErrors.name}</p>
+                    <p className="text-danger text-[11px] mt-0.5">{formErrors.name}</p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor={fieldIdEmail} className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-                    Official Email Address <span className="text-rose-600">*</span>
+                  <label htmlFor={fieldIdEmail} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                    Official Email Address <span className="text-danger">*</span>
                   </label>
                   <input
                     id={fieldIdEmail}
@@ -349,19 +349,19 @@ export const SettingsPage: React.FC = () => {
                     value={settings.email}
                     onChange={(e) => setSettings({ ...settings, email: e.target.value })}
                     placeholder="sales@rrmetalroofing.com"
-                    className={`w-full h-9 py-1.5 px-3 rounded-sm border ${
-                      formErrors.email ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'
-                    } focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900`}
+                    className={`w-full h-9 py-1.5 px-3 rounded-control border ${
+                      formErrors.email ? 'border-rose-400 bg-rose-50/30' : 'border-line-strong'
+                    } focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink font-medium`}
                   />
                   {formErrors.email && (
-                    <p className="text-rose-600 text-[11px] mt-0.5">{formErrors.email}</p>
+                    <p className="text-danger text-[11px] mt-0.5">{formErrors.email}</p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor={fieldIdAddress} className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Official Billing &amp; Yard Address <span className="text-rose-600">*</span></span>
+                  <label htmlFor={fieldIdAddress} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-faint" />
+                    <span>Official Billing &amp; Yard Address <span className="text-danger">*</span></span>
                   </label>
                   <textarea
                     id={fieldIdAddress}
@@ -370,12 +370,12 @@ export const SettingsPage: React.FC = () => {
                     value={settings.address}
                     onChange={(e) => setSettings({ ...settings, address: e.target.value })}
                     placeholder="SF No. 123, Industrial Estate, Pollachi Main Road, Coimbatore, Tamil Nadu - 641021"
-                    className={`w-full py-2 px-3 rounded-sm border ${
-                      formErrors.address ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'
-                    } focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900`}
+                    className={`w-full py-2 px-3 rounded-control border ${
+                      formErrors.address ? 'border-rose-400 bg-rose-50/30' : 'border-line-strong'
+                    } focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink font-medium`}
                   />
                   {formErrors.address && (
-                    <p className="text-rose-600 text-[11px] mt-0.5">{formErrors.address}</p>
+                    <p className="text-danger text-[11px] mt-0.5">{formErrors.address}</p>
                   )}
                 </div>
               </div>
@@ -383,8 +383,8 @@ export const SettingsPage: React.FC = () => {
               {/* RIGHT COLUMN */}
               <div className="space-y-4">
                 <div>
-                  <label htmlFor={fieldIdGstin} className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-                    Company GSTIN <span className="text-rose-600">*</span>
+                  <label htmlFor={fieldIdGstin} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                    Company GSTIN <span className="text-danger">*</span>
                   </label>
                   <input
                     id={fieldIdGstin}
@@ -394,14 +394,14 @@ export const SettingsPage: React.FC = () => {
                     value={settings.gstin}
                     onChange={(e) => setSettings({ ...settings, gstin: e.target.value.toUpperCase() })}
                     placeholder="33AAAAA0000A1Z5"
-                    className={`w-full h-9 py-1.5 px-3 rounded-sm border font-mono font-semibold ${
-                      formErrors.gstin ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300'
-                    } focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900`}
+                    className={`w-full h-9 py-1.5 px-3 rounded-control border font-mono tabular-nums font-semibold ${
+                      formErrors.gstin ? 'border-rose-400 bg-rose-50/30' : 'border-line-strong'
+                    } focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink`}
                   />
                   {formErrors.gstin ? (
-                    <p className="text-rose-600 text-[11px] mt-0.5">{formErrors.gstin}</p>
+                    <p className="text-danger text-[11px] mt-0.5">{formErrors.gstin}</p>
                   ) : (
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-[10px] text-muted mt-1">
                       First 2 digits represent State Code (33 = Tamil Nadu), used for automatic Intra/Inter tax classification.
                     </p>
                   )}
@@ -409,14 +409,14 @@ export const SettingsPage: React.FC = () => {
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                    <span className="text-[11px] font-semibold text-faint uppercase tracking-wider">
                       Contact Phone Numbers
                     </span>
                     {isAdmin && (
                       <button
                         type="button"
                         onClick={handleAddPhone}
-                        className="text-[#0f2444] hover:text-blue-800 text-[11px] font-bold flex items-center gap-1"
+                        className="text-brand hover:text-brand-dark text-[11px] font-semibold flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" /> Add Phone
                       </button>
@@ -431,13 +431,13 @@ export const SettingsPage: React.FC = () => {
                           value={phone}
                           onChange={(e) => handlePhoneChange(idx, e.target.value)}
                           placeholder="+91 98422 12345"
-                          className="flex-1 h-9 py-1.5 px-3 rounded-sm border border-slate-300 focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900 font-mono text-xs"
+                          className="flex-1 h-9 py-1.5 px-3 rounded-control border border-line-strong focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink font-mono tabular-nums text-xs"
                         />
                         {isAdmin && settings.phones.length > 1 && (
                           <button
                             type="button"
                             onClick={() => handleRemovePhone(idx)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                            className="p-1.5 text-faint hover:text-danger rounded-control transition"
                             title="Remove phone number"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -453,9 +453,9 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         {/* Section 2: Bank Details */}
-        <div className="bg-white rounded-sm border border-slate-300 shadow-2xs overflow-hidden">
-          <div className="p-3.5 bg-slate-100 border-b border-slate-300 flex items-center gap-2 font-bold text-slate-800 text-xs uppercase tracking-wide">
-            <CreditCard className="w-4 h-4 text-[#0f2444]" />
+        <div className="bg-white rounded-card border border-line shadow-xs overflow-hidden">
+          <div className="p-3.5 bg-surface-2 border-b border-line flex items-center gap-2 font-semibold text-ink text-xs uppercase tracking-wider">
+            <CreditCard className="w-4 h-4 text-brand" />
             <span>Bank Account Coordinates (Printed on Quotations)</span>
           </div>
 
@@ -464,7 +464,7 @@ export const SettingsPage: React.FC = () => {
               {/* LEFT COLUMN */}
               <div className="space-y-4">
                 <div>
-                  <label htmlFor={fieldIdBankName} className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                  <label htmlFor={fieldIdBankName} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
                     Bank Name
                   </label>
                   <input
@@ -479,12 +479,12 @@ export const SettingsPage: React.FC = () => {
                       })
                     }
                     placeholder="e.g. HDFC Bank / State Bank of India"
-                    className="w-full h-9 py-1.5 px-3 rounded-sm border border-slate-300 focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900"
+                    className="w-full h-9 py-1.5 px-3 rounded-control border border-line-strong focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink font-medium"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor={fieldIdIfsc} className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                  <label htmlFor={fieldIdIfsc} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
                     IFSC Code
                   </label>
                   <input
@@ -502,7 +502,7 @@ export const SettingsPage: React.FC = () => {
                       })
                     }
                     placeholder="HDFC0001234"
-                    className="w-full h-9 py-1.5 px-3 rounded-sm border border-slate-300 font-mono font-semibold focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900"
+                    className="w-full h-9 py-1.5 px-3 rounded-control border border-line-strong font-mono tabular-nums font-semibold focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink"
                   />
                 </div>
               </div>
@@ -510,7 +510,7 @@ export const SettingsPage: React.FC = () => {
               {/* RIGHT COLUMN */}
               <div className="space-y-4">
                 <div>
-                  <label htmlFor={fieldIdAccountNo} className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                  <label htmlFor={fieldIdAccountNo} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
                     Account Number
                   </label>
                   <input
@@ -525,12 +525,12 @@ export const SettingsPage: React.FC = () => {
                       })
                     }
                     placeholder="50200012345678"
-                    className="w-full h-9 py-1.5 px-3 rounded-sm border border-slate-300 font-mono font-semibold focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900"
+                    className="w-full h-9 py-1.5 px-3 rounded-control border border-line-strong font-mono tabular-nums font-semibold focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor={fieldIdBranch} className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                  <label htmlFor={fieldIdBranch} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
                     Branch Name
                   </label>
                   <input
@@ -545,7 +545,7 @@ export const SettingsPage: React.FC = () => {
                       })
                     }
                     placeholder="Coimbatore Main Branch"
-                    className="w-full h-9 py-1.5 px-3 rounded-sm border border-slate-300 focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900"
+                    className="w-full h-9 py-1.5 px-3 rounded-control border border-line-strong focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink font-medium"
                   />
                 </div>
               </div>
@@ -554,17 +554,17 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         {/* Section 3: Default Terms & Conditions */}
-        <div className="bg-white rounded-sm border border-slate-300 shadow-2xs overflow-hidden">
-          <div className="p-3.5 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
-            <div className="flex items-center gap-2 font-bold text-slate-800 text-xs uppercase tracking-wide">
-              <FileText className="w-4 h-4 text-[#0f2444]" />
+        <div className="bg-white rounded-card border border-line shadow-xs overflow-hidden">
+          <div className="p-3.5 bg-surface-2 border-b border-line flex items-center justify-between">
+            <div className="flex items-center gap-2 font-semibold text-ink text-xs uppercase tracking-wider">
+              <FileText className="w-4 h-4 text-brand" />
               <span>Standard Quotation Terms &amp; Conditions</span>
             </div>
             {isAdmin && (
               <button
                 type="button"
                 onClick={handleAddTerm}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-[#0f2444] hover:text-blue-900 bg-white hover:bg-slate-50 border border-slate-300 rounded-sm shadow-2xs transition"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-brand hover:text-brand-dark bg-white hover:bg-surface-2 border border-line-strong rounded-control shadow-xs transition"
               >
                 <Plus className="w-3.5 h-3.5" /> Add Term Line
               </button>
@@ -572,13 +572,13 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <div className="p-5 space-y-3 text-xs">
-            <p className="text-slate-500 text-[11px]">
+            <p className="text-muted text-[11px]">
               Standard commercial terms automatically attached to generated quotation documents.
             </p>
 
             {settings.defaultTerms.map((term, idx) => (
               <div key={`term-${idx}`} className="flex items-center gap-2">
-                <span className="w-7 text-right font-mono text-slate-500 text-xs shrink-0 font-semibold">
+                <span className="w-7 text-right font-mono tabular-nums text-faint text-xs shrink-0 font-semibold">
                   {String(idx + 1).padStart(2, '0')}.
                 </span>
                 <input
@@ -587,13 +587,13 @@ export const SettingsPage: React.FC = () => {
                   value={term}
                   onChange={(e) => handleTermChange(idx, e.target.value)}
                   placeholder="Enter condition or terms..."
-                  className="flex-1 h-9 py-1.5 px-3 rounded-sm border border-slate-300 focus:outline-none focus:border-[#0f2444] disabled:bg-slate-100 text-slate-900"
+                  className="flex-1 h-9 py-1.5 px-3 rounded-control border border-line-strong focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink font-medium"
                 />
                 {isAdmin && (
                   <button
                     type="button"
                     onClick={() => handleRemoveTerm(idx)}
-                    className="p-2 text-slate-400 hover:text-rose-600 rounded-sm border border-transparent hover:border-slate-200 transition shrink-0"
+                    className="p-2 text-faint hover:text-danger rounded-control transition shrink-0"
                     title="Remove this term"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -611,14 +611,14 @@ export const SettingsPage: React.FC = () => {
               type="button"
               onClick={loadSettings}
               disabled={saving}
-              className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-sm transition"
+              className="px-4 py-2 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 border border-line-strong rounded-control transition"
             >
               Discard Changes
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-[#0f2444] hover:bg-[#16335d] text-white rounded-sm text-xs font-bold shadow-xs transition disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-5 py-2 bg-brand hover:bg-brand-dark text-white rounded-control text-xs font-semibold shadow-xs transition disabled:opacity-60"
             >
               {saving ? (
                 <>

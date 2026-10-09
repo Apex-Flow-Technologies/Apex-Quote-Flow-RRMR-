@@ -1,13 +1,39 @@
-import React from 'react';
 import {
   Document,
   Page,
   Text,
   View,
   StyleSheet,
+  Font,
 } from '@react-pdf/renderer';
 import type { Quotation } from '../../types/quotation';
 import { formatRoundOff } from '../../engine';
+
+export const FONT_FAMILY = 'Noto Sans';
+
+/**
+ * Resolves local font asset URL for both:
+ * 1. Browser runtime (local dev server & deployed Firebase Hosting)
+ * 2. Node.js environment (Vitest test suite)
+ */
+const getFontSource = (filename: string): string => {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    const baseUrl = import.meta.env?.BASE_URL || '/';
+    const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    return new URL(`${cleanBase}fonts/${filename}`, window.location.origin).href;
+  }
+  // Fallback for Node.js / Vitest test runner
+  return `public/fonts/${filename}`;
+};
+
+Font.register({
+  family: FONT_FAMILY,
+  fonts: [
+    { src: getFontSource('NotoSans-Regular.ttf'), fontWeight: 'normal' },
+    { src: getFontSource('NotoSans-SemiBold.ttf'), fontWeight: 'semibold' },
+    { src: getFontSource('NotoSans-Bold.ttf'), fontWeight: 'bold' },
+  ],
+});
 
 interface QuotationPdfDocumentProps {
   quotation: Quotation;
@@ -15,7 +41,7 @@ interface QuotationPdfDocumentProps {
 
 const styles = StyleSheet.create({
   page: {
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontSize: 8,
     color: '#1e293b',
     paddingTop: 24,
@@ -38,7 +64,7 @@ const styles = StyleSheet.create({
   },
   companyName: {
     fontSize: 13,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
     letterSpacing: 0.5,
@@ -60,7 +86,7 @@ const styles = StyleSheet.create({
   },
   quoteTitle: {
     fontSize: 14,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#1d4ed8',
     letterSpacing: 1,
@@ -68,7 +94,7 @@ const styles = StyleSheet.create({
   },
   quoteNumberBadge: {
     fontSize: 9.5,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
     backgroundColor: '#eff6ff',
@@ -86,7 +112,7 @@ const styles = StyleSheet.create({
   },
   taxModeBadge: {
     fontSize: 7,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#1e40af',
     textTransform: 'uppercase',
@@ -112,7 +138,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 7,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#64748b',
     textTransform: 'uppercase',
@@ -121,7 +147,7 @@ const styles = StyleSheet.create({
   },
   customerName: {
     fontSize: 9.5,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
     marginBottom: 2,
@@ -132,7 +158,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.2,
   },
   gstinHighlight: {
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
   },
@@ -156,7 +182,7 @@ const styles = StyleSheet.create({
   },
   tableHeaderCell: {
     fontSize: 7,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#334155',
     textTransform: 'uppercase',
@@ -183,7 +209,7 @@ const styles = StyleSheet.create({
 
   productName: {
     fontSize: 8,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
   },
@@ -194,7 +220,7 @@ const styles = StyleSheet.create({
   },
   manualTag: {
     fontSize: 6,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#d97706',
   },
@@ -234,14 +260,14 @@ const styles = StyleSheet.create({
   },
   qtyBoxLabel: {
     fontSize: 6.5,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#166534',
     textTransform: 'uppercase',
   },
   qtyBoxValue: {
     fontSize: 9,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#14532d',
     marginTop: 1,
@@ -258,7 +284,7 @@ const styles = StyleSheet.create({
   },
   wordsLabel: {
     fontSize: 6.5,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#64748b',
     textTransform: 'uppercase',
@@ -266,7 +292,7 @@ const styles = StyleSheet.create({
   },
   wordsText: {
     fontSize: 7.5,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#1e3a8a',
     lineHeight: 1.2,
@@ -282,7 +308,7 @@ const styles = StyleSheet.create({
   },
   bankTitle: {
     fontSize: 7,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#334155',
     marginBottom: 2,
@@ -318,13 +344,13 @@ const styles = StyleSheet.create({
   },
   summaryLabelBold: {
     fontSize: 8,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
   },
   summaryValueBold: {
     fontSize: 8,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
   },
@@ -340,7 +366,7 @@ const styles = StyleSheet.create({
   },
   payableLabel: {
     fontSize: 8.5,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#ffffff',
     textTransform: 'uppercase',
@@ -348,7 +374,7 @@ const styles = StyleSheet.create({
   },
   payableValue: {
     fontSize: 10.5,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#ffffff',
   },
@@ -362,7 +388,7 @@ const styles = StyleSheet.create({
   },
   termsTitle: {
     fontSize: 7,
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#475569',
     textTransform: 'uppercase',
@@ -395,7 +421,7 @@ const styles = StyleSheet.create({
   footerPageNum: {
     fontSize: 6.5,
     color: '#94a3b8',
-    fontFamily: 'Helvetica',
+    fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
   },
 });
@@ -422,7 +448,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
               <Text style={styles.companyAddress}>{company.address}</Text>
             )}
             <Text style={styles.companyContact}>
-              GSTIN: <Text style={{ fontFamily: 'Helvetica', fontWeight: 'bold', color: '#0f172a' }}>{company?.gstin || '—'}</Text>
+              GSTIN: <Text style={{ fontFamily: FONT_FAMILY, fontWeight: 'bold', color: '#0f172a' }}>{company?.gstin || '—'}</Text>
               {company?.phones && company.phones.length > 0 && ` • Phone: ${company.phones.join(', ')}`}
             </Text>
             {company?.email && (
@@ -436,7 +462,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
               {quotation.quotationNumber}
             </Text>
             <Text style={styles.quoteDateText}>
-              Date: <Text style={{ fontFamily: 'Helvetica', fontWeight: 'bold' }}>{quotation.quotationDate || '—'}</Text>
+              Date: <Text style={{ fontFamily: FONT_FAMILY, fontWeight: 'bold' }}>{quotation.quotationDate || '—'}</Text>
             </Text>
             <Text style={styles.taxModeBadge}>
               {isIntra ? 'Intra-State (CGST + SGST)' : 'Inter-State (IGST)'}
@@ -514,14 +540,14 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                         : `${line.lengthM || 0}m`
                       } × ${line.nos} nos • ${snap.kgPerMetre} kg/m`
                     )}
-                    {isPiece && `${line.nos} nos • Flat Piece Rate`}
+                    {isPiece && `${line.nos} nos • Per piece`}
                   </Text>
                 </View>
 
                 <Text style={[styles.colHsn, { color: '#475569' }]}>{line.hsn}</Text>
 
                 <View style={styles.colQty}>
-                  <Text style={{ fontFamily: 'Helvetica', fontWeight: 'bold' }}>
+                  <Text style={{ fontFamily: FONT_FAMILY, fontWeight: 'bold' }}>
                     {Number(line.quantity).toFixed(2)} {line.unit}
                   </Text>
                   {line.isManualQuantity && (
@@ -537,7 +563,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                     : '—'}
                 </Text>
 
-                <Text style={[styles.colTaxable, { fontFamily: 'Helvetica', fontWeight: 'bold' }]}>
+                <Text style={[styles.colTaxable, { fontFamily: FONT_FAMILY, fontWeight: 'bold' }]}>
                   {Number(line.taxableAmount).toFixed(2)}
                 </Text>
               </View>
@@ -559,12 +585,14 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                   {Number(quotation.totalKgs).toFixed(2)} Kgs
                 </Text>
               </View>
-              <View style={styles.qtyBoxItem}>
-                <Text style={styles.qtyBoxLabel}>Total Pieces</Text>
-                <Text style={styles.qtyBoxValue}>
-                  {Number(quotation.totalNos)} Nos
-                </Text>
-              </View>
+              {Number(quotation.totalNos) > 0 && (
+                <View style={styles.qtyBoxItem}>
+                  <Text style={styles.qtyBoxLabel}>Qty in Nos</Text>
+                  <Text style={styles.qtyBoxValue}>
+                    {Number(quotation.totalNos)} Nos
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Amount in Words */}
@@ -580,9 +608,9 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
               <View style={styles.bankBox}>
                 <Text style={styles.bankTitle}>Bank Details for Payment</Text>
                 <Text style={styles.bankText}>
-                  Bank: <Text style={{ fontFamily: 'Helvetica', fontWeight: 'bold' }}>{company.bankDetails.bankName}</Text>
-                  {' • '}A/C: <Text style={{ fontFamily: 'Helvetica', fontWeight: 'bold' }}>{company.bankDetails.accountNumber}</Text>
-                  {'\n'}IFSC: <Text style={{ fontFamily: 'Helvetica', fontWeight: 'bold' }}>{company.bankDetails.ifscCode}</Text>
+                  Bank: <Text style={{ fontFamily: FONT_FAMILY, fontWeight: 'bold' }}>{company.bankDetails.bankName}</Text>
+                  {' • '}A/C: <Text style={{ fontFamily: FONT_FAMILY, fontWeight: 'bold' }}>{company.bankDetails.accountNumber}</Text>
+                  {'\n'}IFSC: <Text style={{ fontFamily: FONT_FAMILY, fontWeight: 'bold' }}>{company.bankDetails.ifscCode}</Text>
                   {' • '}Branch: {company.bankDetails.branch}
                 </Text>
               </View>
@@ -627,7 +655,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
             </View>
 
             <View style={styles.payableBox}>
-              <Text style={styles.payableLabel}>Payable Amount:</Text>
+              <Text style={styles.payableLabel}>Total Payable:</Text>
               <Text style={styles.payableValue}>
                 ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </Text>

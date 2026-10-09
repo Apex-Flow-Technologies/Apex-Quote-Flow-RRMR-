@@ -10,16 +10,16 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   variant = 'info',
 }) => {
   const styles = {
-    success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    warning: 'bg-amber-50 text-amber-700 border-amber-200',
-    danger: 'bg-rose-50 text-rose-700 border-rose-200',
-    info: 'bg-slate-100 text-slate-700 border-slate-200',
-    primary: 'bg-blue-50 text-blue-700 border-blue-200',
+    success: 'bg-emerald-50 text-ok border-emerald-200',
+    warning: 'bg-amber-50 text-warn border-amber-200',
+    danger: 'bg-rose-50 text-danger border-rose-200',
+    info: 'bg-surface-2 text-muted border-line-strong',
+    primary: 'bg-brand-soft text-brand border-brand/20',
   }[variant];
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${styles}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-control text-xs font-semibold border ${styles}`}
     >
       {label}
     </span>

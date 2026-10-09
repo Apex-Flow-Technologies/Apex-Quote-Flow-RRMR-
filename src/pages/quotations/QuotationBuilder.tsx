@@ -15,7 +15,7 @@ import {
   type TaxMode,
 } from '../../engine';
 import type { Customer } from '../../types/customer';
-import type { Product, QuantityMethod } from '../../types/product';
+import { type Product, type QuantityMethod, formatQtyMethodLabel } from '../../types/product';
 import type { CompanySettings } from '../../types/settings';
 import type {
   Quotation,
@@ -32,7 +32,6 @@ import {
   Edit2,
   Save,
   User,
-  Building2,
   Calendar,
   AlertCircle,
   CheckCircle2,
@@ -491,7 +490,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
 
   if (loadingMasters) {
     return (
-      <div className="bg-white rounded-sm border border-slate-300 p-16 text-center shadow-xs">
+      <div className="bg-white rounded-card border border-line-strong p-16 text-center shadow-xs">
         <LoadingSpinner label="Loading customer directory and product catalog..." size="lg" />
       </div>
     );
@@ -500,82 +499,79 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   return (
     <div className="space-y-5 pb-8">
       {/* Top Navigation Header */}
-      <div className="border-b border-slate-300 pb-4">
-        <div className="flex items-center gap-2.5">
+      <div className="border-b border-line pb-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={onCancel}
-            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-sm border border-slate-300 transition"
+            className="p-1.5 text-muted hover:text-ink hover:bg-surface-2 rounded-control border border-line-strong transition"
             title="Return to Quotation Register"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <span>Quotation Preparation Desk</span>
-              <span className="text-[10px] font-mono font-bold uppercase text-slate-700 bg-slate-200 px-2 py-0.5 rounded-none border border-slate-300">
+            <h1 className="text-xl font-bold text-ink tracking-tight flex items-center gap-2.5">
+              <span>New quotation</span>
+              <span className="text-[10px] font-mono font-bold uppercase text-brand bg-brand-soft px-2 py-0.5 rounded-control border border-brand/20">
                 Draft
               </span>
             </h1>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Compose roofing quotation with live Decimal-precision weight and GST calculation.
-            </p>
           </div>
         </div>
       </div>
 
       {/* Notifications */}
       {masterError && (
-        <div className="p-3 bg-rose-50 border border-rose-300 rounded-sm text-rose-800 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0 text-rose-700" />
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-control text-danger text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 text-danger" />
           <span>{masterError}</span>
         </div>
       )}
 
       {saveError && (
-        <div className="p-3 bg-rose-50 border border-rose-300 rounded-sm text-rose-900 text-xs flex items-center justify-between">
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-control text-danger text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-700" />
+            <AlertCircle className="w-4 h-4 shrink-0 text-danger" />
             <span>{saveError}</span>
           </div>
-          <button onClick={() => setSaveError(null)} className="text-rose-400 hover:text-rose-700">
+          <button onClick={() => setSaveError(null)} className="text-danger/60 hover:text-danger">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {saveSuccessMessage && (
-        <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-sm text-emerald-900 text-xs flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
-          <span className="font-bold">{saveSuccessMessage}</span>
+        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-control text-ok text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-ok shrink-0" />
+          <span className="font-semibold">{saveSuccessMessage}</span>
         </div>
       )}
 
       {/* Section 1: Customer Selection & Quotation Date */}
-      <div className={`bg-white p-4 sm:p-5 rounded-sm border border-slate-300 shadow-xs space-y-4 relative ${isCustomerDropdownOpen ? 'z-40' : 'z-20'}`}>
+      <div className={`bg-white p-4 sm:p-5 rounded-card border border-line-strong shadow-xs space-y-4 relative ${isCustomerDropdownOpen ? 'z-40' : 'z-20'}`}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Customer Selection */}
           <div className="md:col-span-2 space-y-1.5">
-            <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
-              Customer / Client <span className="text-rose-600">*</span>
+            <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+              Customer / Client <span className="text-danger">*</span>
             </label>
 
             {selectedCustomer ? (
-              <div className="p-3 rounded-sm border border-slate-300 bg-slate-50 flex items-start justify-between">
+              <div className="p-3.5 rounded-control border border-line-strong bg-surface-2 flex items-start justify-between">
                 <div className="space-y-1 text-xs">
-                  <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <User className="w-4 h-4 text-[#0f2444]" />
+                  <div className="font-bold text-ink flex items-center gap-2">
+                    <User className="w-4 h-4 text-brand" />
                     <span>{selectedCustomer.name}</span>
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-none bg-blue-100 text-blue-900 border border-blue-300">
+                    <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20">
                       {taxMode === 'intra' ? 'Intra-State (CGST+SGST)' : 'Inter-State (IGST)'}
                     </span>
                   </div>
-                  <div className="text-slate-600 space-x-3 text-[11px]">
+                  <div className="text-muted space-x-3 text-[11px]">
                     {selectedCustomer.gstin ? (
                       <span>
-                        GSTIN: <strong className="font-mono text-slate-900">{selectedCustomer.gstin}</strong>
+                        GSTIN: <strong className="font-mono text-ink font-semibold">{selectedCustomer.gstin}</strong>
                       </span>
                     ) : (
-                      <span className="text-slate-500 italic">Unregistered Buyer</span>
+                      <span className="text-faint italic">Unregistered Buyer</span>
                     )}
                     {selectedCustomer.phone && <span>Phone: {selectedCustomer.phone}</span>}
                     {selectedCustomer.city && <span>City: {selectedCustomer.city}</span>}
@@ -583,14 +579,14 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                 </div>
                 <button
                   onClick={() => setSelectedCustomer(null)}
-                  className="text-xs text-[#0f2444] hover:text-blue-800 font-bold underline ml-2"
+                  className="text-xs text-brand hover:text-brand-dark font-semibold underline ml-2"
                 >
                   Change
                 </button>
               </div>
             ) : (
               <div ref={customerSearchRef} className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-faint absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search customer by name, GSTIN, or phone..."
@@ -606,17 +602,17 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                       setIsCustomerDropdownOpen(false);
                     }
                   }}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-sm border border-slate-300 focus:outline-none focus:border-[#0f2444] text-slate-900"
+                  className="w-full pl-9 pr-3 py-2 text-[13.5px] rounded-control border border-line-strong focus:border-brand focus:ring-3 focus:ring-brand/15 text-ink bg-white"
                 />
 
                 {isCustomerDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-300 rounded-sm shadow-xl z-50 max-h-56 overflow-y-auto">
+                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-line-strong rounded-control shadow-lg z-50 max-h-56 overflow-y-auto">
                     {loadingMasters ? (
-                      <div className="p-3 text-xs text-slate-500 text-center">
+                      <div className="p-3 text-xs text-muted text-center">
                         Loading customers...
                       </div>
                     ) : filteredCustomers.length === 0 ? (
-                      <div className="p-3 text-xs text-slate-500 text-center">
+                      <div className="p-3 text-xs text-muted text-center">
                         No customers match &quot;{customerSearch}&quot;.
                       </div>
                     ) : (
@@ -629,15 +625,15 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                             setIsCustomerDropdownOpen(false);
                             setCustomerSearch('');
                           }}
-                          className="w-full text-left p-2.5 hover:bg-slate-50 border-b border-slate-200 last:border-0 flex items-center justify-between text-xs transition"
+                          className="w-full text-left p-3 hover:bg-surface-2 border-b border-line last:border-0 flex items-center justify-between text-xs transition"
                         >
                           <div>
-                            <div className="font-bold text-slate-900">{cust.name}</div>
-                            <div className="text-[11px] text-slate-600 font-medium">
+                            <div className="font-semibold text-ink">{cust.name}</div>
+                            <div className="text-[11px] text-muted">
                               {cust.gstin ? `GSTIN: ${cust.gstin}` : 'Unregistered'} &bull; {cust.phone || 'No phone'}
                             </div>
                           </div>
-                          <span className="text-[10px] text-[#0f2444] font-bold">Select &rarr;</span>
+                          <span className="text-[10px] text-brand font-bold">Select &rarr;</span>
                         </button>
                       ))
                     )}
@@ -649,48 +645,34 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
 
           {/* Quotation Date */}
           <div>
-            <label htmlFor={fieldIdDate} className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1.5">
-              Quotation Date <span className="text-rose-600">*</span>
+            <label htmlFor={fieldIdDate} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1.5">
+              Quotation Date <span className="text-danger">*</span>
             </label>
             <div className="relative">
-              <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Calendar className="w-4 h-4 text-faint absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 id={fieldIdDate}
                 type="date"
                 value={quotationDate}
                 onChange={(e) => setQuotationDate(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-sm border border-slate-300 focus:outline-none focus:border-[#0f2444] font-medium text-slate-900"
+                className="w-full pl-9 pr-3 py-2 text-[13.5px] rounded-control border border-line-strong focus:border-brand focus:ring-3 focus:ring-brand/15 font-mono tabular-nums text-ink bg-white"
               />
             </div>
           </div>
         </div>
-
-        {/* Company Settings Banner */}
-        {companySettings && (
-          <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between text-[11px] text-slate-600">
-            <div className="flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-slate-500" />
-              <span>Issuing Supplier: <strong className="text-slate-900 font-bold">{companySettings.name}</strong></span>
-              <span className="font-mono text-slate-700">({companySettings.gstin})</span>
-            </div>
-            <div>
-              <span>Bank: {companySettings.bankDetails?.bankName} &bull; A/C: {companySettings.bankDetails?.accountNumber}</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Section 2: Line Item Form (Dynamic for Sheet / Pipe / Piece) */}
-      <div className={`bg-white rounded-sm border border-slate-300 shadow-xs relative ${isProductDropdownOpen ? 'z-30' : 'z-20'}`}>
-        <div className="p-3.5 bg-slate-100 border-b border-slate-300 flex items-center justify-between rounded-t-sm">
-          <div className="flex items-center gap-2 font-bold text-slate-800 text-xs uppercase tracking-wide">
-            <Package className="w-4 h-4 text-[#0f2444]" />
+      <div className={`bg-white rounded-card border border-line-strong shadow-xs relative ${isProductDropdownOpen ? 'z-30' : 'z-20'}`}>
+        <div className="p-4 bg-surface-2 border-b border-line flex items-center justify-between rounded-t-card">
+          <div className="flex items-center gap-2 font-bold text-muted text-xs uppercase tracking-wider">
+            <Package className="w-4 h-4 text-brand" />
             <span>{lineForm.editingLineId ? 'Edit Quotation Line Item' : 'Add Item to Quotation'}</span>
           </div>
           {lineForm.editingLineId && (
             <button
               onClick={() => setLineForm(INITIAL_LINE_FORM)}
-              className="text-xs text-slate-600 hover:text-slate-900 underline font-medium"
+              className="text-xs text-brand hover:text-brand-dark underline font-medium"
             >
               Cancel Edit
             </button>
@@ -699,8 +681,8 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
 
         <form onSubmit={handleSaveLine} className="p-4 sm:p-5 space-y-4 text-xs">
           {lineFormError && (
-            <div className="p-3 bg-rose-50 border border-rose-300 rounded-sm text-rose-900 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-700" />
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-control text-danger flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-danger" />
               <span>{lineFormError}</span>
             </div>
           )}
@@ -708,11 +690,11 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           {/* Product Picker */}
           {!lineForm.product ? (
             <div ref={productSearchRef} className="relative">
-              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-                Select Active Product <span className="text-rose-600">*</span>
+              <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                Add item <span className="text-danger">*</span>
               </label>
               <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-faint absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search products by name, category, or HSN code..."
@@ -728,17 +710,17 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                       setIsProductDropdownOpen(false);
                     }
                   }}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-sm border border-slate-300 focus:outline-none focus:border-[#0f2444] text-slate-900 bg-white"
+                  className="w-full pl-9 pr-3 py-2 text-[13.5px] rounded-control border border-line-strong focus:border-brand focus:ring-3 focus:ring-brand/15 text-ink bg-white"
                 />
 
                 {isProductDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-300 rounded-sm shadow-xl z-50 max-h-72 overflow-y-auto">
+                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-line-strong rounded-control shadow-lg z-50 max-h-72 overflow-y-auto">
                     {loadingMasters ? (
-                      <div className="p-3 text-xs text-slate-500 text-center">
+                      <div className="p-3 text-xs text-muted text-center">
                         Loading products...
                       </div>
                     ) : filteredProducts.length === 0 ? (
-                      <div className="p-3 text-xs text-slate-500 text-center">
+                      <div className="p-3 text-xs text-muted text-center">
                         No matching products found.
                       </div>
                     ) : (
@@ -747,21 +729,21 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                           key={p.id}
                           type="button"
                           onClick={() => handleSelectProduct(p)}
-                          className="w-full text-left p-2.5 hover:bg-slate-50 border-b border-slate-200 last:border-0 flex items-center justify-between text-xs transition"
+                          className="w-full text-left p-3 hover:bg-surface-2 border-b border-line last:border-0 flex items-center justify-between text-xs transition"
                         >
                           <div className="pr-4 min-w-0">
-                            <div className="font-bold text-slate-900 truncate">{p.name}</div>
-                            <div className="text-[11px] text-slate-600 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <div className="font-semibold text-ink truncate">{p.name}</div>
+                            <div className="text-[11px] text-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
                               <span>{p.category}</span>
                               <span>&bull;</span>
-                              <span className="font-mono">HSN {p.hsn}</span>
+                              <span className="font-mono text-faint">HSN {p.hsn}</span>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="font-mono font-bold text-slate-900 text-xs">
+                            <span className="font-mono tabular-nums font-bold text-ink text-xs">
                               ₹{p.ratePerUnit} / {p.unit}
                             </span>
-                            <span className="block text-[10px] text-[#0f2444] font-bold">Select</span>
+                            <span className="block text-[10px] text-brand font-bold">Select</span>
                           </div>
                         </button>
                       ))
@@ -772,16 +754,16 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
             </div>
           ) : (
             /* Selected Product Header inside Form */
-            <div className="p-3 bg-slate-50 rounded-sm border border-slate-300 flex items-center justify-between">
+            <div className="p-3.5 bg-surface-2 rounded-control border border-line-strong flex items-center justify-between">
               <div>
-                <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <div className="font-bold text-ink text-sm flex items-center gap-2">
                   <span>{lineForm.product.name}</span>
-                  <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-none bg-blue-100 text-blue-900 border border-blue-300">
-                    {lineForm.product.qtyMethod}
+                  <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20">
+                    {formatQtyMethodLabel(lineForm.product.qtyMethod)}
                   </span>
-                  <span className="text-[11px] text-slate-600 font-mono">HSN: {lineForm.product.hsn}</span>
+                  <span className="text-[11px] text-muted font-mono">HSN: {lineForm.product.hsn}</span>
                 </div>
-                <div className="text-[11px] text-slate-600 mt-0.5">
+                <div className="text-[11px] text-muted mt-0.5">
                   {'thicknessMm' in lineForm.product && 'coilWidthM' in lineForm.product && (
                     <span>Thickness: {lineForm.product.thicknessMm}mm &bull; Coil: {lineForm.product.coilWidthM}m &bull; </span>
                   )}
@@ -795,7 +777,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
               <button
                 type="button"
                 onClick={() => setLineForm((prev) => ({ ...prev, product: null }))}
-                className="text-xs text-[#0f2444] hover:text-blue-800 font-bold underline"
+                className="text-xs text-brand hover:text-brand-dark font-semibold underline"
               >
                 Change Product
               </button>
@@ -807,21 +789,21 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
             <div className="space-y-4 pt-1">
               {/* Method-Specific Measurement Inputs */}
               {lineForm.product.qtyMethod === 'SHEET_WEIGHT' && (
-                <div className="bg-slate-50 p-3.5 rounded-sm border border-slate-300 space-y-3">
-                  <div className="font-bold text-slate-800 text-xs flex items-center justify-between">
+                <div className="bg-surface-2 p-4 rounded-control border border-line-strong space-y-3">
+                  <div className="font-bold text-muted text-xs flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[#0f2444]" />
-                      <span>Sheet Dimensions (Feet &amp; Inches)</span>
+                      <Sparkles className="w-3.5 h-3.5 text-brand" />
+                      <span className="uppercase tracking-wider text-[10.5px]">Sheet Dimensions (Feet &amp; Inches)</span>
                     </div>
-                    <span className="text-[10px] text-slate-500 font-normal">
+                    <span className="text-[11px] text-muted font-normal">
                       Thickness: {lineForm.product.thicknessMm}mm &bull; Coil: {lineForm.product.coilWidthM}m
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
-                      <label htmlFor={fieldIdFeet} className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Length (Feet) <span className="text-rose-600">*</span>
+                      <label htmlFor={fieldIdFeet} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Length (Feet) <span className="text-danger">*</span>
                       </label>
                       <input
                         id={fieldIdFeet}
@@ -831,12 +813,12 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         value={lineForm.lengthFeet}
                         onChange={(e) => setLineForm({ ...lineForm, lengthFeet: e.target.value })}
                         placeholder="8"
-                        className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono font-bold text-slate-900"
+                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                       />
                     </div>
 
                     <div>
-                      <label htmlFor={fieldIdInches} className="block text-[11px] font-bold text-slate-700 mb-1">
+                      <label htmlFor={fieldIdInches} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
                         Length (Inches)
                       </label>
                       <input
@@ -848,13 +830,13 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         value={lineForm.lengthInches}
                         onChange={(e) => setLineForm({ ...lineForm, lengthInches: e.target.value })}
                         placeholder="0"
-                        className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono text-slate-900"
+                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                       />
                     </div>
 
                     <div>
-                      <label htmlFor={fieldIdNos} className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Number of Pieces (Nos) <span className="text-rose-600">*</span>
+                      <label htmlFor={fieldIdNos} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Number of Pieces (Nos) <span className="text-danger">*</span>
                       </label>
                       <input
                         id={fieldIdNos}
@@ -864,13 +846,13 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         value={lineForm.nos}
                         onChange={(e) => setLineForm({ ...lineForm, nos: e.target.value })}
                         placeholder="1"
-                        className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono font-bold text-slate-900"
+                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                       />
                     </div>
 
                     <div>
-                      <label htmlFor={fieldIdRate} className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Rate per Kg (₹) <span className="text-rose-600">*</span>
+                      <label htmlFor={fieldIdRate} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Rate per Kg (₹) <span className="text-danger">*</span>
                       </label>
                       <input
                         id={fieldIdRate}
@@ -878,7 +860,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         step="0.01"
                         value={lineForm.rate}
                         onChange={(e) => setLineForm({ ...lineForm, rate: e.target.value })}
-                        className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono font-bold text-slate-900"
+                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                       />
                     </div>
                   </div>
@@ -886,18 +868,18 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
               )}
 
               {lineForm.product.qtyMethod === 'SECTION_WEIGHT' && (
-                <div className="bg-slate-50 p-3.5 rounded-sm border border-slate-300 space-y-3">
-                  <div className="font-bold text-slate-800 text-xs flex items-center justify-between">
-                    <span>MS Pipe / Section Dimensions</span>
+                <div className="bg-surface-2 p-4 rounded-control border border-line-strong space-y-3">
+                  <div className="font-bold text-muted text-xs flex items-center justify-between">
+                    <span className="uppercase tracking-wider text-[10.5px]">MS Pipe / Section Dimensions</span>
                     <div className="text-[11px] flex items-center gap-1.5">
-                      <span className="text-slate-600 font-semibold">Unit:</span>
+                      <span className="text-muted font-semibold">Unit:</span>
                       <button
                         type="button"
                         onClick={() => setLineForm({ ...lineForm, lengthUnit: 'metres' })}
-                        className={`px-2 py-0.5 rounded-none text-xs font-bold uppercase border ${
+                        className={`px-2.5 py-1 rounded-control text-xs font-semibold uppercase border transition ${
                           lineForm.lengthUnit === 'metres'
-                            ? 'bg-[#0f2444] text-white border-[#0f2444]'
-                            : 'bg-white text-slate-700 border-slate-300'
+                            ? 'bg-brand text-white border-brand'
+                            : 'bg-white text-muted border-line-strong hover:bg-surface-2'
                         }`}
                       >
                         Metres
@@ -905,10 +887,10 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                       <button
                         type="button"
                         onClick={() => setLineForm({ ...lineForm, lengthUnit: 'ft_in' })}
-                        className={`px-2 py-0.5 rounded-none text-xs font-bold uppercase border ${
+                        className={`px-2.5 py-1 rounded-control text-xs font-semibold uppercase border transition ${
                           lineForm.lengthUnit === 'ft_in'
-                            ? 'bg-[#0f2444] text-white border-[#0f2444]'
-                            : 'bg-white text-slate-700 border-slate-300'
+                            ? 'bg-brand text-white border-brand'
+                            : 'bg-white text-muted border-line-strong hover:bg-surface-2'
                         }`}
                       >
                         Feet / Inches
@@ -919,8 +901,8 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {lineForm.lengthUnit === 'metres' ? (
                       <div>
-                        <label htmlFor={fieldIdMetres} className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Length (Metres) <span className="text-rose-600">*</span>
+                        <label htmlFor={fieldIdMetres} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                          Length (Metres) <span className="text-danger">*</span>
                         </label>
                         <input
                           id={fieldIdMetres}
@@ -930,14 +912,14 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                           value={lineForm.lengthMetres}
                           onChange={(e) => setLineForm({ ...lineForm, lengthMetres: e.target.value })}
                           placeholder="6.0"
-                          className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono font-bold text-slate-900"
+                          className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                         />
                       </div>
                     ) : (
                       <>
                         <div>
-                          <label htmlFor={fieldIdFeet} className="block text-[11px] font-bold text-slate-700 mb-1">
-                            Length (Feet) <span className="text-rose-600">*</span>
+                          <label htmlFor={fieldIdFeet} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                            Length (Feet) <span className="text-danger">*</span>
                           </label>
                           <input
                             id={fieldIdFeet}
@@ -947,11 +929,11 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                             value={lineForm.lengthFeet}
                             onChange={(e) => setLineForm({ ...lineForm, lengthFeet: e.target.value })}
                             placeholder="20"
-                            className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono font-bold text-slate-900"
+                            className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                           />
                         </div>
                         <div>
-                          <label htmlFor={fieldIdInches} className="block text-[11px] font-bold text-slate-700 mb-1">
+                          <label htmlFor={fieldIdInches} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
                             Length (Inches)
                           </label>
                           <input
@@ -961,15 +943,15 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                             value={lineForm.lengthInches}
                             onChange={(e) => setLineForm({ ...lineForm, lengthInches: e.target.value })}
                             placeholder="0"
-                            className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono text-slate-900"
+                            className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                           />
                         </div>
                       </>
                     )}
 
                     <div>
-                      <label htmlFor={fieldIdNos} className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Nos <span className="text-rose-600">*</span>
+                      <label htmlFor={fieldIdNos} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Nos <span className="text-danger">*</span>
                       </label>
                       <input
                         id={fieldIdNos}
@@ -979,13 +961,13 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         value={lineForm.nos}
                         onChange={(e) => setLineForm({ ...lineForm, nos: e.target.value })}
                         placeholder="10"
-                        className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono font-bold text-slate-900"
+                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                       />
                     </div>
 
                     <div>
-                      <label htmlFor={fieldIdRate} className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Rate per Kg (₹) <span className="text-rose-600">*</span>
+                      <label htmlFor={fieldIdRate} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Rate per Kg (₹) <span className="text-danger">*</span>
                       </label>
                       <input
                         id={fieldIdRate}
@@ -993,7 +975,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         step="0.01"
                         value={lineForm.rate}
                         onChange={(e) => setLineForm({ ...lineForm, rate: e.target.value })}
-                        className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono font-bold text-slate-900"
+                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                       />
                     </div>
                   </div>
@@ -1001,13 +983,13 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
               )}
 
               {lineForm.product.qtyMethod === 'PIECE' && (
-                <div className="bg-slate-50 p-3.5 rounded-sm border border-slate-300 space-y-3">
-                  <div className="font-bold text-slate-800 text-xs">Piece Count &amp; Accessories</div>
+                <div className="bg-surface-2 p-4 rounded-control border border-line-strong space-y-3">
+                  <div className="font-bold text-muted text-xs uppercase tracking-wider text-[10.5px]">Piece Count &amp; Accessories</div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
                     <div>
-                      <label htmlFor={fieldIdNos} className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Number of Pieces (Nos) <span className="text-rose-600">*</span>
+                      <label htmlFor={fieldIdNos} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Number of Pieces (Nos) <span className="text-danger">*</span>
                       </label>
                       <input
                         id={fieldIdNos}
@@ -1017,13 +999,13 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         value={lineForm.nos}
                         onChange={(e) => setLineForm({ ...lineForm, nos: e.target.value })}
                         placeholder="7"
-                        className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono font-bold text-slate-900"
+                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                       />
                     </div>
 
                     <div>
-                      <label htmlFor={fieldIdRate} className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Rate per Piece (₹) <span className="text-rose-600">*</span>
+                      <label htmlFor={fieldIdRate} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Rate per Piece (₹) <span className="text-danger">*</span>
                       </label>
                       <input
                         id={fieldIdRate}
@@ -1031,7 +1013,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         step="0.01"
                         value={lineForm.rate}
                         onChange={(e) => setLineForm({ ...lineForm, rate: e.target.value })}
-                        className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-white font-mono font-bold text-slate-900"
+                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
                       />
                     </div>
                   </div>
@@ -1039,10 +1021,10 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
               )}
 
               {/* Discounts & Manual Quantity Override */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-line">
                 {/* Discount */}
                 <div>
-                  <label htmlFor={fieldIdDiscount} className="block text-[11px] font-bold text-slate-700 mb-1">
+                  <label htmlFor={fieldIdDiscount} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
                     Line Discount (₹ Amount)
                   </label>
                   <input
@@ -1053,25 +1035,25 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                     value={lineForm.discountAmount}
                     onChange={(e) => setLineForm({ ...lineForm, discountAmount: e.target.value, discountPct: '' })}
                     placeholder="0.00"
-                    className="w-full py-1.5 px-3 rounded-sm border border-slate-300 font-mono text-xs"
+                    className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums text-xs text-ink focus:border-brand focus:ring-3 focus:ring-brand/15"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor={fieldIdGst} className="block text-[11px] font-bold text-slate-700 mb-1">GST Rate (%)</label>
+                  <label htmlFor={fieldIdGst} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">GST Rate (%)</label>
                   <input
                     id={fieldIdGst}
                     type="number"
                     step="0.5"
                     value={lineForm.gstRate}
                     disabled
-                    className="w-full py-1.5 px-3 rounded-sm border border-slate-300 bg-slate-100 font-mono font-bold text-slate-700"
+                    className="w-full py-2 px-3 rounded-control border border-line-strong bg-surface-2 font-mono tabular-nums font-semibold text-muted text-xs"
                   />
                 </div>
 
                 {/* Manual Quantity Override */}
                 <div className="space-y-1">
-                  <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-ink pt-1 text-xs">
                     <input
                       type="checkbox"
                       checked={lineForm.isManualQuantity}
@@ -1084,7 +1066,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                             : '',
                         })
                       }
-                      className="rounded-sm border-slate-300 text-[#0f2444] focus:ring-0 h-4 w-4"
+                      className="rounded-control border-line-strong text-brand focus:ring-brand/20 h-4 w-4"
                     />
                     <span>Manual Quantity Override</span>
                   </label>
@@ -1098,9 +1080,9 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         value={lineForm.manualQuantity}
                         onChange={(e) => setLineForm({ ...lineForm, manualQuantity: e.target.value })}
                         placeholder={`e.g. 85 (${lineForm.product.unit})`}
-                        className="w-full py-1.5 px-3 rounded-sm border border-amber-400 bg-amber-50 font-mono font-bold text-amber-950"
+                        className="w-full py-2 px-3 rounded-control border border-warn/40 bg-amber-50/50 font-mono tabular-nums font-bold text-ink text-xs focus:border-warn"
                       />
-                      <span className="text-[10px] text-amber-800 font-medium">
+                      <span className="text-[10px] text-warn font-medium">
                         Bypasses calculated formula for billing. Dimensions remain preserved.
                       </span>
                     </div>
@@ -1110,39 +1092,32 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
 
               {/* Real-Time Line Calculation Feedback Box */}
               {calculatedLinePreview && (
-                <div className="p-3.5 bg-[#0f2444] text-white rounded-sm flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="p-3.5 bg-brand-soft border border-brand/20 rounded-control flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-5">
                     <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Calculated Quantity</span>
-                      <span className="font-mono font-bold text-sky-300 text-sm">
+                      <span className="text-faint block text-[10px] uppercase font-bold tracking-wider">Calculated Quantity</span>
+                      <span className="font-mono tabular-nums font-bold text-brand text-sm">
                         {calculatedLinePreview.quantity} {calculatedLinePreview.unit}
                         {calculatedLinePreview.isManualQuantity && (
-                          <span className="text-[10px] text-amber-300 ml-1 font-normal">(Manual)</span>
+                          <span className="text-[10px] text-warn ml-1 font-normal">(Manual)</span>
                         )}
                       </span>
                     </div>
 
                     {calculatedLinePreview.perPieceQuantity > 0 && !calculatedLinePreview.isManualQuantity && (
                       <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Per Piece</span>
-                        <span className="font-mono text-slate-200 font-semibold">
+                        <span className="text-faint block text-[10px] uppercase font-bold tracking-wider">Per Piece</span>
+                        <span className="font-mono tabular-nums text-muted font-semibold">
                           {calculatedLinePreview.perPieceQuantity} {calculatedLinePreview.unit}/pc
                         </span>
                       </div>
                     )}
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Taxable Value</span>
-                      <span className="font-mono text-white font-bold">
-                        ₹{Number(calculatedLinePreview.taxableAmount).toFixed(2)}
-                      </span>
-                    </div>
                   </div>
 
                   <div className="text-right">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Line Total (incl. GST)</span>
-                    <span className="font-mono font-bold text-amber-300 text-base">
-                      ₹{Number(calculatedLinePreview.totalAmount).toFixed(2)}
+                    <span className="text-faint block text-[10px] uppercase font-bold tracking-wider">Amount before GST</span>
+                    <span className="font-mono tabular-nums font-bold text-ink text-base">
+                      ₹{Number(calculatedLinePreview.taxableAmount).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -1152,7 +1127,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
               <div className="flex justify-end pt-1">
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0f2444] hover:bg-[#16335d] text-white rounded-sm font-bold text-xs shadow-xs transition"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-control font-semibold text-xs shadow-xs transition"
                 >
                   <Plus className="w-4 h-4" />
                   <span>{lineForm.editingLineId ? 'Update Line in Draft' : 'Add Line to Quotation'}</span>
@@ -1164,65 +1139,64 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
       </div>
 
       {/* Section 3: Draft Quotation Lines Table */}
-      <div className="bg-white rounded-sm border border-slate-300 shadow-xs overflow-hidden relative z-10">
-        <div className="p-3.5 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
-          <div className="font-bold text-slate-800 text-xs uppercase tracking-wide flex items-center gap-2">
-            <Layers className="w-4 h-4 text-[#0f2444]" />
+      <div className="bg-white rounded-card border border-line-strong shadow-xs overflow-hidden relative z-10">
+        <div className="p-4 bg-surface-2 border-b border-line flex items-center justify-between">
+          <div className="font-bold text-muted text-xs uppercase tracking-wider flex items-center gap-2">
+            <Layers className="w-4 h-4 text-brand" />
             <span>Quotation Line Items ({lines.length})</span>
           </div>
           {lines.length > 0 && (
-            <span className="text-xs text-slate-600 font-medium">
-              Tax Mode: <strong className="text-slate-900 font-bold">{taxMode === 'intra' ? 'CGST+SGST (Intra)' : 'IGST (Inter)'}</strong>
+            <span className="text-xs text-muted font-medium">
+              Tax Mode: <strong className="text-ink font-semibold">{taxMode === 'intra' ? 'CGST+SGST (Intra)' : 'IGST (Inter)'}</strong>
             </span>
           )}
         </div>
 
         {lines.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-xs">
+          <div className="p-12 text-center text-muted text-xs">
             No line items added yet. Select a product above and click &quot;Add Line to Quotation&quot;.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold text-[11px] uppercase tracking-wider">
-                  <th className="py-2.5 px-3 text-center w-8">#</th>
-                  <th className="py-2.5 px-3">Product</th>
-                  <th className="py-2.5 px-3">Specifications</th>
-                  <th className="py-2.5 px-3 text-center">Length</th>
-                  <th className="py-2.5 px-3 text-center">Nos</th>
-                  <th className="py-2.5 px-3 text-right">Qty</th>
-                  <th className="py-2.5 px-3 text-center">Unit</th>
-                  <th className="py-2.5 px-3 text-right">Rate (₹)</th>
-                  <th className="py-2.5 px-3 text-right">Discount</th>
-                  <th className="py-2.5 px-3 text-right">Taxable (₹)</th>
-                  <th className="py-2.5 px-3 text-center">GST</th>
-                  <th className="py-2.5 px-3 text-right" title="Line taxable amount plus individual rounded GST">Est. Total (₹)*</th>
-                  <th className="py-2.5 px-3 text-right">Actions</th>
+                <tr className="bg-surface-2 border-b border-line text-faint font-semibold text-[10.5px] uppercase tracking-wider">
+                  <th className="py-3 px-3 text-center w-8">#</th>
+                  <th className="py-3 px-3">Product</th>
+                  <th className="py-3 px-3">Specifications</th>
+                  <th className="py-3 px-3 text-center">Length</th>
+                  <th className="py-3 px-3 text-center">Nos</th>
+                  <th className="py-3 px-3 text-right">Qty</th>
+                  <th className="py-3 px-3 text-center">Unit</th>
+                  <th className="py-3 px-3 text-right">Rate (₹)</th>
+                  <th className="py-3 px-3 text-right">Discount</th>
+                  <th className="py-3 px-3 text-center">GST</th>
+                  <th className="py-3 px-3 text-right">Amount before GST</th>
+                  <th className="py-3 px-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-line">
                 {lines.map((line, idx) => (
-                  <tr key={line.id} className="hover:bg-slate-50/70">
-                    <td className="py-2.5 px-3 text-center text-slate-500 font-mono text-[11px]">{idx + 1}</td>
-                    <td className="py-2.5 px-3">
-                      <div className="font-bold text-slate-900">{line.productName}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">HSN: {line.hsn}</div>
+                  <tr key={line.id} className="hover:bg-surface-2/60 transition">
+                    <td className="py-3 px-3 text-center text-muted font-mono text-[11px]">{idx + 1}</td>
+                    <td className="py-3 px-3">
+                      <div className="font-semibold text-ink">{line.productName}</div>
+                      <div className="text-[10px] text-faint font-mono">HSN: {line.hsn}</div>
                     </td>
-                    <td className="py-2.5 px-3 text-slate-600 text-[11px]">
+                    <td className="py-3 px-3 text-muted text-[11px]">
                       {line.snapshot.qtyMethod === 'SHEET_WEIGHT' && (
                         <span>
-                          Thick: <strong className="font-mono text-slate-800">{line.snapshot.thicknessMm}mm</strong> &bull; Coil: <strong className="font-mono text-slate-800">{line.snapshot.coilWidthM}m</strong>
+                          Thick: <strong className="font-mono text-ink">{line.snapshot.thicknessMm}mm</strong> &bull; Coil: <strong className="font-mono text-ink">{line.snapshot.coilWidthM}m</strong>
                         </span>
                       )}
                       {line.snapshot.qtyMethod === 'SECTION_WEIGHT' && (
                         <span>
-                          Section: <strong className="font-mono text-slate-800">{line.snapshot.kgPerMetre} kg/m</strong>
+                          Section: <strong className="font-mono text-ink">{line.snapshot.kgPerMetre} kg/m</strong>
                         </span>
                       )}
-                      {line.snapshot.qtyMethod === 'PIECE' && <span>Fixed Piece Accessory</span>}
+                      {line.snapshot.qtyMethod === 'PIECE' && <span>Per piece</span>}
                     </td>
-                    <td className="py-2.5 px-3 text-center font-mono font-medium text-slate-800 text-[11px]">
+                    <td className="py-3 px-3 text-center font-mono tabular-nums font-medium text-ink text-[11px]">
                       {line.snapshot.qtyMethod === 'SHEET_WEIGHT' && (
                         <span>{line.lengthFeet}&apos; {line.lengthInches ? `${line.lengthInches}"` : '0"'}</span>
                       )}
@@ -1233,33 +1207,30 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                             : `${line.lengthM}m`}
                         </span>
                       )}
-                      {line.snapshot.qtyMethod === 'PIECE' && <span className="text-slate-400">—</span>}
+                      {line.snapshot.qtyMethod === 'PIECE' && <span className="text-faint">—</span>}
                     </td>
-                    <td className="py-2.5 px-3 text-center font-bold font-mono text-slate-800">{line.nos}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                    <td className="py-3 px-3 text-center font-bold font-mono tabular-nums text-ink">{line.nos}</td>
+                    <td className="py-3 px-3 text-right font-mono tabular-nums font-bold text-ink">
                       {Number(line.quantity).toFixed(2)}
                       {line.isManualQuantity && (
-                        <span className="block text-[9px] uppercase font-bold text-amber-700">Manual</span>
+                        <span className="block text-[9px] uppercase font-bold text-warn">Manual</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-center font-semibold text-slate-700 text-[11px]">{line.unit}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-700">₹{Number(line.rate).toFixed(2)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-500">
+                    <td className="py-3 px-3 text-center font-semibold text-muted text-[11px]">{line.unit}</td>
+                    <td className="py-3 px-3 text-right font-mono tabular-nums text-muted">₹{Number(line.rate).toFixed(2)}</td>
+                    <td className="py-3 px-3 text-right font-mono tabular-nums text-muted">
                       {line.discountAmount ? `₹${Number(line.discountAmount).toFixed(2)}` : '—'}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
+                    <td className="py-3 px-3 text-center font-mono tabular-nums text-muted">{line.gstRate}%</td>
+                    <td className="py-3 px-3 text-right font-mono tabular-nums font-bold text-ink">
                       ₹{Number(line.taxableAmount).toFixed(2)}
                     </td>
-                    <td className="py-2.5 px-3 text-center font-mono text-slate-700">{line.gstRate}%</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                      ₹{Number(line.totalAmount).toFixed(2)}
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td className="py-3 px-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
                           onClick={() => handleEditLine(line)}
-                          className="p-1 text-slate-500 hover:text-[#0f2444] rounded-sm transition"
+                          className="p-1 text-muted hover:text-brand rounded-control transition"
                           title="Edit Line"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -1267,7 +1238,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                         <button
                           type="button"
                           onClick={() => handleDeleteLine(line.id)}
-                          className="p-1 text-slate-500 hover:text-rose-600 rounded-sm transition"
+                          className="p-1 text-muted hover:text-danger rounded-control transition"
                           title="Remove Line"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1278,9 +1249,6 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                 ))}
               </tbody>
             </table>
-            <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 text-[10px] text-slate-500 italic">
-              * Note: Line item totals reflect individual half-up GST rounding. Official document GST, Grand Total, and Round-Off are calculated on aggregate taxable turnover per HSN group as mandated by GST statutory rules.
-            </div>
           </div>
         )}
       </div>
@@ -1291,70 +1259,76 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Physical Quantities & Words */}
             <div className="space-y-3">
-              <div className="bg-white p-4 rounded-sm border border-slate-300 shadow-xs">
-                <div className="font-bold text-slate-700 text-xs uppercase tracking-wider mb-2.5">
-                  Physical Quantities Summary
+              <div className="bg-white p-4 sm:p-5 rounded-card border border-line-strong shadow-xs">
+                <div className="font-bold text-muted text-[10.5px] uppercase tracking-wider mb-2.5">
+                  Quantity
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 bg-slate-50 rounded-sm border border-slate-300">
-                    <span className="text-[11px] text-slate-600 font-semibold block uppercase">Total Weight</span>
-                    <span className="text-base font-mono font-bold text-[#0f2444]">{totals.totalKgs.toFixed(2)} Kgs</span>
+                <div className={`grid ${totals.totalNos.gt(0) ? 'grid-cols-2' : 'grid-cols-1'} gap-3 text-xs`}>
+                  <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
+                    <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Weight</span>
+                    <span className="text-base font-mono tabular-nums font-bold text-ink">{totals.totalKgs.toFixed(2)} Kgs</span>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-sm border border-slate-300">
-                    <span className="text-[11px] text-slate-600 font-semibold block uppercase">Total Pieces</span>
-                    <span className="text-base font-mono font-bold text-[#0f2444]">{totals.totalNos.toString()} Nos</span>
-                  </div>
+                  {totals.totalNos.gt(0) && (
+                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
+                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Qty in Nos</span>
+                      <span className="text-base font-mono tabular-nums font-bold text-ink">{totals.totalNos.toString()} Nos</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="bg-slate-50 p-3.5 rounded-sm border border-slate-300">
-                <div className="text-[10px] uppercase font-bold text-slate-700 tracking-wider mb-1">
+              {/* Amount in Words (pale-blue box with blue left border) */}
+              <div className="bg-brand-soft border-l-4 border-l-brand border border-line-strong p-3.5 rounded-control">
+                <div className="text-[10.5px] uppercase font-bold text-faint tracking-wider mb-1">
                   Amount in Words
                 </div>
-                <div className="text-xs font-bold text-slate-900 italic">{totals.amountInWords}</div>
+                <div className="text-xs font-semibold text-ink italic leading-relaxed">{totals.amountInWords}</div>
               </div>
             </div>
 
-            {/* Financial Breakdown Card */}
-            <div className="bg-white p-4 rounded-sm border border-slate-300 shadow-xs space-y-2 text-xs">
-              <div className="flex justify-between text-slate-700 font-medium">
-                <span>Subtotal (Taxable Value):</span>
-                <span className="font-mono font-bold text-slate-900">₹{totals.subtotal.toFixed(2)}</span>
-              </div>
-
-              {taxMode === 'intra' ? (
-                <>
-                  <div className="flex justify-between text-slate-600">
-                    <span>CGST (Central Tax):</span>
-                    <span className="font-mono font-semibold text-slate-900">₹{totals.cgstTotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>SGST (State Tax):</span>
-                    <span className="font-mono font-semibold text-slate-900">₹{totals.sgstTotal.toFixed(2)}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex justify-between text-slate-600">
-                  <span>IGST (Integrated Tax):</span>
-                  <span className="font-mono font-semibold text-slate-900">₹{totals.igstTotal.toFixed(2)}</span>
+            {/* Financial Breakdown Card (White card, clean label/value rows, grand total bold blue) */}
+            <div className="bg-white border border-line-strong rounded-card shadow-xs overflow-hidden flex flex-col justify-between">
+              <div className="p-4 space-y-2 text-xs">
+                <div className="flex justify-between text-muted">
+                  <span>Subtotal (Taxable Value):</span>
+                  <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.subtotal.toFixed(2)}</span>
                 </div>
-              )}
 
-              <div className="flex justify-between text-slate-700 border-t border-slate-200 pt-2 font-medium">
-                <span>Grand Total:</span>
-                <span className="font-mono font-bold text-slate-900">₹{totals.grandTotal.toFixed(2)}</span>
+                {taxMode === 'intra' ? (
+                  <>
+                    <div className="flex justify-between text-muted">
+                      <span>CGST (Central Tax):</span>
+                      <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.cgstTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-muted">
+                      <span>SGST (State Tax):</span>
+                      <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.sgstTotal.toFixed(2)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between text-muted">
+                    <span>IGST (Integrated Tax):</span>
+                    <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.igstTotal.toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-muted border-t border-line pt-2">
+                  <span>Grand Total:</span>
+                  <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.grandTotal.toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between text-muted">
+                  <span>Round-off:</span>
+                  <span className="font-mono tabular-nums text-ink">
+                    {formatRoundOff(totals.roundOff)}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex justify-between text-slate-600">
-                <span>Round-off:</span>
-                <span className="font-mono text-slate-900 font-semibold">
-                  {formatRoundOff(totals.roundOff)}
-                </span>
-              </div>
-
-              <div className="flex justify-between text-sm font-bold bg-[#0f2444] text-white -mx-4 -mb-4 mt-3 p-4 rounded-b-sm">
-                <span className="uppercase tracking-wide">Final Payable Amount:</span>
-                <span className="text-lg font-mono text-amber-300 font-bold">
+              {/* Total Payable banner (Clean surface background with ~25px blue grand total) */}
+              <div className="flex justify-between items-baseline border-t border-line bg-surface-2/60 p-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted">Total payable:</span>
+                <span className="text-[25px] font-mono tabular-nums text-brand font-bold">
                   ₹{totals.payableAmount.toNumber().toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -1362,16 +1336,16 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           </div>
 
           {/* Bottom Final Action Bar */}
-          <div className="bg-white p-4 rounded-sm border border-slate-300 shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="text-xs text-slate-600">
+          <div className="bg-white p-4 rounded-card border border-line-strong shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="text-xs text-muted">
               {!selectedCustomer ? (
-                <span className="text-amber-800 font-medium flex items-center gap-1.5">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="text-warn font-medium flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-warn shrink-0" />
                   Select a customer above to finalize and issue this quotation.
                 </span>
               ) : (
-                <span className="text-slate-600">
-                  Ready to issue official quotation for <strong className="text-slate-900 font-bold">{selectedCustomer.name}</strong>.
+                <span className="text-muted">
+                  Ready to issue official quotation for <strong className="text-ink font-semibold">{selectedCustomer.name}</strong>.
                 </span>
               )}
             </div>
@@ -1380,7 +1354,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-sm shadow-xs transition"
+                className="px-4 py-2 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 border border-line-strong rounded-control shadow-xs transition"
               >
                 Cancel Draft
               </button>
@@ -1388,7 +1362,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                 type="button"
                 onClick={handleSaveQuotation}
                 disabled={isSaving || lines.length === 0 || !selectedCustomer}
-                className="inline-flex items-center gap-1.5 px-5 py-2 bg-[#0f2444] hover:bg-[#16335d] text-white rounded-sm text-xs font-bold shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 px-5 py-2 bg-brand hover:bg-brand-dark text-white rounded-control text-xs font-semibold shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
                   <>
