@@ -200,16 +200,58 @@ Production rules are located in `firestore.rules`.
 
 ## 8. Deployment to Firebase Hosting
 
-To deploy the application to Firebase Hosting:
+The application uses Firebase Hosting to serve the production Vite build from the `dist/` directory.
 
-1. Build the production bundle:
-   ```bash
-   npm run build
-   ```
-2. Deploy using Firebase CLI:
-   ```bash
-   firebase.cmd deploy --only hosting
-   ```
-   *(Or `firebase deploy --only hosting` on systems where script execution is enabled)*
+### Prerequisites
 
----
+- Node.js and npm installed.
+- Firebase CLI installed and authenticated.
+- Access to the `rr-metal-roofing` Firebase project.
+- Correct environment variables configured for the target deployment.
+
+### Build and Deploy
+
+Run these commands from the project root.
+
+**1. Install dependencies**
+
+```bash
+npm install
+```
+
+**2. Build the application**
+
+```bash
+npm run build
+```
+
+**3. Deploy to Firebase Hosting**
+
+On Windows Command Prompt:
+
+```bat
+firebase.cmd deploy --only hosting
+```
+
+If the Firebase CLI is available as `firebase` in your terminal:
+
+```bash
+firebase deploy --only hosting
+```
+
+### Verify the Deployment
+
+After deployment completes, open the Hosting URL displayed by the Firebase CLI and verify that:
+
+- The login page loads correctly.
+- Authentication works with an administrator-provisioned account.
+- Firestore reads and writes follow the configured security rules.
+- Quotation creation, calculations, and PDF generation work as expected.
+
+**Important:** Deploying Hosting does not automatically deploy Firestore security rules. If the rules have changed, review and deploy them separately when authorized:
+
+```bat
+firebase.cmd deploy --only firestore:rules
+```
+
+Do not deploy to a production project until the target project, environment configuration, and changes have been reviewed.
