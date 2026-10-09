@@ -213,26 +213,3 @@ To deploy the application to Firebase Hosting:
    *(Or `firebase deploy --only hosting` on systems where script execution is enabled)*
 
 ---
-
-## 9. Current Sprint 1 Roadmap & Next Phase
-
-- [x] **Phase 1 (Complete):**
-  - React + TypeScript + Vite project foundation
-  - Firebase Web SDK integration with runtime validation
-  - Production Firestore security rules foundation
-  - Strict TypeScript domain models (`UserProfile`, `Product`, `Customer`, `Quotation`, `QuotationLine`, `CompanySettings`, `QuotationCounter`)
-  - Firebase Authentication + Session Persistence + `users/{uid}` role resolution
-  - Inactive user and unprovisioned user handling
-  - Firebase Hosting SPA configuration (`dist` target with rewrites)
-  - Unit testing suite configured with Vitest
-- [ ] **Phase 2 (Upcoming):**
-  - Pure TypeScript calculation engine in `src/engine/` using `decimal.js`
-  - Unit tests verifying Demo-day checks 2–6 (Sheet calculation, Pipe calculation, 7-line sample with GST splitting)
-- [ ] **Phase 3:**
-  - Product catalog Firestore integration with 20 demo placeholder seeds
-  - Dynamic product forms (sheet dimensions, pipe kg/m, pieces)
-- [ ] **Phase 4:**
-  - Quotation Builder UI connected to the calculation engine
-  - Atomic quotation numbering (`RR/QT/26-27/0001`) via `counters/quotation` transaction
-- [ ] **Phase 5:**
-  - `@react-pdf/renderer` A4 PDF generator matching demo visual layout
