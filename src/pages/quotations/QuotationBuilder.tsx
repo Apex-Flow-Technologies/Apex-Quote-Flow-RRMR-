@@ -5,40 +5,35 @@ import { getProducts } from '../../services/productService';
 import { getCompanySettings } from '../../services/settingsService';
 import { createQuotation } from '../../services/quotationService';
 import {
-  calculateQuotationLine,
   calculateQuotationTotals,
   determineTaxMode,
-  recalculateLineTax,
   formatRoundOff,
-  validateLineDraft,
   ENGINE_VERSION,
   type TaxMode,
 } from '../../engine';
 import type { Customer } from '../../types/customer';
-import { type Product, type QuantityMethod, formatQtyMethodLabel } from '../../types/product';
+import type { Product } from '../../types/product';
 import type { CompanySettings } from '../../types/settings';
 import type {
   Quotation,
   QuotationLine,
-  QuotationLineSnapshot,
   CreateQuotationInput,
 } from '../../types/quotation';
-import { Decimal } from 'decimal.js';
+import {
+  EditableQuotationTable,
+  createInitialRow,
+  computeRowCalculation,
+  type EditableRowState,
+} from '../../components/quotations/EditableQuotationTable';
 import {
   ArrowLeft,
   Search,
-  Plus,
-  Trash2,
-  Edit2,
   Save,
   User,
   Calendar,
   AlertCircle,
   CheckCircle2,
   X,
-  Package,
-  Layers,
-  Sparkles,
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
@@ -46,38 +41,6 @@ interface QuotationBuilderProps {
   onCancel: () => void;
   onSaved: (quotation: Quotation) => void;
 }
-
-interface LineFormState {
-  editingLineId: string | null;
-  product: Product | null;
-  lengthFeet: string;
-  lengthInches: string;
-  lengthMetres: string;
-  lengthUnit: 'ft_in' | 'metres';
-  nos: string;
-  rate: string;
-  gstRate: string;
-  discountPct: string;
-  discountAmount: string;
-  isManualQuantity: boolean;
-  manualQuantity: string;
-}
-
-const INITIAL_LINE_FORM: LineFormState = {
-  editingLineId: null,
-  product: null,
-  lengthFeet: '8',
-  lengthInches: '0',
-  lengthMetres: '6',
-  lengthUnit: 'ft_in',
-  nos: '1',
-  rate: '',
-  gstRate: '18',
-  discountPct: '',
-  discountAmount: '',
-  isManualQuantity: false,
-  manualQuantity: '',
-};
 
 export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   onCancel,
@@ -97,19 +60,16 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   const [quotationDate, setQuotationDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
-  const [lines, setLines] = useState<QuotationLine[]>([]);
+
+  // Editable Table Rows
+  const [rows, setRows] = useState<EditableRowState[]>([createInitialRow()]);
 
   // Customer Search & Selector
   const [customerSearch, setCustomerSearch] = useState<string>('');
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState<boolean>(false);
   const customerSearchRef = useRef<HTMLDivElement>(null);
 
-  // Product Search for Line Form
-  const [productSearch, setProductSearch] = useState<string>('');
-  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState<boolean>(false);
-  const productSearchRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdowns on click outside
+  // Close customer dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -117,12 +77,6 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         !customerSearchRef.current.contains(event.target as Node)
       ) {
         setIsCustomerDropdownOpen(false);
-      }
-      if (
-        productSearchRef.current &&
-        !productSearchRef.current.contains(event.target as Node)
-      ) {
-        setIsProductDropdownOpen(false);
       }
     };
 
@@ -132,10 +86,6 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
     };
   }, []);
 
-  // Line Form
-  const [lineForm, setLineForm] = useState<LineFormState>(INITIAL_LINE_FORM);
-  const [lineFormError, setLineFormError] = useState<string | null>(null);
-
   // Save State
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -143,14 +93,6 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
 
   // Accessible unique IDs
   const fieldIdDate = useId();
-  const fieldIdFeet = useId();
-  const fieldIdInches = useId();
-  const fieldIdMetres = useId();
-  const fieldIdNos = useId();
-  const fieldIdRate = useId();
-  const fieldIdGst = useId();
-  const fieldIdDiscount = useId();
-  const fieldIdManualQty = useId();
 
   // Load masters on mount
   useEffect(() => {
@@ -184,17 +126,26 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
     return determineTaxMode(selectedCustomer?.gstin, companySettings?.gstin);
   }, [selectedCustomer?.gstin, companySettings?.gstin]);
 
+  // Valid lines derived from editable table rows
+  const validLines = useMemo(() => {
+    return rows
+      .map((r) => r.calculatedLine)
+      .filter((l): l is QuotationLine => l !== null);
+  }, [rows]);
+
   // Quotation Document Totals (computed using Phase 2 engine)
   const totals = useMemo(() => {
-    return calculateQuotationTotals(lines, taxMode, true);
-  }, [lines, taxMode]);
+    return calculateQuotationTotals(validLines, taxMode, true);
+  }, [validLines, taxMode]);
 
-  // Keep line-level tax distributions in sync with active taxMode (CALC-01)
+  // Keep row calculations in sync with active taxMode
   useEffect(() => {
-    setLines((prevLines) => {
-      if (prevLines.length === 0) return prevLines;
-      return prevLines.map((line) => recalculateLineTax(line, taxMode));
-    });
+    setRows((prev) =>
+      prev.map((r) => {
+        const { calculatedLine, validationError } = computeRowCalculation(r, taxMode);
+        return { ...r, calculatedLine, validationError };
+      })
+    );
   }, [taxMode]);
 
   // Filtered customer list for selection
@@ -209,195 +160,28 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
     );
   }, [customers, customerSearch]);
 
-  // Filtered products for line draft
-  const filteredProducts = useMemo(() => {
-    if (!productSearch.trim()) return products;
-    const q = productSearch.toLowerCase().trim();
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.hsn.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
-    );
-  }, [products, productSearch]);
-
-  // Select Product into Line Form
-  const handleSelectProduct = (product: Product) => {
-    setLineForm({
-      editingLineId: null,
-      product,
-      lengthFeet: '8',
-      lengthInches: '0',
-      lengthMetres: '6',
-      lengthUnit: product.qtyMethod === 'SECTION_WEIGHT' ? 'metres' : 'ft_in',
-      nos: '1',
-      rate: String(product.ratePerUnit),
-      gstRate: String(product.gstRate),
-      discountPct: '',
-      discountAmount: '',
-      isManualQuantity: false,
-      manualQuantity: '',
-    });
-    setProductSearch('');
-    setIsProductDropdownOpen(false);
-    setLineFormError(null);
+  // Row Management
+  const handleAddRow = () => {
+    setRows((prev) => [...prev, createInitialRow()]);
   };
 
-  // Helper to build a QuotationLineSnapshot from product & current rate
-  const buildSnapshot = (product: Product, rateNum: number): QuotationLineSnapshot => {
-    return {
-      productId: product.id,
-      productName: product.name,
-      category: product.category,
-      hsn: product.hsn,
-      qtyMethod: product.qtyMethod as QuantityMethod,
-      unit: product.unit,
-      thicknessMm: 'thicknessMm' in product ? product.thicknessMm : undefined,
-      coilWidthM: 'coilWidthM' in product ? product.coilWidthM : undefined,
-      coverWidthM: 'coverWidthM' in product ? product.coverWidthM : undefined,
-      kgPerMetre: 'kgPerMetre' in product ? product.kgPerMetre : undefined,
-      densityFactor: 'densityFactor' in product ? product.densityFactor : undefined,
-      rate: rateNum,
-      gstRate: product.gstRate,
-    };
-  };
-
-  // Real-time calculation preview for current line being edited
-  const calculatedLinePreview = useMemo<QuotationLine | null>(() => {
-    if (!lineForm.product) return null;
-
-    try {
-      const rateNum = lineForm.rate ? new Decimal(lineForm.rate).toNumber() : lineForm.product.ratePerUnit;
-      const snapshot = buildSnapshot(lineForm.product, rateNum);
-
-      let lengthParam: { feet?: number; inches?: number; metres?: number } = {};
-      if (lineForm.product.qtyMethod === 'SHEET_WEIGHT' || lineForm.lengthUnit === 'ft_in') {
-        lengthParam = {
-          feet: lineForm.lengthFeet ? Number(lineForm.lengthFeet) : 0,
-          inches: lineForm.lengthInches ? Number(lineForm.lengthInches) : 0,
-        };
-      } else if (lineForm.product.qtyMethod === 'SECTION_WEIGHT' && lineForm.lengthUnit === 'metres') {
-        lengthParam = {
-          metres: lineForm.lengthMetres ? Number(lineForm.lengthMetres) : 0,
-        };
-      }
-
-      const nosNum = lineForm.nos ? Number(lineForm.nos) : 1;
-
-      return calculateQuotationLine(
-        {
-          snapshot,
-          length: lengthParam,
-          nos: nosNum,
-          customRate: rateNum,
-          isManualQuantity: lineForm.isManualQuantity,
-          manualQuantity: lineForm.isManualQuantity && lineForm.manualQuantity
-            ? Number(lineForm.manualQuantity)
-            : undefined,
-          discountPct: lineForm.discountPct ? Number(lineForm.discountPct) : undefined,
-          discountAmount: lineForm.discountAmount ? Number(lineForm.discountAmount) : undefined,
-        },
-        taxMode
-      );
-    } catch {
-      return null;
-    }
-  }, [lineForm, taxMode]);
-
-  // Add or Update line in draft list
-  const handleSaveLine = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!lineForm.product) {
-      setLineFormError('Please select a product first.');
-      return;
-    }
-
-    // Unified engine validation (CALC-04, CALC-08)
-    const validation = validateLineDraft({
-      product: lineForm.product,
-      rate: lineForm.rate,
-      nos: lineForm.nos,
-      lengthUnit: lineForm.lengthUnit,
-      lengthFeet: lineForm.lengthFeet,
-      lengthInches: lineForm.lengthInches,
-      lengthMetres: lineForm.lengthMetres,
-      isManualQuantity: lineForm.isManualQuantity,
-      manualQuantity: lineForm.manualQuantity,
-      discountPct: lineForm.discountPct,
-      discountAmount: lineForm.discountAmount,
-      calculatedQuantity: calculatedLinePreview?.quantity,
-    });
-
-    if (!validation.isValid) {
-      setLineFormError(validation.error || 'Invalid line values.');
-      return;
-    }
-
-    if (!calculatedLinePreview || calculatedLinePreview.quantity <= 0) {
-      setLineFormError('Unable to calculate valid line quantity. Check inputs.');
-      return;
-    }
-
-    if (lineForm.editingLineId) {
-      // Update existing line
-      setLines((prev) =>
-        prev.map((l) =>
-          l.id === lineForm.editingLineId ? { ...calculatedLinePreview, id: lineForm.editingLineId! } : l
-        )
-      );
-    } else {
-      // Append new line
-      setLines((prev) => [...prev, calculatedLinePreview]);
-    }
-
-    // Reset line form
-    setLineForm(INITIAL_LINE_FORM);
-    setLineFormError(null);
-  };
-
-  // Edit an existing line in draft list
-  const handleEditLine = (line: QuotationLine) => {
-    // Find master product if available
-    const product = products.find((p) => p.id === line.snapshot.productId) || ({
-      id: line.snapshot.productId,
-      name: line.snapshot.productName,
-      category: line.snapshot.category,
-      hsn: line.snapshot.hsn,
-      qtyMethod: line.snapshot.qtyMethod,
-      unit: line.snapshot.unit,
-      ratePerUnit: line.snapshot.rate,
-      gstRate: line.snapshot.gstRate,
-      active: true,
-      thicknessMm: line.snapshot.thicknessMm,
-      coilWidthM: line.snapshot.coilWidthM,
-      kgPerMetre: line.snapshot.kgPerMetre,
-      densityFactor: line.snapshot.densityFactor,
-    } as unknown as Product);
-
-    const isPipeInFeet = line.snapshot.qtyMethod === 'SECTION_WEIGHT' && line.lengthFeet !== undefined && line.lengthFeet !== null;
-    setLineForm({
-      editingLineId: line.id,
-      product,
-      lengthFeet: line.lengthFeet !== undefined ? String(line.lengthFeet) : '8',
-      lengthInches: line.lengthInches !== undefined ? String(line.lengthInches) : '0',
-      lengthMetres: line.lengthM !== undefined ? String(line.lengthM) : '6',
-      lengthUnit: line.snapshot.qtyMethod === 'SECTION_WEIGHT' ? (isPipeInFeet ? 'ft_in' : 'metres') : 'ft_in',
-      nos: String(line.nos),
-      rate: String(line.rate),
-      gstRate: String(line.gstRate),
-      discountPct: line.discountPct !== undefined ? String(line.discountPct) : '',
-      discountAmount: line.discountAmount !== undefined ? String(line.discountAmount) : '',
-      isManualQuantity: line.isManualQuantity,
-      manualQuantity: line.manualQuantity !== undefined ? String(line.manualQuantity) : '',
+  const handleRemoveRow = (id: string) => {
+    setRows((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      return next.length === 0 ? [createInitialRow()] : next;
     });
   };
 
-  // Delete line from draft list
-  const handleDeleteLine = (lineId: string) => {
-    setLines((prev) => prev.filter((l) => l.id !== lineId));
-    if (lineForm.editingLineId === lineId) {
-      setLineForm(INITIAL_LINE_FORM);
-    }
+  const handleDuplicateRow = (id: string) => {
+    setRows((prev) => {
+      const target = prev.find((r) => r.id === id);
+      if (!target) return prev;
+      const duplicated: EditableRowState = {
+        ...target,
+        id: `row_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      };
+      return [...prev, duplicated];
+    });
   };
 
   // Atomic Save Quotation
@@ -409,12 +193,18 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
       return;
     }
 
-    if (lines.length === 0) {
-      setSaveError('Quotation must contain at least one line item.');
+    if (validLines.length === 0) {
+      setSaveError('Quotation must contain at least one valid line item.');
       return;
     }
 
-    const hasInvalidLine = lines.some((l) => l.quantity <= 0 || l.rate <= 0);
+    const hasIncompleteRow = rows.some((r) => r.product && (!r.calculatedLine || r.validationError));
+    if (hasIncompleteRow) {
+      setSaveError('Please correct line errors before saving the quotation.');
+      return;
+    }
+
+    const hasInvalidLine = validLines.some((l) => l.quantity <= 0 || l.rate <= 0);
     if (hasInvalidLine) {
       setSaveError('Quotation contains invalid line items with zero quantity or rate.');
       return;
@@ -440,7 +230,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           address: selectedCustomer.address,
         },
         company: companySettings,
-        lines,
+        lines: validLines,
         taxMode,
         totalKgs: totals.totalKgs.toNumber(),
         totalNos: totals.totalNos.toNumber(),
@@ -662,599 +452,19 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         </div>
       </div>
 
-      {/* Section 2: Line Item Form (Dynamic for Sheet / Pipe / Piece) */}
-      <div className={`bg-white rounded-card border border-line-strong shadow-xs relative ${isProductDropdownOpen ? 'z-30' : 'z-20'}`}>
-        <div className="p-4 bg-surface-2 border-b border-line flex items-center justify-between rounded-t-card">
-          <div className="flex items-center gap-2 font-bold text-muted text-xs uppercase tracking-wider">
-            <Package className="w-4 h-4 text-brand" />
-            <span>{lineForm.editingLineId ? 'Edit Quotation Line Item' : 'Add Item to Quotation'}</span>
-          </div>
-          {lineForm.editingLineId && (
-            <button
-              onClick={() => setLineForm(INITIAL_LINE_FORM)}
-              className="text-xs text-brand hover:text-brand-dark underline font-medium"
-            >
-              Cancel Edit
-            </button>
-          )}
-        </div>
+      {/* Section 2: Editable Quotation Lines Table */}
+      <EditableQuotationTable
+        products={products}
+        taxMode={taxMode}
+        rows={rows}
+        onRowsChange={setRows}
+        onAddRow={handleAddRow}
+        onRemoveRow={handleRemoveRow}
+        onDuplicateRow={handleDuplicateRow}
+      />
 
-        <form onSubmit={handleSaveLine} className="p-4 sm:p-5 space-y-4 text-xs">
-          {lineFormError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-control text-danger flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-danger" />
-              <span>{lineFormError}</span>
-            </div>
-          )}
-
-          {/* Product Picker */}
-          {!lineForm.product ? (
-            <div ref={productSearchRef} className="relative">
-              <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                Add item <span className="text-danger">*</span>
-              </label>
-              <div className="relative">
-                <Search className="w-4 h-4 text-faint absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search products by name, category, or HSN code..."
-                  value={productSearch}
-                  onFocus={() => setIsProductDropdownOpen(true)}
-                  onClick={() => setIsProductDropdownOpen(true)}
-                  onChange={(e) => {
-                    setProductSearch(e.target.value);
-                    setIsProductDropdownOpen(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setIsProductDropdownOpen(false);
-                    }
-                  }}
-                  className="w-full pl-9 pr-3 py-2 text-[13.5px] rounded-control border border-line-strong focus:border-brand focus:ring-3 focus:ring-brand/15 text-ink bg-white"
-                />
-
-                {isProductDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-line-strong rounded-control shadow-lg z-50 max-h-72 overflow-y-auto">
-                    {loadingMasters ? (
-                      <div className="p-3 text-xs text-muted text-center">
-                        Loading products...
-                      </div>
-                    ) : filteredProducts.length === 0 ? (
-                      <div className="p-3 text-xs text-muted text-center">
-                        No matching products found.
-                      </div>
-                    ) : (
-                      filteredProducts.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => handleSelectProduct(p)}
-                          className="w-full text-left p-3 hover:bg-surface-2 border-b border-line last:border-0 flex items-center justify-between text-xs transition"
-                        >
-                          <div className="pr-4 min-w-0">
-                            <div className="font-semibold text-ink truncate">{p.name}</div>
-                            <div className="text-[11px] text-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
-                              <span>{p.category}</span>
-                              <span>&bull;</span>
-                              <span className="font-mono text-faint">HSN {p.hsn}</span>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <span className="font-mono tabular-nums font-bold text-ink text-xs">
-                              ₹{p.ratePerUnit} / {p.unit}
-                            </span>
-                            <span className="block text-[10px] text-brand font-bold">Select</span>
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* Selected Product Header inside Form */
-            <div className="p-3.5 bg-surface-2 rounded-control border border-line-strong flex items-center justify-between">
-              <div>
-                <div className="font-bold text-ink text-sm flex items-center gap-2">
-                  <span>{lineForm.product.name}</span>
-                  <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20">
-                    {formatQtyMethodLabel(lineForm.product.qtyMethod)}
-                  </span>
-                  <span className="text-[11px] text-muted font-mono">HSN: {lineForm.product.hsn}</span>
-                </div>
-                <div className="text-[11px] text-muted mt-0.5">
-                  {'thicknessMm' in lineForm.product && 'coilWidthM' in lineForm.product && (
-                    <span>Thickness: {lineForm.product.thicknessMm}mm &bull; Coil: {lineForm.product.coilWidthM}m &bull; </span>
-                  )}
-                  {'kgPerMetre' in lineForm.product && (
-                    <span>Weight: {lineForm.product.kgPerMetre} kg/m &bull; </span>
-                  )}
-                  <span>Master Rate: ₹{lineForm.product.ratePerUnit}/{lineForm.product.unit} &bull; GST: {lineForm.product.gstRate}%</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setLineForm((prev) => ({ ...prev, product: null }))}
-                className="text-xs text-brand hover:text-brand-dark font-semibold underline"
-              >
-                Change Product
-              </button>
-            </div>
-          )}
-
-          {/* Dynamic Inputs (rendered when product is chosen) */}
-          {lineForm.product && (
-            <div className="space-y-4 pt-1">
-              {/* Method-Specific Measurement Inputs */}
-              {lineForm.product.qtyMethod === 'SHEET_WEIGHT' && (
-                <div className="bg-surface-2 p-4 rounded-control border border-line-strong space-y-3">
-                  <div className="font-bold text-muted text-xs flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-brand" />
-                      <span className="uppercase tracking-wider text-[10.5px]">Sheet Dimensions (Feet &amp; Inches)</span>
-                    </div>
-                    <span className="text-[11px] text-muted font-normal">
-                      Thickness: {lineForm.product.thicknessMm}mm &bull; Coil: {lineForm.product.coilWidthM}m
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div>
-                      <label htmlFor={fieldIdFeet} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                        Length (Feet) <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        id={fieldIdFeet}
-                        type="number"
-                        step="1"
-                        min="0"
-                        value={lineForm.lengthFeet}
-                        onChange={(e) => setLineForm({ ...lineForm, lengthFeet: e.target.value })}
-                        placeholder="8"
-                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor={fieldIdInches} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                        Length (Inches)
-                      </label>
-                      <input
-                        id={fieldIdInches}
-                        type="number"
-                        step="0.5"
-                        min="0"
-                        max="11.9"
-                        value={lineForm.lengthInches}
-                        onChange={(e) => setLineForm({ ...lineForm, lengthInches: e.target.value })}
-                        placeholder="0"
-                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor={fieldIdNos} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                        Number of Pieces (Nos) <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        id={fieldIdNos}
-                        type="number"
-                        step="1"
-                        min="1"
-                        value={lineForm.nos}
-                        onChange={(e) => setLineForm({ ...lineForm, nos: e.target.value })}
-                        placeholder="1"
-                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor={fieldIdRate} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                        Rate per Kg (₹) <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        id={fieldIdRate}
-                        type="number"
-                        step="0.01"
-                        value={lineForm.rate}
-                        onChange={(e) => setLineForm({ ...lineForm, rate: e.target.value })}
-                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {lineForm.product.qtyMethod === 'SECTION_WEIGHT' && (
-                <div className="bg-surface-2 p-4 rounded-control border border-line-strong space-y-3">
-                  <div className="font-bold text-muted text-xs flex items-center justify-between">
-                    <span className="uppercase tracking-wider text-[10.5px]">MS Pipe / Section Dimensions</span>
-                    <div className="text-[11px] flex items-center gap-1.5">
-                      <span className="text-muted font-semibold">Unit:</span>
-                      <button
-                        type="button"
-                        onClick={() => setLineForm({ ...lineForm, lengthUnit: 'metres' })}
-                        className={`px-2.5 py-1 rounded-control text-xs font-semibold uppercase border transition ${
-                          lineForm.lengthUnit === 'metres'
-                            ? 'bg-brand text-white border-brand'
-                            : 'bg-white text-muted border-line-strong hover:bg-surface-2'
-                        }`}
-                      >
-                        Metres
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setLineForm({ ...lineForm, lengthUnit: 'ft_in' })}
-                        className={`px-2.5 py-1 rounded-control text-xs font-semibold uppercase border transition ${
-                          lineForm.lengthUnit === 'ft_in'
-                            ? 'bg-brand text-white border-brand'
-                            : 'bg-white text-muted border-line-strong hover:bg-surface-2'
-                        }`}
-                      >
-                        Feet / Inches
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {lineForm.lengthUnit === 'metres' ? (
-                      <div>
-                        <label htmlFor={fieldIdMetres} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                          Length (Metres) <span className="text-danger">*</span>
-                        </label>
-                        <input
-                          id={fieldIdMetres}
-                          type="number"
-                          step="0.01"
-                          min="0.1"
-                          value={lineForm.lengthMetres}
-                          onChange={(e) => setLineForm({ ...lineForm, lengthMetres: e.target.value })}
-                          placeholder="6.0"
-                          className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                        />
-                      </div>
-                    ) : (
-                      <>
-                        <div>
-                          <label htmlFor={fieldIdFeet} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                            Length (Feet) <span className="text-danger">*</span>
-                          </label>
-                          <input
-                            id={fieldIdFeet}
-                            type="number"
-                            step="1"
-                            min="0"
-                            value={lineForm.lengthFeet}
-                            onChange={(e) => setLineForm({ ...lineForm, lengthFeet: e.target.value })}
-                            placeholder="20"
-                            className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor={fieldIdInches} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                            Length (Inches)
-                          </label>
-                          <input
-                            id={fieldIdInches}
-                            type="number"
-                            step="0.5"
-                            value={lineForm.lengthInches}
-                            onChange={(e) => setLineForm({ ...lineForm, lengthInches: e.target.value })}
-                            placeholder="0"
-                            className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <div>
-                      <label htmlFor={fieldIdNos} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                        Nos <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        id={fieldIdNos}
-                        type="number"
-                        step="1"
-                        min="1"
-                        value={lineForm.nos}
-                        onChange={(e) => setLineForm({ ...lineForm, nos: e.target.value })}
-                        placeholder="10"
-                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor={fieldIdRate} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                        Rate per Kg (₹) <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        id={fieldIdRate}
-                        type="number"
-                        step="0.01"
-                        value={lineForm.rate}
-                        onChange={(e) => setLineForm({ ...lineForm, rate: e.target.value })}
-                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {lineForm.product.qtyMethod === 'PIECE' && (
-                <div className="bg-surface-2 p-4 rounded-control border border-line-strong space-y-3">
-                  <div className="font-bold text-muted text-xs uppercase tracking-wider text-[10.5px]">Piece Count &amp; Accessories</div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
-                    <div>
-                      <label htmlFor={fieldIdNos} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                        Number of Pieces (Nos) <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        id={fieldIdNos}
-                        type="number"
-                        step="1"
-                        min="1"
-                        value={lineForm.nos}
-                        onChange={(e) => setLineForm({ ...lineForm, nos: e.target.value })}
-                        placeholder="7"
-                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                      />
-                    </div>
-
-                    <div>
-                      <label htmlFor={fieldIdRate} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                        Rate per Piece (₹) <span className="text-danger">*</span>
-                      </label>
-                      <input
-                        id={fieldIdRate}
-                        type="number"
-                        step="0.01"
-                        value={lineForm.rate}
-                        onChange={(e) => setLineForm({ ...lineForm, rate: e.target.value })}
-                        className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-bold text-ink text-[13.5px] focus:border-brand focus:ring-3 focus:ring-brand/15"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Discounts & Manual Quantity Override */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-line">
-                {/* Discount */}
-                <div>
-                  <label htmlFor={fieldIdDiscount} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-                    Line Discount (₹ Amount)
-                  </label>
-                  <input
-                    id={fieldIdDiscount}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={lineForm.discountAmount}
-                    onChange={(e) => setLineForm({ ...lineForm, discountAmount: e.target.value, discountPct: '' })}
-                    placeholder="0.00"
-                    className="w-full py-2 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums text-xs text-ink focus:border-brand focus:ring-3 focus:ring-brand/15"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor={fieldIdGst} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">GST Rate (%)</label>
-                  <input
-                    id={fieldIdGst}
-                    type="number"
-                    step="0.5"
-                    value={lineForm.gstRate}
-                    disabled
-                    className="w-full py-2 px-3 rounded-control border border-line-strong bg-surface-2 font-mono tabular-nums font-semibold text-muted text-xs"
-                  />
-                </div>
-
-                {/* Manual Quantity Override */}
-                <div className="space-y-1">
-                  <label className="flex items-center gap-2 cursor-pointer font-semibold text-ink pt-1 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={lineForm.isManualQuantity}
-                      onChange={(e) =>
-                        setLineForm({
-                          ...lineForm,
-                          isManualQuantity: e.target.checked,
-                          manualQuantity: e.target.checked
-                            ? lineForm.manualQuantity || (calculatedLinePreview ? String(calculatedLinePreview.quantity) : '')
-                            : '',
-                        })
-                      }
-                      className="rounded-control border-line-strong text-brand focus:ring-brand/20 h-4 w-4"
-                    />
-                    <span>Manual Quantity Override</span>
-                  </label>
-
-                  {lineForm.isManualQuantity && (
-                    <div className="pt-1">
-                      <input
-                        id={fieldIdManualQty}
-                        type="number"
-                        step="0.01"
-                        value={lineForm.manualQuantity}
-                        onChange={(e) => setLineForm({ ...lineForm, manualQuantity: e.target.value })}
-                        placeholder={`e.g. 85 (${lineForm.product.unit})`}
-                        className="w-full py-2 px-3 rounded-control border border-warn/40 bg-amber-50/50 font-mono tabular-nums font-bold text-ink text-xs focus:border-warn"
-                      />
-                      <span className="text-[10px] text-warn font-medium">
-                        Bypasses calculated formula for billing. Dimensions remain preserved.
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Real-Time Line Calculation Feedback Box */}
-              {calculatedLinePreview && (
-                <div className="p-3.5 bg-brand-soft border border-brand/20 rounded-control flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-5">
-                    <div>
-                      <span className="text-faint block text-[10px] uppercase font-bold tracking-wider">Calculated Quantity</span>
-                      <span className="font-mono tabular-nums font-bold text-brand text-sm">
-                        {calculatedLinePreview.quantity} {calculatedLinePreview.unit}
-                        {calculatedLinePreview.isManualQuantity && (
-                          <span className="text-[10px] text-warn ml-1 font-normal">(Manual)</span>
-                        )}
-                      </span>
-                    </div>
-
-                    {calculatedLinePreview.perPieceQuantity > 0 && !calculatedLinePreview.isManualQuantity && (
-                      <div>
-                        <span className="text-faint block text-[10px] uppercase font-bold tracking-wider">Per Piece</span>
-                        <span className="font-mono tabular-nums text-muted font-semibold">
-                          {calculatedLinePreview.perPieceQuantity} {calculatedLinePreview.unit}/pc
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-faint block text-[10px] uppercase font-bold tracking-wider">Amount before GST</span>
-                    <span className="font-mono tabular-nums font-bold text-ink text-base">
-                      ₹{Number(calculatedLinePreview.taxableAmount).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Submit Line Button */}
-              <div className="flex justify-end pt-1">
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-control font-semibold text-xs shadow-xs transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>{lineForm.editingLineId ? 'Update Line in Draft' : 'Add Line to Quotation'}</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </form>
-      </div>
-
-      {/* Section 3: Draft Quotation Lines Table */}
-      <div className="bg-white rounded-card border border-line-strong shadow-xs overflow-hidden relative z-10">
-        <div className="p-4 bg-surface-2 border-b border-line flex items-center justify-between">
-          <div className="font-bold text-muted text-xs uppercase tracking-wider flex items-center gap-2">
-            <Layers className="w-4 h-4 text-brand" />
-            <span>Quotation Line Items ({lines.length})</span>
-          </div>
-          {lines.length > 0 && (
-            <span className="text-xs text-muted font-medium">
-              Tax Mode: <strong className="text-ink font-semibold">{taxMode === 'intra' ? 'CGST+SGST (Intra)' : 'IGST (Inter)'}</strong>
-            </span>
-          )}
-        </div>
-
-        {lines.length === 0 ? (
-          <div className="p-12 text-center text-muted text-xs">
-            No line items added yet. Select a product above and click &quot;Add Line to Quotation&quot;.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-surface-2 border-b border-line text-faint font-semibold text-[10.5px] uppercase tracking-wider">
-                  <th className="py-3 px-3 text-center w-8">#</th>
-                  <th className="py-3 px-3">Product</th>
-                  <th className="py-3 px-3">Specifications</th>
-                  <th className="py-3 px-3 text-center">Length</th>
-                  <th className="py-3 px-3 text-center">Nos</th>
-                  <th className="py-3 px-3 text-right">Qty</th>
-                  <th className="py-3 px-3 text-center">Unit</th>
-                  <th className="py-3 px-3 text-right">Rate (₹)</th>
-                  <th className="py-3 px-3 text-right">Discount</th>
-                  <th className="py-3 px-3 text-center">GST</th>
-                  <th className="py-3 px-3 text-right">Amount before GST</th>
-                  <th className="py-3 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {lines.map((line, idx) => (
-                  <tr key={line.id} className="hover:bg-surface-2/60 transition">
-                    <td className="py-3 px-3 text-center text-muted font-mono text-[11px]">{idx + 1}</td>
-                    <td className="py-3 px-3">
-                      <div className="font-semibold text-ink">{line.productName}</div>
-                      <div className="text-[10px] text-faint font-mono">HSN: {line.hsn}</div>
-                    </td>
-                    <td className="py-3 px-3 text-muted text-[11px]">
-                      {line.snapshot.qtyMethod === 'SHEET_WEIGHT' && (
-                        <span>
-                          Thick: <strong className="font-mono text-ink">{line.snapshot.thicknessMm}mm</strong> &bull; Coil: <strong className="font-mono text-ink">{line.snapshot.coilWidthM}m</strong>
-                        </span>
-                      )}
-                      {line.snapshot.qtyMethod === 'SECTION_WEIGHT' && (
-                        <span>
-                          Section: <strong className="font-mono text-ink">{line.snapshot.kgPerMetre} kg/m</strong>
-                        </span>
-                      )}
-                      {line.snapshot.qtyMethod === 'PIECE' && <span>Per piece</span>}
-                    </td>
-                    <td className="py-3 px-3 text-center font-mono tabular-nums font-medium text-ink text-[11px]">
-                      {line.snapshot.qtyMethod === 'SHEET_WEIGHT' && (
-                        <span>{line.lengthFeet}&apos; {line.lengthInches ? `${line.lengthInches}"` : '0"'}</span>
-                      )}
-                      {line.snapshot.qtyMethod === 'SECTION_WEIGHT' && (
-                        <span>
-                          {line.lengthFeet !== undefined && line.lengthFeet !== null
-                            ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
-                            : `${line.lengthM}m`}
-                        </span>
-                      )}
-                      {line.snapshot.qtyMethod === 'PIECE' && <span className="text-faint">—</span>}
-                    </td>
-                    <td className="py-3 px-3 text-center font-bold font-mono tabular-nums text-ink">{line.nos}</td>
-                    <td className="py-3 px-3 text-right font-mono tabular-nums font-bold text-ink">
-                      {Number(line.quantity).toFixed(2)}
-                      {line.isManualQuantity && (
-                        <span className="block text-[9px] uppercase font-bold text-warn">Manual</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-3 text-center font-semibold text-muted text-[11px]">{line.unit}</td>
-                    <td className="py-3 px-3 text-right font-mono tabular-nums text-muted">₹{Number(line.rate).toFixed(2)}</td>
-                    <td className="py-3 px-3 text-right font-mono tabular-nums text-muted">
-                      {line.discountAmount ? `₹${Number(line.discountAmount).toFixed(2)}` : '—'}
-                    </td>
-                    <td className="py-3 px-3 text-center font-mono tabular-nums text-muted">{line.gstRate}%</td>
-                    <td className="py-3 px-3 text-right font-mono tabular-nums font-bold text-ink">
-                      ₹{Number(line.taxableAmount).toFixed(2)}
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleEditLine(line)}
-                          className="p-1 text-muted hover:text-brand rounded-control transition"
-                          title="Edit Line"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteLine(line.id)}
-                          className="p-1 text-muted hover:text-danger rounded-control transition"
-                          title="Remove Line"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Section 4: Live Totals & Summary Card */}
-      {lines.length > 0 && (
+      {/* Section 3: Live Totals & Summary Card */}
+      {validLines.length > 0 && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Physical Quantities & Words */}
@@ -1361,7 +571,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
               <button
                 type="button"
                 onClick={handleSaveQuotation}
-                disabled={isSaving || lines.length === 0 || !selectedCustomer}
+                disabled={isSaving || validLines.length === 0 || !selectedCustomer}
                 className="inline-flex items-center gap-1.5 px-5 py-2 bg-brand hover:bg-brand-dark text-white rounded-control text-xs font-semibold shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? (

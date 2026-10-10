@@ -56,6 +56,7 @@ export interface PieceProduct extends BaseProduct {
 
 export interface OtherProduct extends BaseProduct {
   qtyMethod: 'AREA' | 'RUNNING_LENGTH' | 'LENGTH_FT' | 'MANUAL';
+  coilWidthM?: number;
   coverWidthM?: number;
   thicknessMm?: number;
   thickness?: number;

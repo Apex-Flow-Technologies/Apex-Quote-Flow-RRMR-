@@ -13,5 +13,6 @@ export * from './tax';
 export * from './totals';
 export * from './words';
 export * from './line';
+export { formatQtyMethodLabel } from '../types/product';
 
 export const ENGINE_VERSION = '2.0.0-decimal-precision';
