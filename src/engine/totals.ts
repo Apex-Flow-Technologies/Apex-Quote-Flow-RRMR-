@@ -8,7 +8,9 @@ export interface QuotationLineTotalInput {
   hsn: string;
   unit: ProductUnit;
   quantity: number | string | Decimal;
+  unroundedQuantity?: number | string | Decimal;
   taxableAmount: number | string | Decimal;
+  unroundedTaxableAmount?: number | string | Decimal;
   gstRate: number | string | Decimal;
 }
 
@@ -21,6 +23,7 @@ export interface QuotationTotalsResult {
   totalFt: Decimal;
   // Financial totals
   subtotal: Decimal;
+  unroundedSubtotal: Decimal;
   cgstTotal: Decimal;
   sgstTotal: Decimal;
   igstTotal: Decimal;
@@ -29,33 +32,42 @@ export interface QuotationTotalsResult {
   grandTotal: Decimal;
   roundOff: Decimal;
   payableAmount: Decimal;
+  advanceAmount: Decimal;
+  balanceDue: Decimal;
   amountInWords: string;
 }
 
 /**
- * Calculates complete quotation document totals:
- * - Quantities grouped strictly by unit (Kgs and Nos never summed)
- * - Taxes grouped by (HSN, rate) and rounded per group
- * - Grand total, whole-rupee round-off, and Indian amount in words
+ * Calculates complete quotation document totals per Sprint 2 specification:
+ * - Quantities grouped strictly by unit (never added together)
+ * - Sums unrounded line amounts first, then rounds taxable total to 2 decimals exactly once
+ * - Calculates GST from the resulting taxable total
+ * - Supports quotation-level GST switch (default: enabled)
+ * - Supports optional advance amount and balance due (balanceDue = total - advance)
+ * - Round-off disabled by default (can be optionally enabled)
  */
 export function calculateQuotationTotals(
   lines: QuotationLineTotalInput[],
   taxMode: TaxMode,
-  enableRoundOff = true
+  enableRoundOff = false,
+  isGstEnabled = true,
+  advanceAmount: number | string | Decimal = 0
 ): QuotationTotalsResult {
   let totalKgs = new Decimal(0);
   let totalNos = new Decimal(0);
   let totalSqMtr = new Decimal(0);
   let totalRMtr = new Decimal(0);
   let totalFt = new Decimal(0);
-  let subtotal = new Decimal(0);
+  let unroundedSubtotal = new Decimal(0);
 
   // Map to group taxable amounts by `hsn_rate`
-  const taxGroups = new Map<string, { hsn: string; gstRate: Decimal; taxable: Decimal }>();
+  const taxGroups = new Map<string, { hsn: string; gstRate: Decimal; unroundedTaxable: Decimal }>();
 
   for (const line of lines) {
     const qty = new Decimal(line.quantity || 0);
-    const taxable = new Decimal(line.taxableAmount || 0);
+    const lineTaxable = line.unroundedTaxableAmount !== undefined && line.unroundedTaxableAmount !== null && line.unroundedTaxableAmount !== ''
+      ? new Decimal(line.unroundedTaxableAmount)
+      : new Decimal(line.taxableAmount || 0);
     const gstRate = new Decimal(line.gstRate || 0);
 
     // Sum quantities strictly by unit
@@ -77,21 +89,24 @@ export function calculateQuotationTotals(
         break;
     }
 
-    subtotal = subtotal.plus(taxable);
+    unroundedSubtotal = unroundedSubtotal.plus(lineTaxable);
 
-    // Accumulate tax group
+    // Accumulate tax group using unrounded taxable amount
     const groupKey = `${line.hsn || 'DEFAULT'}_${gstRate.toString()}`;
     const existing = taxGroups.get(groupKey);
     if (existing) {
-      existing.taxable = existing.taxable.plus(taxable);
+      existing.unroundedTaxable = existing.unroundedTaxable.plus(lineTaxable);
     } else {
       taxGroups.set(groupKey, {
         hsn: line.hsn || '',
         gstRate,
-        taxable,
+        unroundedTaxable: lineTaxable,
       });
     }
   }
+
+  // Round taxable total to two decimal places exactly once
+  const subtotal = unroundedSubtotal.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
   // Calculate tax per group
   let cgstTotal = new Decimal(0);
@@ -99,22 +114,30 @@ export function calculateQuotationTotals(
   let igstTotal = new Decimal(0);
   const taxSummary: TaxGroupSummary[] = [];
 
-  for (const group of taxGroups.values()) {
-    const groupTax = calculateTaxForGroup(group.taxable, group.gstRate, taxMode);
+  if (isGstEnabled) {
+    // If only one group exists, ensure its rounded taxable base equals subtotal
+    const groupEntries = Array.from(taxGroups.values());
+    for (const group of groupEntries) {
+      const groupTaxable = groupEntries.length === 1
+        ? subtotal
+        : group.unroundedTaxable.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 
-    cgstTotal = cgstTotal.plus(groupTax.cgstAmount);
-    sgstTotal = sgstTotal.plus(groupTax.sgstAmount);
-    igstTotal = igstTotal.plus(groupTax.igstAmount);
+      const groupTax = calculateTaxForGroup(groupTaxable, group.gstRate, taxMode);
 
-    taxSummary.push({
-      hsn: group.hsn,
-      gstRate: group.gstRate.toNumber(),
-      taxableAmount: group.taxable.toNumber(),
-      cgstAmount: groupTax.cgstAmount.toNumber(),
-      sgstAmount: groupTax.sgstAmount.toNumber(),
-      igstAmount: groupTax.igstAmount.toNumber(),
-      totalTax: groupTax.totalTax.toNumber(),
-    });
+      cgstTotal = cgstTotal.plus(groupTax.cgstAmount);
+      sgstTotal = sgstTotal.plus(groupTax.sgstAmount);
+      igstTotal = igstTotal.plus(groupTax.igstAmount);
+
+      taxSummary.push({
+        hsn: group.hsn,
+        gstRate: group.gstRate.toNumber(),
+        taxableAmount: groupTaxable.toNumber(),
+        cgstAmount: groupTax.cgstAmount.toNumber(),
+        sgstAmount: groupTax.sgstAmount.toNumber(),
+        igstAmount: groupTax.igstAmount.toNumber(),
+        totalTax: groupTax.totalTax.toNumber(),
+      });
+    }
   }
 
   const totalTax = cgstTotal.plus(sgstTotal).plus(igstTotal);
@@ -129,6 +152,8 @@ export function calculateQuotationTotals(
     roundOff = payableAmount.minus(grandTotal);
   }
 
+  const advance = new Decimal(advanceAmount || 0);
+  const balanceDue = payableAmount.minus(advance);
   const words = amountToIndianWords(payableAmount);
 
   return {
@@ -137,7 +162,8 @@ export function calculateQuotationTotals(
     totalSqMtr: totalSqMtr.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
     totalRMtr: totalRMtr.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
     totalFt: totalFt.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
-    subtotal: subtotal.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
+    subtotal,
+    unroundedSubtotal,
     cgstTotal: cgstTotal.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
     sgstTotal: sgstTotal.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
     igstTotal: igstTotal.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
@@ -146,6 +172,8 @@ export function calculateQuotationTotals(
     grandTotal: grandTotal.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
     roundOff: roundOff.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
     payableAmount: payableAmount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
+    advanceAmount: advance.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
+    balanceDue: balanceDue.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
     amountInWords: words,
   };
 }

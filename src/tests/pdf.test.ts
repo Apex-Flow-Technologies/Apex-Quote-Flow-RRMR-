@@ -309,7 +309,7 @@ describe('Phase 5 — A4 Quotation PDF Generation & Presentation Integrity', () 
       const calculatedLines = reference7LineInputs.map((input) =>
         calculateQuotationLine(input, 'intra')
       );
-      const totals = calculateQuotationTotals(calculatedLines, 'intra');
+      const totals = calculateQuotationTotals(calculatedLines, 'intra', true);
 
       const mockQuotation: Quotation = {
         id: 'qt_ref_05',

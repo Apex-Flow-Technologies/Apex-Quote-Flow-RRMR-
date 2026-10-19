@@ -8,8 +8,8 @@ import { calculateQuotationLine } from '../engine';
 import type { QuotationLineSnapshot } from '../types/quotation';
 
 describe('Phase 3: Product Master Validation & Schema Rules', () => {
-  it('should verify that all 20 demo catalogue products adhere to Sprint 1 measurement requirements', () => {
-    expect(DEMO_PRODUCTS).toHaveLength(20);
+  it('should verify that all demo catalogue products adhere to Sprint 1 and Sprint 2 measurement requirements', () => {
+    expect(DEMO_PRODUCTS.length).toBeGreaterThanOrEqual(20);
 
     // Verify SHEET products have thicknessMm and coilWidthM
     const sheetProducts = DEMO_PRODUCTS.filter((p) => p.qtyMethod === 'SHEET_WEIGHT') as SheetProduct[];
@@ -36,6 +36,21 @@ describe('Phase 3: Product Master Validation & Schema Rules', () => {
       expect(piece.unit).toBe('Nos');
       expect((piece as unknown as SheetProduct).coilWidthM).toBeUndefined();
       expect((piece as unknown as SectionProduct).kgPerMetre).toBeUndefined();
+    });
+
+    // Verify Sprint 2 SQM products
+    const sqmProducts = DEMO_PRODUCTS.filter((p) => p.qtyMethod === 'SQM');
+    expect(sqmProducts.length).toBeGreaterThan(0);
+    sqmProducts.forEach((sqm) => {
+      expect(sqm.unit).toBe('Sq.Mtr');
+    });
+
+    // Verify Sprint 2 WEIGHT_PER_PIECE products
+    const weightPerPieceProducts = DEMO_PRODUCTS.filter((p) => p.qtyMethod === 'WEIGHT_PER_PIECE');
+    expect(weightPerPieceProducts.length).toBeGreaterThan(0);
+    weightPerPieceProducts.forEach((w) => {
+      expect(w.unit).toBe('Kgs');
+      expect('kgPerPiece' in w && (w.kgPerPiece ?? 0) > 0).toBe(true);
     });
   });
 

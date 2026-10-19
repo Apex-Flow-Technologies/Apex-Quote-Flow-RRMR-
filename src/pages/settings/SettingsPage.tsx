@@ -18,6 +18,7 @@ import {
   FileText,
   Shield,
   MapPin,
+  Calculator,
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
@@ -39,7 +40,11 @@ const EMPTY_SETTINGS: CompanySettings = {
     'Transportation and unloading charges extra at actuals.',
     'Delivery within 3-5 working days from order confirmation.',
     '100% advance payment required before profiling and dispatch.',
+    'Transport charges extra.',
   ],
+  feetToMetre: 0.305,
+  defaultWidthFactor: 1.08,
+  enableRoundOff: false,
 };
 
 export const SettingsPage: React.FC = () => {
@@ -83,6 +88,9 @@ export const SettingsPage: React.FC = () => {
             branch: data.bankDetails?.branch || '',
           },
           defaultTerms: Array.isArray(data.defaultTerms) ? data.defaultTerms : [],
+          feetToMetre: data.feetToMetre !== undefined ? data.feetToMetre : 0.305,
+          defaultWidthFactor: data.defaultWidthFactor !== undefined ? data.defaultWidthFactor : 1.08,
+          enableRoundOff: data.enableRoundOff !== undefined ? data.enableRoundOff : false,
         });
       } else {
         setSettings(EMPTY_SETTINGS);
@@ -152,6 +160,9 @@ export const SettingsPage: React.FC = () => {
           branch: settings.bankDetails.branch.trim(),
         },
         defaultTerms: settings.defaultTerms.map((t) => t.trim()).filter(Boolean),
+        feetToMetre: settings.feetToMetre !== undefined ? Number(settings.feetToMetre) : 0.305,
+        defaultWidthFactor: settings.defaultWidthFactor !== undefined ? Number(settings.defaultWidthFactor) : 1.08,
+        enableRoundOff: Boolean(settings.enableRoundOff),
       };
 
       await setCompanySettings(payload);
@@ -601,6 +612,86 @@ export const SettingsPage: React.FC = () => {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Section 4: Calculation & Profile Factors */}
+        <div className="bg-white rounded-card border border-line shadow-xs overflow-hidden">
+          <div className="p-3.5 bg-surface-2 border-b border-line flex items-center justify-between">
+            <div className="flex items-center gap-2 font-semibold text-ink text-xs uppercase tracking-wider">
+              <Calculator className="w-4 h-4 text-brand" />
+              <span>Quotation Calculation &amp; Default Factors</span>
+            </div>
+          </div>
+
+          <div className="p-5 space-y-4 text-xs">
+            <p className="text-muted text-[11px]">
+              System default factors applied when creating new quotations. Staff can also adjust width factor per quotation if required.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                  Default Width Factor
+                </label>
+                <input
+                  type="number"
+                  step="0.001"
+                  disabled={!isAdmin}
+                  value={settings.defaultWidthFactor ?? 1.08}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      defaultWidthFactor: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  className="w-full h-9 py-1.5 px-3 rounded-control border border-line-strong font-mono tabular-nums font-semibold focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink"
+                />
+                <span className="text-[10px] text-muted mt-1 block">Default 1.08 (effective sheet coverage width in metres)</span>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                  Feet to Metre Conversion Factor
+                </label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  disabled={!isAdmin}
+                  value={settings.feetToMetre ?? 0.305}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      feetToMetre: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  className="w-full h-9 py-1.5 px-3 rounded-control border border-line-strong font-mono tabular-nums font-semibold focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink"
+                />
+                <span className="text-[10px] text-muted mt-1 block">Default 0.305 (industry standard conversion for roofing)</span>
+              </div>
+
+              <div className="flex flex-col justify-center">
+                <label className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                  Total Round Off (Paise)
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer mt-1.5">
+                  <input
+                    type="checkbox"
+                    disabled={!isAdmin}
+                    checked={!!settings.enableRoundOff}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        enableRoundOff: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 text-brand rounded-sm border-line-strong focus:ring-brand disabled:opacity-50"
+                  />
+                  <span className="text-xs font-medium text-ink">Enable Round Off to nearest Rupee</span>
+                </label>
+                <span className="text-[10px] text-muted mt-1 block">Default disabled (exact paise precision preserved)</span>
+              </div>
+            </div>
           </div>
         </div>
 

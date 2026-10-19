@@ -283,7 +283,7 @@ describe('Phase 4 — Quotation Builder & Calculation Engine Integration', () =>
       calculateQuotationLine(input, 'intra')
     );
 
-    const totals = calculateQuotationTotals(lines, 'intra');
+    const totals = calculateQuotationTotals(lines, 'intra', true);
 
     expect(totals.totalKgs.toNumber()).toBe(677.6);
     expect(totals.totalNos.toNumber()).toBe(7);
@@ -311,7 +311,7 @@ describe('Phase 4 — Quotation Builder & Calculation Engine Integration', () =>
       calculateQuotationLine(input, taxMode)
     );
 
-    const totals = calculateQuotationTotals(lines, taxMode);
+    const totals = calculateQuotationTotals(lines, taxMode, true);
 
     expect(totals.cgstTotal.toNumber()).toBe(0);
     expect(totals.sgstTotal.toNumber()).toBe(0);

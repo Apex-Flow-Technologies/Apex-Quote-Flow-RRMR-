@@ -1,7 +1,10 @@
 export type QuantityMethod =
+  | 'SQM'
+  | 'WEIGHT_PER_PIECE'
+  | 'PIECE'
+  | 'CUSTOM'
   | 'SHEET_WEIGHT'
   | 'SECTION_WEIGHT'
-  | 'PIECE'
   | 'AREA'
   | 'RUNNING_LENGTH'
   | 'LENGTH_FT'
@@ -14,7 +17,7 @@ export type StockMethod = 'WEIGHT' | 'PIECE' | 'NONE';
 export interface BaseProduct {
   id: string;
   name: string;
-  category: string; // e.g. "Crimp", "Coloron", "Plain", "L Sheet", "Ridge", "Fixing", "Pipe"
+  category: string; // e.g. "Sheet", "Accessory", "Structural", "Screw", "Crimp", "Coloron", "Plain", "Ridge", "Pipe"
   hsn: string;
   ratePerUnit: number;
   baseRate?: number;
@@ -25,8 +28,31 @@ export interface BaseProduct {
   isPlaceholder?: boolean;
   stockMethod?: StockMethod;
   stockUom?: ProductUnit;
+  kgPerPiece?: number; // for structural steel products
+  thicknessMm?: number;
+  coilWidthM?: number;
+  coverWidthM?: number;
+  widthFactor?: number;
   createdAt?: string | number | Record<string, unknown>;
   updatedAt?: string | number | Record<string, unknown>;
+}
+
+export interface SqmProduct extends BaseProduct {
+  qtyMethod: 'SQM';
+  widthFactor?: number;
+  coilWidthM?: number;
+  coverWidthM?: number;
+  thicknessMm?: number;
+}
+
+export interface WeightPerPieceProduct extends BaseProduct {
+  qtyMethod: 'WEIGHT_PER_PIECE';
+  kgPerPiece: number;
+  thicknessMm?: number;
+}
+
+export interface CustomProduct extends BaseProduct {
+  qtyMethod: 'CUSTOM';
 }
 
 export interface SheetProduct extends BaseProduct {
@@ -62,9 +88,19 @@ export interface OtherProduct extends BaseProduct {
   thickness?: number;
 }
 
-export type Product = SheetProduct | SectionProduct | PieceProduct | OtherProduct;
+export type Product =
+  | SqmProduct
+  | WeightPerPieceProduct
+  | CustomProduct
+  | SheetProduct
+  | SectionProduct
+  | PieceProduct
+  | OtherProduct;
 
 export type CreateProductInput =
+  | (Omit<SqmProduct, 'createdAt' | 'updatedAt' | 'id'> & { id?: string })
+  | (Omit<WeightPerPieceProduct, 'createdAt' | 'updatedAt' | 'id'> & { id?: string })
+  | (Omit<CustomProduct, 'createdAt' | 'updatedAt' | 'id'> & { id?: string })
   | (Omit<SheetProduct, 'createdAt' | 'updatedAt' | 'id'> & { id?: string })
   | (Omit<SectionProduct, 'createdAt' | 'updatedAt' | 'id'> & { id?: string })
   | (Omit<PieceProduct, 'createdAt' | 'updatedAt' | 'id'> & { id?: string })
@@ -78,12 +114,20 @@ export type CalculationMethod = QuantityMethod;
  */
 export function formatQtyMethodLabel(method: QuantityMethod | string): string {
   switch (method) {
+    case 'SQM':
+      return 'Square Metre (Sq.Mtr)';
+    case 'WEIGHT_PER_PIECE':
+      return 'Structural Steel (kg/pc)';
+    case 'PIECE':
+      return 'Per piece';
+
+    case 'CUSTOM':
+      return 'Custom line';
     case 'SHEET_WEIGHT':
       return 'Sheet · by weight';
     case 'SECTION_WEIGHT':
       return 'Pipe · by weight';
-    case 'PIECE':
-      return 'Per piece';
+
     case 'AREA':
       return 'By area';
     case 'RUNNING_LENGTH':

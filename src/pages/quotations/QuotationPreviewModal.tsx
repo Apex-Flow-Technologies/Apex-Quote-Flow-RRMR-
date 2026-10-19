@@ -34,7 +34,11 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
               <div className="font-bold text-sm tracking-tight flex items-center gap-2 text-ink">
                 <span className="font-mono tabular-nums">{quotation.quotationNumber}</span>
                 <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20">
-                  {quotation.taxMode === 'intra' ? 'Intra-State (CGST+SGST)' : 'Inter-State (IGST)'}
+                  {quotation.isGstEnabled === false
+                    ? 'Non-GST (Composition / Unregistered)'
+                    : quotation.taxMode === 'intra'
+                      ? 'Intra-State (CGST+SGST)'
+                      : 'Inter-State (IGST)'}
                 </span>
               </div>
               <div className="text-[11px] text-muted">
@@ -120,7 +124,7 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                     <th className="py-2.5 px-3 text-right">Quantity</th>
                     <th className="py-2.5 px-3 text-right">Rate (₹)</th>
                     <th className="py-2.5 px-3 text-center">GST</th>
-                    <th className="py-2.5 px-3 text-right">Amount before GST</th>
+                    <th className="py-2.5 px-3 text-right">Taxable Value</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
@@ -130,15 +134,38 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                       <td className="py-2.5 px-3">
                         <div className="font-semibold text-ink">{line.productName}</div>
                         <div className="text-[11px] text-muted">
+                          {line.snapshot.qtyMethod === 'SQM' && (
+                            <span>
+                              {line.lengthValue !== undefined ? line.lengthValue : (line.lengthFeet || 0)} {line.lengthUnit || 'ft'} &times; {line.nos} nos &bull; Width: {line.widthFactor || line.snapshot.widthFactor || quotation.widthFactor || 1.08}
+                            </span>
+                          )}
+                          {line.snapshot.qtyMethod === 'WEIGHT_PER_PIECE' && (
+                            <span>
+                              {line.nos} nos &times; {line.kgPerPiece || line.snapshot.kgPerPiece || 0} kg/pc
+                            </span>
+                          )}
+                          {(line.snapshot.qtyMethod === 'CUSTOM' || (line as unknown as { isCustomItem?: boolean }).isCustomItem) && (
+                            <span>{line.nos > 1 ? `${line.nos} nos` : 'Custom item'}</span>
+                          )}
                           {line.snapshot.qtyMethod === 'SHEET_WEIGHT' && (
                             <span>
-                              Thick: {line.snapshot.thicknessMm}mm &bull; Coil: {line.snapshot.coilWidthM}m
+                              {line.lengthFeet || 0}&apos;{line.lengthInches || 0}&quot; &times; {line.nos} nos &bull; Thick: {line.snapshot.thicknessMm}mm &bull; Coil: {line.snapshot.coilWidthM}m
                             </span>
                           )}
                           {line.snapshot.qtyMethod === 'SECTION_WEIGHT' && (
-                            <span>Section: {line.snapshot.kgPerMetre} kg/m</span>
+                            <span>
+                              {line.lengthFeet !== undefined && line.lengthFeet !== null
+                                ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
+                                : `${line.lengthM || 0}m`
+                              } &times; {line.nos} nos &bull; Section: {line.snapshot.kgPerMetre} kg/m
+                            </span>
                           )}
-                          {line.snapshot.qtyMethod === 'PIECE' && <span>Per piece</span>}
+                          {line.snapshot.qtyMethod === 'PIECE' && <span>{line.nos} nos &bull; Per piece</span>}
+                          {line.isManualQuantity && (
+                            <span className="ml-1.5 text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
+                              (Manual)
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono text-muted text-[11px]">
@@ -148,13 +175,13 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                         {line.nos ?? '—'}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-medium text-ink">
-                        {Number(line.quantity).toFixed(2)} {line.unit}
+                        {line.unit === 'Nos' ? `${Number(line.quantity)} ${line.unit}` : `${Number(line.quantity).toFixed(2)} ${line.unit}`}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-muted">
                         ₹{Number(line.rate).toFixed(2)}
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono text-muted">
-                        {line.gstRate}%
+                        {quotation.isGstEnabled === false ? '0%' : `${line.gstRate}%`}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-ink">
                         ₹{Number(line.taxableAmount).toFixed(2)}
@@ -172,15 +199,25 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
             <div className="space-y-3">
               <div className="bg-white p-4 rounded-control border border-line-strong shadow-xs">
                 <div className="font-bold text-muted text-[10.5px] uppercase tracking-wider mb-2.5">
-                  Quantity
+                  Physical Quantities
                 </div>
-                <div className={`grid ${quotation.totalNos != null && quotation.totalNos > 0 ? 'grid-cols-2' : 'grid-cols-1'} gap-3 text-xs`}>
-                  <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
-                    <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Weight</span>
-                    <span className="text-base font-mono tabular-nums font-bold text-ink">
-                      {Number(quotation.totalKgs).toFixed(2)} Kgs
-                    </span>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  {Number(quotation.totalSqMtr || 0) > 0 && (
+                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
+                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Area</span>
+                      <span className="text-base font-mono tabular-nums font-bold text-ink">
+                        {Number(quotation.totalSqMtr).toFixed(2)} Sq.Mtr
+                      </span>
+                    </div>
+                  )}
+                  {Number(quotation.totalKgs || 0) > 0 && (
+                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
+                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Weight</span>
+                      <span className="text-base font-mono tabular-nums font-bold text-ink">
+                        {Number(quotation.totalKgs).toFixed(2)} Kgs
+                      </span>
+                    </div>
+                  )}
                   {quotation.totalNos != null && quotation.totalNos > 0 && (
                     <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
                       <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Qty in Nos</span>
@@ -213,52 +250,82 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                   </span>
                 </div>
 
-                {quotation.taxMode === 'intra' ? (
-                  <>
+                {quotation.isGstEnabled !== false ? (
+                  quotation.taxMode === 'intra' ? (
+                    <>
+                      <div className="flex justify-between text-muted">
+                        <span>CGST (Central Tax):</span>
+                        <span className="font-mono tabular-nums font-semibold text-ink">
+                          ₹{Number(quotation.cgstTotal).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-muted">
+                        <span>SGST (State Tax):</span>
+                        <span className="font-mono tabular-nums font-semibold text-ink">
+                          ₹{Number(quotation.sgstTotal).toFixed(2)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
                     <div className="flex justify-between text-muted">
-                      <span>CGST (Central Tax):</span>
+                      <span>IGST (Integrated Tax):</span>
                       <span className="font-mono tabular-nums font-semibold text-ink">
-                        ₹{Number(quotation.cgstTotal).toFixed(2)}
+                        ₹{Number(quotation.igstTotal).toFixed(2)}
                       </span>
                     </div>
-                    <div className="flex justify-between text-muted">
-                      <span>SGST (State Tax):</span>
-                      <span className="font-mono tabular-nums font-semibold text-ink">
-                        ₹{Number(quotation.sgstTotal).toFixed(2)}
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex justify-between text-muted">
-                    <span>IGST (Integrated Tax):</span>
-                    <span className="font-mono tabular-nums font-semibold text-ink">
-                      ₹{Number(quotation.igstTotal).toFixed(2)}
-                    </span>
-                  </div>
-                )}
+                  )
+                ) : null}
 
                 <div className="flex justify-between text-muted border-t border-line pt-2">
-                  <span>Total with Tax:</span>
-                  <span className="font-mono tabular-nums font-semibold text-ink">
+                  <span className="font-semibold text-ink">Grand Total:</span>
+                  <span className="font-mono tabular-nums font-bold text-ink">
                     ₹{Number(quotation.grandTotal).toFixed(2)}
                   </span>
                 </div>
 
-                <div className="flex justify-between text-muted">
-                  <span>Round-off:</span>
-                  <span className="font-mono tabular-nums text-ink">
-                    {formatRoundOff(quotation.roundOff)}
-                  </span>
-                </div>
+                {Number(quotation.roundOff || 0) !== 0 && (
+                  <div className="flex justify-between text-muted">
+                    <span>Round-off:</span>
+                    <span className="font-mono tabular-nums text-ink">
+                      {formatRoundOff(quotation.roundOff)}
+                    </span>
+                  </div>
+                )}
+
+                {quotation.advanceAmount !== undefined && quotation.advanceAmount !== null && Number(quotation.advanceAmount) > 0 && (
+                  <>
+                    <div className="flex justify-between text-muted">
+                      <span>Total Payable:</span>
+                      <span className="font-mono tabular-nums font-semibold text-ink">
+                        ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700">
+                      <span className="font-semibold">Advance Received:</span>
+                      <span className="font-mono tabular-nums font-bold">
+                        ₹{Number(quotation.advanceAmount).toFixed(2)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Total Payable banner (Clean white/surface card with 25px blue grand total) */}
-              <div className="flex justify-between items-baseline border-t border-line bg-surface-2/60 p-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted">Total payable:</span>
-                <span className="text-2xl font-mono tabular-nums text-brand font-bold">
-                  ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+              {/* Total Payable or Balance Due Banner */}
+              {quotation.advanceAmount !== undefined && quotation.advanceAmount !== null && Number(quotation.advanceAmount) > 0 ? (
+                <div className="flex justify-between items-baseline border-t border-line bg-amber-50/70 p-4">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-900">Balance Due:</span>
+                  <span className="text-2xl font-mono tabular-nums text-amber-700 font-bold">
+                    ₹{Number(quotation.balanceDue ?? (quotation.payableAmount - Number(quotation.advanceAmount))).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex justify-between items-baseline border-t border-line bg-surface-2/60 p-4">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted">Total Payable:</span>
+                  <span className="text-2xl font-mono tabular-nums text-brand font-bold">
+                    ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -22,6 +22,7 @@ import type {
 import {
   EditableQuotationTable,
   createInitialRow,
+  createCustomRow,
   computeRowCalculation,
   type EditableRowState,
 } from '../../components/quotations/EditableQuotationTable';
@@ -60,6 +61,9 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   const [quotationDate, setQuotationDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+  const [widthFactor, setWidthFactor] = useState<string>('1.08');
+  const [isGstEnabled, setIsGstEnabled] = useState<boolean>(true);
+  const [advanceAmount, setAdvanceAmount] = useState<string>('');
 
   // Editable Table Rows
   const [rows, setRows] = useState<EditableRowState[]>([createInitialRow()]);
@@ -109,6 +113,9 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         // Only active products can be added to new quotes
         setProducts(loadedProducts.filter((p) => p.active));
         setCompanySettings(loadedCompany);
+        if (loadedCompany?.defaultWidthFactor) {
+          setWidthFactor(String(loadedCompany.defaultWidthFactor));
+        }
       } catch (err: unknown) {
         console.error('Failed to load masters for quotation builder:', err);
         const msg = err instanceof Error ? err.message : 'Error loading catalog/customer data';
@@ -126,6 +133,15 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
     return determineTaxMode(selectedCustomer?.gstin, companySettings?.gstin);
   }, [selectedCustomer?.gstin, companySettings?.gstin]);
 
+  const wfNum = useMemo(() => {
+    const parsed = Number(widthFactor);
+    return !isNaN(parsed) && parsed > 0 ? parsed : 1.08;
+  }, [widthFactor]);
+
+  const feetToMetreNum = useMemo(() => {
+    return companySettings?.feetToMetre ?? 0.305;
+  }, [companySettings?.feetToMetre]);
+
   // Valid lines derived from editable table rows
   const validLines = useMemo(() => {
     return rows
@@ -135,18 +151,38 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
 
   // Quotation Document Totals (computed using Phase 2 engine)
   const totals = useMemo(() => {
-    return calculateQuotationTotals(validLines, taxMode, true);
-  }, [validLines, taxMode]);
+    const advNum = advanceAmount.trim() !== '' ? Number(advanceAmount) : undefined;
+    const enableRoundOff = companySettings?.enableRoundOff ?? false;
+    return calculateQuotationTotals(
+      validLines,
+      taxMode,
+      enableRoundOff,
+      isGstEnabled,
+      advNum ?? 0
+    );
+  }, [validLines, taxMode, companySettings?.enableRoundOff, advanceAmount, isGstEnabled]);
 
-  // Keep row calculations in sync with active taxMode
+  // Keep row calculations in sync with active taxMode and quotation parameters
   useEffect(() => {
     setRows((prev) =>
       prev.map((r) => {
-        const { calculatedLine, validationError } = computeRowCalculation(r, taxMode);
+        const { calculatedLine, validationError } = computeRowCalculation(r, taxMode, wfNum, feetToMetreNum);
         return { ...r, calculatedLine, validationError };
       })
     );
-  }, [taxMode]);
+  }, [taxMode, wfNum, feetToMetreNum]);
+
+  const handleWidthFactorChange = (val: string) => {
+    setWidthFactor(val);
+    const parsed = Number(val);
+    const effectiveWf = !isNaN(parsed) && parsed > 0 ? parsed : 1.08;
+    setRows((prev) =>
+      prev.map((r) => {
+        const { calculatedLine, validationError } = computeRowCalculation(r, taxMode, effectiveWf, feetToMetreNum);
+        return { ...r, calculatedLine, validationError };
+      })
+    );
+  };
 
   // Filtered customer list for selection
   const filteredCustomers = useMemo(() => {
@@ -163,6 +199,10 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   // Row Management
   const handleAddRow = () => {
     setRows((prev) => [...prev, createInitialRow()]);
+  };
+
+  const handleAddCustomRow = () => {
+    setRows((prev) => [...prev, createCustomRow()]);
   };
 
   const handleRemoveRow = (id: string) => {
@@ -198,7 +238,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
       return;
     }
 
-    const hasIncompleteRow = rows.some((r) => r.product && (!r.calculatedLine || r.validationError));
+    const hasIncompleteRow = rows.some((r) => (r.product || r.isCustomItem) && (!r.calculatedLine || r.validationError));
     if (hasIncompleteRow) {
       setSaveError('Please correct line errors before saving the quotation.');
       return;
@@ -219,6 +259,8 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
       setIsSaving(true);
       setSaveError(null);
 
+      const advNum = advanceAmount.trim() !== '' ? Number(advanceAmount) : undefined;
+
       const quotationPayload: CreateQuotationInput = {
         revision: 1,
         quotationDate,
@@ -232,6 +274,11 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         company: companySettings,
         lines: validLines,
         taxMode,
+        widthFactor: wfNum,
+        feetToMetre: feetToMetreNum,
+        isGstEnabled,
+        advanceAmount: advNum,
+        balanceDue: totals.balanceDue ? totals.balanceDue.toNumber() : undefined,
         totalKgs: totals.totalKgs.toNumber(),
         totalNos: totals.totalNos.toNumber(),
         totalSqMtr: totals.totalSqMtr.toNumber(),
@@ -450,6 +497,48 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Quotation Parameters & Options Bar */}
+        <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label htmlFor="quote-width-factor" className="text-xs font-semibold text-ink">
+                Width factor:
+              </label>
+              <input
+                id="quote-width-factor"
+                type="number"
+                step="0.001"
+                min="0.1"
+                value={widthFactor}
+                onChange={(e) => handleWidthFactorChange(e.target.value)}
+                className="w-20 py-1 px-2 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
+                placeholder="1.08"
+                title="Quotation-level default width factor for sheet SQM"
+              />
+              <span className="text-[11px] text-muted">(default 1.08)</span>
+            </div>
+
+            <div className="h-4 w-px bg-line" />
+
+            <label className="relative inline-flex items-center cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isGstEnabled}
+                onChange={(e) => setIsGstEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-8 h-4.5 bg-line-strong peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-brand"></div>
+              <span className="ml-2 font-semibold text-ink text-xs">
+                {isGstEnabled ? 'GST 18% Enabled' : 'No GST (Exempt / Direct)'}
+              </span>
+            </label>
+          </div>
+
+          <div className="text-[11px] text-muted">
+            Length conversion: <strong className="font-mono text-ink">1 ft = {feetToMetreNum} m</strong>
+          </div>
+        </div>
       </div>
 
       {/* Section 2: Editable Quotation Lines Table */}
@@ -457,8 +546,11 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         products={products}
         taxMode={taxMode}
         rows={rows}
+        widthFactor={wfNum}
+        feetToMetre={feetToMetreNum}
         onRowsChange={setRows}
         onAddRow={handleAddRow}
+        onAddCustomRow={handleAddCustomRow}
         onRemoveRow={handleRemoveRow}
         onDuplicateRow={handleDuplicateRow}
       />
@@ -471,13 +563,21 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
             <div className="space-y-3">
               <div className="bg-white p-4 sm:p-5 rounded-card border border-line-strong shadow-xs">
                 <div className="font-bold text-muted text-[10.5px] uppercase tracking-wider mb-2.5">
-                  Quantity
+                  Quantity Summary
                 </div>
-                <div className={`grid ${totals.totalNos.gt(0) ? 'grid-cols-2' : 'grid-cols-1'} gap-3 text-xs`}>
-                  <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
-                    <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Weight</span>
-                    <span className="text-base font-mono tabular-nums font-bold text-ink">{totals.totalKgs.toFixed(2)} Kgs</span>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  {totals.totalSqMtr.gt(0) && (
+                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
+                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Area</span>
+                      <span className="text-base font-mono tabular-nums font-bold text-ink">{totals.totalSqMtr.toFixed(2)} Sq.Mtr</span>
+                    </div>
+                  )}
+                  {totals.totalKgs.gt(0) && (
+                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
+                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Weight</span>
+                      <span className="text-base font-mono tabular-nums font-bold text-ink">{totals.totalKgs.toFixed(2)} Kgs</span>
+                    </div>
+                  )}
                   {totals.totalNos.gt(0) && (
                     <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
                       <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Qty in Nos</span>
@@ -504,21 +604,28 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                   <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.subtotal.toFixed(2)}</span>
                 </div>
 
-                {taxMode === 'intra' ? (
-                  <>
+                {isGstEnabled ? (
+                  taxMode === 'intra' ? (
+                    <>
+                      <div className="flex justify-between text-muted">
+                        <span>CGST (Central Tax 9%):</span>
+                        <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.cgstTotal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-muted">
+                        <span>SGST (State Tax 9%):</span>
+                        <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.sgstTotal.toFixed(2)}</span>
+                      </div>
+                    </>
+                  ) : (
                     <div className="flex justify-between text-muted">
-                      <span>CGST (Central Tax):</span>
-                      <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.cgstTotal.toFixed(2)}</span>
+                      <span>IGST (Integrated Tax 18%):</span>
+                      <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.igstTotal.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-muted">
-                      <span>SGST (State Tax):</span>
-                      <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.sgstTotal.toFixed(2)}</span>
-                    </div>
-                  </>
+                  )
                 ) : (
-                  <div className="flex justify-between text-muted">
-                    <span>IGST (Integrated Tax):</span>
-                    <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.igstTotal.toFixed(2)}</span>
+                  <div className="flex justify-between text-muted text-[11px] italic">
+                    <span>GST (Not Applicable):</span>
+                    <span className="font-mono tabular-nums">₹0.00</span>
                   </div>
                 )}
 
@@ -527,20 +634,47 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                   <span className="font-mono tabular-nums font-semibold text-ink">₹{totals.grandTotal.toFixed(2)}</span>
                 </div>
 
-                <div className="flex justify-between text-muted">
-                  <span>Round-off:</span>
-                  <span className="font-mono tabular-nums text-ink">
-                    {formatRoundOff(totals.roundOff)}
-                  </span>
+                {companySettings?.enableRoundOff && (
+                  <div className="flex justify-between text-muted">
+                    <span>Round-off:</span>
+                    <span className="font-mono tabular-nums text-ink">
+                      {formatRoundOff(totals.roundOff)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Advance Amount Input */}
+                <div className="flex items-center justify-between text-muted border-t border-line pt-2">
+                  <span className="font-medium text-ink">Advance Received (₹):</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={advanceAmount}
+                    placeholder="0.00"
+                    onChange={(e) => setAdvanceAmount(e.target.value)}
+                    className="w-28 py-1 px-2 text-right font-mono tabular-nums font-bold text-xs rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
+                  />
                 </div>
               </div>
 
-              {/* Total Payable banner (Clean surface background with ~25px blue grand total) */}
-              <div className="flex justify-between items-baseline border-t border-line bg-surface-2/60 p-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted">Total payable:</span>
-                <span className="text-[25px] font-mono tabular-nums text-brand font-bold">
-                  ₹{totals.payableAmount.toNumber().toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
+              {/* Total Payable & Balance Due Banners */}
+              <div className="border-t border-line bg-surface-2/60 p-4 space-y-2">
+                <div className="flex justify-between items-baseline">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted">Total payable:</span>
+                  <span className="text-[25px] font-mono tabular-nums text-brand font-bold">
+                    ₹{totals.payableAmount.toNumber().toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {advanceAmount.trim() !== '' && Number(advanceAmount) > 0 && totals.balanceDue && (
+                  <div className="flex justify-between items-baseline pt-2 border-t border-line">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-900">Balance due:</span>
+                    <span className="text-[20px] font-mono tabular-nums text-amber-900 font-bold">
+                      ₹{totals.balanceDue.toNumber().toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

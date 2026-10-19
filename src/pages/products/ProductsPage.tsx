@@ -32,6 +32,10 @@ import {
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
 const PRODUCT_CATEGORIES = [
+  'Sheet',
+  'Accessory',
+  'Structural',
+  'Screw',
   'Crimp',
   'Coloron',
   'Plain',
@@ -39,7 +43,6 @@ const PRODUCT_CATEGORIES = [
   'L Sheet',
   'Fixing',
   'Pipe',
-  'Accessory',
   'Other',
 ];
 
@@ -57,15 +60,17 @@ interface ProductFormData {
   coilWidthM: string;
   densityFactor: string;
   kgPerMetre: string;
+  kgPerPiece: string;
+  widthFactor: string;
   active: boolean;
 }
 
 const INITIAL_FORM_STATE: ProductFormData = {
   name: '',
-  category: 'Crimp',
+  category: 'Sheet',
   hsn: '72109090',
-  qtyMethod: 'SHEET_WEIGHT',
-  unit: 'Kgs',
+  qtyMethod: 'SQM',
+  unit: 'Sq.Mtr',
   ratePerUnit: '',
   baseRate: '',
   minRate: '',
@@ -74,6 +79,8 @@ const INITIAL_FORM_STATE: ProductFormData = {
   coilWidthM: '1.06',
   densityFactor: '7.968',
   kgPerMetre: '2.34',
+  kgPerPiece: '',
+  widthFactor: '1.08',
   active: true,
 };
 
@@ -117,6 +124,8 @@ export const ProductsPage: React.FC = () => {
   const fieldIdCoilWidth = useId();
   const fieldIdDensity = useId();
   const fieldIdKgPerMetre = useId();
+  const fieldIdWidthFactor = useId();
+  const fieldIdKgPerPiece = useId();
   const fieldIdBaseRate = useId();
   const fieldIdMinRate = useId();
 
@@ -229,6 +238,14 @@ export const ProductsPage: React.FC = () => {
         'kgPerMetre' in product && product.kgPerMetre !== undefined
           ? String(product.kgPerMetre)
           : '',
+      kgPerPiece:
+        'kgPerPiece' in product && product.kgPerPiece !== undefined
+          ? String(product.kgPerPiece)
+          : '',
+      widthFactor:
+        'widthFactor' in product && product.widthFactor !== undefined
+          ? String(product.widthFactor)
+          : '1.08',
       active: product.active,
     });
     setFormErrors({});
@@ -238,14 +255,16 @@ export const ProductsPage: React.FC = () => {
   // Handle method change in form
   const handleMethodChange = (newMethod: QuantityMethod) => {
     let newUnit: ProductUnit = 'Kgs';
-    if (newMethod === 'PIECE') {
+    if (newMethod === 'PIECE' || newMethod === 'CUSTOM') {
       newUnit = 'Nos';
-    } else if (newMethod === 'AREA') {
+    } else if (newMethod === 'AREA' || newMethod === 'SQM') {
       newUnit = 'Sq.Mtr';
     } else if (newMethod === 'RUNNING_LENGTH') {
       newUnit = 'R.Mtr';
     } else if (newMethod === 'LENGTH_FT') {
       newUnit = 'Ft';
+    } else if (newMethod === 'WEIGHT_PER_PIECE') {
+      newUnit = 'Kgs';
     }
 
     setFormData((prev) => ({
@@ -296,7 +315,20 @@ export const ProductsPage: React.FC = () => {
     }
 
     // Method-specific validation
-    if (formData.qtyMethod === 'SHEET_WEIGHT') {
+    if (formData.qtyMethod === 'WEIGHT_PER_PIECE') {
+      try {
+        if (!formData.kgPerPiece || formData.kgPerPiece.trim() === '') {
+          errors.kgPerPiece = 'Kg per piece is required for structural calculation';
+        } else {
+          const kg = new Decimal(formData.kgPerPiece);
+          if (kg.lte(0) || !kg.isFinite()) {
+            errors.kgPerPiece = 'Kg per piece must be greater than 0';
+          }
+        }
+      } catch {
+        errors.kgPerPiece = 'Invalid kg per piece number';
+      }
+    } else if (formData.qtyMethod === 'SHEET_WEIGHT') {
       try {
         if (!formData.thicknessMm || formData.thicknessMm.trim() === '') {
           errors.thicknessMm = 'Thickness is required for sheet calculation';
@@ -382,7 +414,23 @@ export const ProductsPage: React.FC = () => {
 
       let finalPayload: CreateProductInput;
 
-      if (formData.qtyMethod === 'SHEET_WEIGHT') {
+      if (formData.qtyMethod === 'SQM') {
+        finalPayload = {
+          ...basePayload,
+          qtyMethod: 'SQM',
+          unit: 'Sq.Mtr',
+          widthFactor: formData.widthFactor.trim() ? new Decimal(formData.widthFactor).toNumber() : 1.08,
+          stockMethod: 'PIECE',
+        };
+      } else if (formData.qtyMethod === 'WEIGHT_PER_PIECE') {
+        finalPayload = {
+          ...basePayload,
+          qtyMethod: 'WEIGHT_PER_PIECE',
+          unit: 'Kgs',
+          kgPerPiece: formData.kgPerPiece.trim() ? new Decimal(formData.kgPerPiece).toNumber() : 0,
+          stockMethod: 'WEIGHT',
+        };
+      } else if (formData.qtyMethod === 'SHEET_WEIGHT') {
         finalPayload = {
           ...basePayload,
           qtyMethod: 'SHEET_WEIGHT',
@@ -653,6 +701,9 @@ export const ProductsPage: React.FC = () => {
                   const isSheet = product.qtyMethod === 'SHEET_WEIGHT';
                   const isPipe = product.qtyMethod === 'SECTION_WEIGHT';
                   const isPiece = product.qtyMethod === 'PIECE';
+                  const isSqm = product.qtyMethod === 'SQM';
+                  const isWeightPerPiece = product.qtyMethod === 'WEIGHT_PER_PIECE';
+                  const isCustom = product.qtyMethod === 'CUSTOM';
 
                   return (
                     <tr
@@ -672,6 +723,14 @@ export const ProductsPage: React.FC = () => {
                           )}
                         </div>
                         <div className="text-[11px] text-muted mt-0.5">
+                          {isSqm && (
+                            <span>
+                              Width factor: <strong className="font-mono tabular-nums text-ink">{'widthFactor' in product && product.widthFactor ? product.widthFactor : 1.08}</strong> &bull; Length × 0.305 × width
+                            </span>
+                          )}
+                          {isWeightPerPiece && 'kgPerPiece' in product && (
+                            <span>Weight: <strong className="font-mono tabular-nums text-ink">{product.kgPerPiece} kg/pc</strong></span>
+                          )}
                           {isSheet && 'thicknessMm' in product && (
                             <span>
                               Thick: <strong className="font-mono tabular-nums text-ink">{product.thicknessMm}mm</strong> &bull; Coil: <strong className="font-mono tabular-nums text-ink">{product.coilWidthM}m</strong>
@@ -681,6 +740,7 @@ export const ProductsPage: React.FC = () => {
                             <span>Weight: <strong className="font-mono tabular-nums text-ink">{product.kgPerMetre} kg/m</strong></span>
                           )}
                           {isPiece && <span>Fixed unit count</span>}
+                          {isCustom && <span>Custom / Service item</span>}
                         </div>
                       </td>
 
@@ -698,7 +758,11 @@ export const ProductsPage: React.FC = () => {
                       <td className="py-2.5 px-3.5">
                         <span
                           className={`inline-block px-2 py-0.5 rounded-control text-[10px] font-bold uppercase tracking-wider border ${
-                            isSheet
+                            isSqm
+                              ? 'bg-blue-50 text-blue-900 border-blue-200'
+                              : isWeightPerPiece
+                              ? 'bg-purple-50 text-purple-900 border-purple-200'
+                              : isSheet
                               ? 'bg-brand-soft text-brand-dark border-brand/20'
                               : isPipe
                               ? 'bg-amber-50 text-amber-900 border-amber-200'
@@ -830,20 +894,24 @@ export const ProductsPage: React.FC = () => {
                   <select
                     id={fieldIdQtyMethod}
                     value={formData.qtyMethod}
-                    disabled={!!editingProduct}
                     onChange={(e) => handleMethodChange(e.target.value as QuantityMethod)}
                     className="w-full py-1.5 px-3 rounded-control border border-line-strong bg-white font-medium text-ink focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted"
                   >
+                    <option value="SQM">Square Metre · Sq.Mtr (Length × Width Factor)</option>
+                    <option value="WEIGHT_PER_PIECE">Structural Steel · kg/pc (Fixed piece weight)</option>
+                    <option value="PIECE">Per piece (Fixed Nos rate)</option>
+                    <option value="CUSTOM">Custom line / Service charge</option>
                     <option value="SHEET_WEIGHT">Sheet · by weight (Thickness × Coil Width)</option>
                     <option value="SECTION_WEIGHT">Pipe · by weight (kg per metre)</option>
-                    <option value="PIECE">Per piece (Fixed Nos rate)</option>
                     <option value="AREA">By area (Sq.Mtr)</option>
                     <option value="RUNNING_LENGTH">By running metre (R.Mtr)</option>
                     <option value="LENGTH_FT">By feet (Ft)</option>
                     <option value="MANUAL">Manual</option>
                   </select>
                   {editingProduct && (
-                    <span className="text-[10px] text-muted mt-0.5 block">Calculation method is locked on edit.</span>
+                    <span className="text-[10px] text-muted mt-0.5 block">
+                      Note: Changing calculation method affects how quantities are calculated for new quotation lines.
+                    </span>
                   )}
                 </div>
 
@@ -947,6 +1015,64 @@ export const ProductsPage: React.FC = () => {
               </div>
 
               {/* Method-Specific Dynamic Fields */}
+              {formData.qtyMethod === 'SQM' && (
+                <div className="bg-surface-2 p-3.5 rounded-card border border-line space-y-3">
+                  <div className="font-semibold text-ink text-xs flex items-center justify-between">
+                    <span>Square Metre Parameters</span>
+                    <span className="text-[10px] text-muted font-normal">
+                      Formula: Length (ft) × 0.305 × Width Factor (1.08) × Nos = Sq.Mtr
+                    </span>
+                  </div>
+
+                  <div>
+                    <label htmlFor={fieldIdWidthFactor} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                      Width Factor (default 1.08) <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      id={fieldIdWidthFactor}
+                      type="number"
+                      step="0.001"
+                      value={formData.widthFactor}
+                      onChange={(e) => setFormData({ ...formData, widthFactor: e.target.value })}
+                      placeholder="1.08"
+                      className="w-full py-1.5 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-semibold text-ink focus:outline-none focus:border-brand max-w-xs"
+                    />
+                    {formErrors.widthFactor && (
+                      <p className="text-danger text-[10px] mt-0.5">{formErrors.widthFactor}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {formData.qtyMethod === 'WEIGHT_PER_PIECE' && (
+                <div className="bg-surface-2 p-3.5 rounded-card border border-line space-y-3">
+                  <div className="font-semibold text-ink text-xs flex items-center justify-between">
+                    <span>Structural Steel / Weight per Piece Parameters</span>
+                    <span className="text-[10px] text-muted font-normal">
+                      Formula: Nos × kg/pc = Total Weight (Kgs)
+                    </span>
+                  </div>
+
+                  <div>
+                    <label htmlFor={fieldIdKgPerPiece} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                      Weight per Piece (kg/pc) <span className="text-danger">*</span>
+                    </label>
+                    <input
+                      id={fieldIdKgPerPiece}
+                      type="number"
+                      step="0.01"
+                      value={formData.kgPerPiece}
+                      onChange={(e) => setFormData({ ...formData, kgPerPiece: e.target.value })}
+                      placeholder="e.g. 40.00 (from structural steel weight chart)"
+                      className="w-full py-1.5 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-semibold text-ink focus:outline-none focus:border-brand max-w-xs"
+                    />
+                    {formErrors.kgPerPiece && (
+                      <p className="text-danger text-[10px] mt-0.5">{formErrors.kgPerPiece}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {formData.qtyMethod === 'SHEET_WEIGHT' && (
                 <div className="bg-surface-2 p-3.5 rounded-card border border-line space-y-3">
                   <div className="font-semibold text-ink text-xs flex items-center justify-between">

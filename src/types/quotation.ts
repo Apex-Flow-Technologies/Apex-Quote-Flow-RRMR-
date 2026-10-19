@@ -12,8 +12,11 @@ export interface QuotationLineSnapshot {
   thicknessMm?: number;
   coilWidthM?: number;
   coverWidthM?: number;
+  widthFactor?: number;
   kgPerMetre?: number;
+  kgPerPiece?: number;
   densityFactor?: number;
+  feetToMetre?: number;
   rate: number;
   gstRate: number; // e.g. 18
 }
@@ -26,16 +29,22 @@ export interface QuotationLine {
   lengthFeet?: number;
   lengthInches?: number;
   lengthM?: number;
+  lengthValue?: number;
+  lengthUnit?: 'ft' | 'in' | 'mm' | 'm';
+  widthFactor?: number;
+  kgPerPiece?: number;
   nos: number;
   // Calculated vs Manual state
   perPieceQuantity: number;
   quantity: number;
+  unroundedQuantity?: number;
   isManualQuantity: boolean;
   manualQuantity?: number;
   // Financial breakdown
   discountPct?: number;
   discountAmount?: number;
   taxableAmount: number;
+  unroundedTaxableAmount?: number;
   cgstAmount: number;
   sgstAmount: number;
   igstAmount: number;
@@ -76,7 +85,12 @@ export interface Quotation {
   company?: CompanySettings;
   lines: QuotationLine[];
   taxMode: 'intra' | 'inter'; // 'intra' -> CGST+SGST, 'inter' -> IGST
-  // Physical quantity totals - strictly separated per Sprint 1 brief
+  widthFactor?: number; // per-quotation width factor (defaults to 1.08)
+  feetToMetre?: number; // metric conversion factor (defaults to 0.305)
+  isGstEnabled?: boolean; // quotation-level switch for including/excluding GST (default true)
+  advanceAmount?: number; // optional advance paid
+  balanceDue?: number; // total - advance
+  // Physical quantity totals - strictly separated per Sprint 1 & 2 brief
   totalKgs: number;
   totalNos: number;
   totalSqMtr?: number;

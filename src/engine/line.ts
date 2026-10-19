@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import type { QuotationLine, QuotationLineSnapshot } from '../types/quotation';
-import { toMetres, type LengthInput } from './length';
+import { toMetres, type LengthInput, type LengthUnit } from './length';
 import { calculateLineQuantity } from './quantity';
 import { calculateLineAmounts } from './money';
 import { calculateTaxForGroup, type TaxMode } from './tax';
@@ -9,6 +9,11 @@ export interface LineBuilderInput {
   id?: string;
   snapshot: QuotationLineSnapshot;
   length?: LengthInput;
+  lengthValue?: number | string | Decimal;
+  lengthUnit?: LengthUnit;
+  widthFactor?: number | string | Decimal;
+  feetToMetre?: number | string | Decimal;
+  kgPerPiece?: number | string | Decimal;
   nos: number | string | Decimal;
   isManualQuantity?: boolean;
   manualQuantity?: number | string | Decimal;
@@ -18,7 +23,7 @@ export interface LineBuilderInput {
 }
 
 /**
- * Derives a full QuotationLine from a snapshot and dimension/quantity inputs.
+ * Derives a full QuotationLine from a snapshot and dimension/quantity inputs per Sprint 2 rules.
  */
 export function calculateQuotationLine(
   input: LineBuilderInput,
@@ -30,12 +35,18 @@ export function calculateQuotationLine(
     ? new Decimal(input.customRate)
     : new Decimal(snapshot.rate);
 
-  const lengthM = toMetres(input.length || {});
+  const lengthM = toMetres(input.length || {}, input.feetToMetre || snapshot.feetToMetre);
 
   const qtyResult = calculateLineQuantity({
     method: snapshot.qtyMethod,
     length: input.length,
+    lengthValue: input.lengthValue,
+    lengthUnit: input.lengthUnit,
+    widthFactor: input.widthFactor ?? snapshot.widthFactor,
+    feetToMetre: input.feetToMetre ?? snapshot.feetToMetre,
+    kgPerPiece: input.kgPerPiece ?? snapshot.kgPerPiece,
     nos: nosDecimal,
+    customUnit: snapshot.unit,
     coilWidthM: snapshot.coilWidthM,
     thicknessMm: snapshot.thicknessMm,
     densityFactor: snapshot.densityFactor,
@@ -46,6 +57,7 @@ export function calculateQuotationLine(
 
   const moneyResult = calculateLineAmounts({
     quantity: qtyResult.lineQuantity,
+    unroundedQuantity: qtyResult.unroundedLineQuantity,
     rate: rateDecimal,
     discountPct: input.discountPct,
     discountAmount: input.discountAmount,
@@ -56,18 +68,29 @@ export function calculateQuotationLine(
 
   return {
     id: input.id || `line_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-    snapshot,
+    snapshot: {
+      ...snapshot,
+      kgPerPiece: input.kgPerPiece !== undefined ? Number(input.kgPerPiece) : snapshot.kgPerPiece,
+      widthFactor: input.widthFactor !== undefined ? Number(input.widthFactor) : snapshot.widthFactor,
+      feetToMetre: input.feetToMetre !== undefined ? Number(input.feetToMetre) : snapshot.feetToMetre,
+    },
     lengthFeet: input.length?.feet !== undefined ? Number(input.length.feet) : undefined,
     lengthInches: input.length?.inches !== undefined ? Number(input.length.inches) : undefined,
     lengthM: lengthM.toNumber(),
+    lengthValue: input.lengthValue !== undefined ? Number(input.lengthValue) : undefined,
+    lengthUnit: input.lengthUnit,
+    widthFactor: input.widthFactor !== undefined ? Number(input.widthFactor) : snapshot.widthFactor,
+    kgPerPiece: input.kgPerPiece !== undefined ? Number(input.kgPerPiece) : snapshot.kgPerPiece,
     nos: nosDecimal.toNumber(),
     perPieceQuantity: qtyResult.perPieceQuantity.toNumber(),
     quantity: qtyResult.lineQuantity.toNumber(),
+    unroundedQuantity: qtyResult.unroundedLineQuantity.toNumber(),
     isManualQuantity: qtyResult.isManual,
     manualQuantity: input.manualQuantity !== undefined ? Number(input.manualQuantity) : undefined,
     discountPct: input.discountPct !== undefined ? Number(input.discountPct) : undefined,
     discountAmount: moneyResult.discountAmount.toNumber(),
     taxableAmount: moneyResult.taxableAmount.toNumber(),
+    unroundedTaxableAmount: moneyResult.unroundedTaxableAmount.toNumber(),
     cgstAmount: taxResult.cgstAmount.toNumber(),
     sgstAmount: taxResult.sgstAmount.toNumber(),
     igstAmount: taxResult.igstAmount.toNumber(),
@@ -75,7 +98,7 @@ export function calculateQuotationLine(
     // Mirror fields
     productName: snapshot.productName,
     hsn: snapshot.hsn,
-    unit: snapshot.unit,
+    unit: qtyResult.unit,
     rate: rateDecimal.toNumber(),
     gstRate: snapshot.gstRate,
   };
@@ -112,10 +135,12 @@ export interface LineValidationInput {
   } | null;
   rate?: number | string | Decimal;
   nos?: number | string | Decimal;
-  lengthUnit?: 'ft_in' | 'metres';
+  lengthUnit?: string;
+  lengthValue?: number | string | Decimal;
   lengthFeet?: number | string | Decimal;
   lengthInches?: number | string | Decimal;
   lengthMetres?: number | string | Decimal;
+  kgPerPiece?: number | string | Decimal;
   isManualQuantity?: boolean;
   manualQuantity?: number | string | Decimal;
   discountPct?: number | string | Decimal;
@@ -171,9 +196,34 @@ export function validateLineDraft(params: LineValidationInput): LineValidationRe
     return { isValid: false, error: 'Please enter valid numeric values.' };
   }
 
-  // Dimension validation for dimension-dependent products
+  // Dimension validation for SQM products
   const method = params.product.qtyMethod;
-  if (method === 'SHEET_WEIGHT' || (method === 'SECTION_WEIGHT' && params.lengthUnit === 'ft_in')) {
+  if (method === 'SQM') {
+    const valRaw = params.lengthValue ?? params.lengthFeet ?? params.lengthMetres;
+    if (valRaw === undefined || valRaw === null || (typeof valRaw === 'string' && valRaw.trim() === '')) {
+      return { isValid: false, error: 'Length must be greater than 0.' };
+    }
+    try {
+      const lenDec = new Decimal(valRaw);
+      if (lenDec.lte(0)) {
+        return { isValid: false, error: 'Length must be greater than 0.' };
+      }
+    } catch {
+      return { isValid: false, error: 'Please enter valid numeric values.' };
+    }
+  } else if (method === 'WEIGHT_PER_PIECE') {
+    const kgRaw = params.kgPerPiece;
+    if (kgRaw !== undefined && kgRaw !== null && (typeof kgRaw !== 'string' || kgRaw.trim() !== '')) {
+      try {
+        const kgDec = new Decimal(kgRaw);
+        if (kgDec.lte(0)) {
+          return { isValid: false, error: 'Weight per piece must be greater than 0.' };
+        }
+      } catch {
+        return { isValid: false, error: 'Please enter valid numeric values.' };
+      }
+    }
+  } else if (method === 'SHEET_WEIGHT' || (method === 'SECTION_WEIGHT' && params.lengthUnit === 'ft_in')) {
     const fRaw = params.lengthFeet;
     const iRaw = params.lengthInches;
     if (

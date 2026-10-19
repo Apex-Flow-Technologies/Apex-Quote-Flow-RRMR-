@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   Document,
   Page,
@@ -42,120 +43,150 @@ interface QuotationPdfDocumentProps {
 const styles = StyleSheet.create({
   page: {
     fontFamily: FONT_FAMILY,
-    fontSize: 8,
+    fontSize: 9.5,
     color: '#1e293b',
-    paddingTop: 24,
-    paddingBottom: 36,
+    paddingTop: 30,
+    paddingBottom: 38,
     paddingHorizontal: 28,
-    lineHeight: 1.3,
+    lineHeight: 1.35,
   },
   // Header Section
   headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 1.5,
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 2,
     borderBottomColor: '#1d4ed8',
   },
   companyDetails: {
-    width: '58%',
+    width: '54%',
+    paddingRight: 8,
   },
   companyName: {
-    fontSize: 13,
+    fontSize: 16,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
     letterSpacing: 0.5,
-    marginBottom: 3,
+    marginBottom: 4,
   },
   companyAddress: {
-    fontSize: 8,
+    fontSize: 8.5,
     color: '#475569',
-    marginBottom: 2,
-    lineHeight: 1.25,
+    marginBottom: 3,
+    lineHeight: 1.35,
   },
   companyContact: {
-    fontSize: 7.5,
+    fontSize: 8.5,
     color: '#64748b',
+    lineHeight: 1.35,
   },
   quoteMetaDetails: {
-    width: '38%',
+    width: '45%',
+    alignItems: 'flex-end',
+  },
+  quoteTitleContainer: {
+    marginBottom: 6,
     alignItems: 'flex-end',
   },
   quoteTitle: {
-    fontSize: 14,
+    fontSize: 18,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#1d4ed8',
-    letterSpacing: 1,
-    marginBottom: 4,
+    letterSpacing: 1.5,
+    lineHeight: 1.15,
+    textAlign: 'right',
   },
   quoteNumberBadge: {
-    fontSize: 9.5,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+    borderRadius: 4,
+    paddingVertical: 3.5,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+    alignSelf: 'flex-end',
+    maxWidth: '100%',
+  },
+  quoteNumberText: {
+    fontSize: 10.5,
+    fontFamily: FONT_FAMILY,
+    fontWeight: 'bold',
+    color: '#1e3a8a',
+    letterSpacing: 0.4,
+    textAlign: 'right',
+    lineHeight: 1.15,
+  },
+  quoteMetaBlock: {
+    alignItems: 'flex-end',
+  },
+  quoteMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: 2.5,
+  },
+  quoteMetaLabel: {
+    fontSize: 8.5,
+    color: '#64748b',
+    marginRight: 5,
+  },
+  quoteMetaValue: {
+    fontSize: 8.5,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
-    backgroundColor: '#eff6ff',
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 3,
-    marginBottom: 3,
-    borderWidth: 0.5,
-    borderColor: '#bfdbfe',
-  },
-  quoteDateText: {
-    fontSize: 8,
-    color: '#475569',
-    marginBottom: 2,
   },
   taxModeBadge: {
-    fontSize: 7,
+    fontSize: 8.5,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
-    color: '#1e40af',
+    color: '#1d4ed8',
     textTransform: 'uppercase',
   },
 
   // Customer Card
   customerCard: {
     backgroundColor: '#f8fafc',
-    borderWidth: 0.75,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 4,
-    padding: 8,
+    borderRadius: 5,
+    padding: 9,
     marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   customerColLeft: {
-    width: '60%',
+    width: '56%',
   },
   customerColRight: {
-    width: '38%',
+    width: '42%',
     alignItems: 'flex-end',
   },
   sectionLabel: {
-    fontSize: 7,
+    fontSize: 7.5,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#64748b',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   customerName: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   customerText: {
-    fontSize: 7.5,
+    fontSize: 8.5,
     color: '#475569',
-    lineHeight: 1.2,
+    lineHeight: 1.35,
   },
   gstinHighlight: {
     fontFamily: FONT_FAMILY,
@@ -165,23 +196,23 @@ const styles = StyleSheet.create({
 
   // Table
   tableContainer: {
-    borderWidth: 0.75,
+    borderWidth: 1,
     borderColor: '#cbd5e1',
-    borderRadius: 4,
+    borderRadius: 5,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: '#f1f5f9',
-    borderBottomWidth: 1,
+    borderBottomWidth: 1.25,
     borderBottomColor: '#cbd5e1',
-    paddingVertical: 5,
-    paddingHorizontal: 4,
+    paddingVertical: 6.5,
+    paddingHorizontal: 5,
     alignItems: 'center',
   },
   tableHeaderCell: {
-    fontSize: 7,
+    fontSize: 8,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#334155',
@@ -190,36 +221,37 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: 'row',
-    borderBottomWidth: 0.5,
+    borderBottomWidth: 0.75,
     borderBottomColor: '#e2e8f0',
-    paddingVertical: 4.5,
-    paddingHorizontal: 4,
+    paddingVertical: 6.5,
+    paddingHorizontal: 5,
     alignItems: 'center',
   },
   tableRowEven: {
     backgroundColor: '#fafafa',
   },
   colSNo: { width: '5%', textAlign: 'center' },
-  colDesc: { width: '37%', paddingRight: 4 },
+  colDesc: { width: '37%', paddingRight: 5 },
   colHsn: { width: '10%', textAlign: 'center' },
-  colQty: { width: '13%', textAlign: 'right', paddingRight: 3 },
-  colRate: { width: '11%', textAlign: 'right', paddingRight: 3 },
-  colDisc: { width: '8%', textAlign: 'right', paddingRight: 3 },
+  colQty: { width: '13%', textAlign: 'right', paddingRight: 4 },
+  colRate: { width: '11%', textAlign: 'right', paddingRight: 4 },
+  colDisc: { width: '8%', textAlign: 'right', paddingRight: 4 },
   colTaxable: { width: '16%', textAlign: 'right' },
 
   productName: {
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
   },
   productSpecs: {
-    fontSize: 6.8,
+    fontSize: 7.8,
     color: '#64748b',
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 1.25,
   },
   manualTag: {
-    fontSize: 6,
+    fontSize: 6.8,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#d97706',
@@ -229,29 +261,30 @@ const styles = StyleSheet.create({
   bottomContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   bottomLeftCol: {
-    width: '54%',
-    justifyContent: 'space-between',
+    width: '53%',
+    justifyContent: 'flex-start',
   },
   bottomRightCol: {
-    width: '43%',
+    width: '44%',
     backgroundColor: '#f8fafc',
-    borderWidth: 0.75,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 4,
-    padding: 8,
+    borderRadius: 5,
+    padding: 9,
   },
 
   // Physical Totals Box
   qtySummaryBox: {
     backgroundColor: '#f0fdf4',
-    borderWidth: 0.75,
+    borderWidth: 1,
     borderColor: '#bbf7d0',
-    borderRadius: 4,
-    padding: 6,
-    marginBottom: 6,
+    borderRadius: 5,
+    padding: 7,
+    marginBottom: 7,
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
@@ -259,113 +292,117 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   qtyBoxLabel: {
-    fontSize: 6.5,
+    fontSize: 7,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#166534',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   qtyBoxValue: {
-    fontSize: 9,
+    fontSize: 10.5,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#14532d',
-    marginTop: 1,
+    marginTop: 2,
   },
 
   // Words Box
   wordsBox: {
     backgroundColor: '#f8fafc',
-    borderWidth: 0.75,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 4,
-    padding: 6,
-    marginBottom: 6,
+    borderRadius: 5,
+    padding: 7,
+    marginBottom: 7,
   },
   wordsLabel: {
-    fontSize: 6.5,
+    fontSize: 7,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#64748b',
     textTransform: 'uppercase',
-    marginBottom: 2,
+    letterSpacing: 0.5,
+    marginBottom: 2.5,
   },
   wordsText: {
-    fontSize: 7.5,
+    fontSize: 8.5,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#1e3a8a',
-    lineHeight: 1.2,
+    lineHeight: 1.3,
   },
 
   // Bank Details
   bankBox: {
     backgroundColor: '#f8fafc',
-    borderWidth: 0.75,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 4,
-    padding: 6,
+    borderRadius: 5,
+    padding: 7,
+    marginBottom: 0,
   },
   bankTitle: {
-    fontSize: 7,
+    fontSize: 7.5,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#334155',
-    marginBottom: 2,
+    marginBottom: 2.5,
     textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   bankText: {
-    fontSize: 7,
+    fontSize: 8,
     color: '#475569',
-    lineHeight: 1.25,
+    lineHeight: 1.3,
   },
 
   // Financial Breakdown rows
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2,
+    paddingVertical: 2.5,
   },
   summaryLabel: {
-    fontSize: 7.5,
+    fontSize: 8.5,
     color: '#475569',
   },
   summaryValue: {
-    fontSize: 7.5,
+    fontSize: 8.5,
     color: '#0f172a',
   },
   summaryRowBold: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 2.5,
-    borderTopWidth: 0.5,
+    paddingVertical: 3,
+    borderTopWidth: 0.75,
     borderTopColor: '#cbd5e1',
-    marginTop: 2,
+    marginTop: 2.5,
   },
   summaryLabelBold: {
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
   },
   summaryValueBold: {
-    fontSize: 8,
+    fontSize: 9,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#0f172a',
   },
   payableBox: {
     backgroundColor: '#1e3a8a',
-    paddingVertical: 5,
-    paddingHorizontal: 6,
-    borderRadius: 3,
+    paddingVertical: 5.5,
+    paddingHorizontal: 8,
+    borderRadius: 4,
     marginTop: 5,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   payableLabel: {
-    fontSize: 8.5,
+    fontSize: 9.5,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#ffffff',
@@ -373,32 +410,59 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   payableValue: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#ffffff',
   },
 
-  // Terms Section
-  termsContainer: {
-    borderTopWidth: 0.75,
+  // Terms Section & Signatory
+  termsRow: {
+    borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
-    paddingTop: 6,
+    paddingTop: 10,
     marginTop: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  termsCol: {
+    width: '60%',
   },
   termsTitle: {
-    fontSize: 7,
+    fontSize: 8,
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
     color: '#475569',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: 3,
   },
   termItem: {
-    fontSize: 6.5,
+    fontSize: 7.5,
     color: '#64748b',
-    marginBottom: 1.5,
-    lineHeight: 1.2,
+    marginBottom: 2,
+    lineHeight: 1.3,
+  },
+  signatoryCol: {
+    width: '35%',
+    alignItems: 'flex-end',
+  },
+  signatoryCompany: {
+    fontSize: 8,
+    fontFamily: FONT_FAMILY,
+    fontWeight: 'bold',
+    color: '#334155',
+    textAlign: 'right',
+  },
+  signatoryLabel: {
+    fontSize: 7.5,
+    color: '#64748b',
+    borderTopWidth: 0.75,
+    borderTopColor: '#94a3b8',
+    paddingTop: 3,
+    width: 120,
+    textAlign: 'center',
   },
 
   // Footer (Fixed at bottom of every page)
@@ -410,16 +474,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 0.5,
+    borderTopWidth: 0.75,
     borderTopColor: '#cbd5e1',
     paddingTop: 4,
   },
   footerText: {
-    fontSize: 6.5,
+    fontSize: 7.5,
     color: '#94a3b8',
   },
   footerPageNum: {
-    fontSize: 6.5,
+    fontSize: 7.5,
     color: '#94a3b8',
     fontFamily: FONT_FAMILY,
     fontWeight: 'bold',
@@ -457,16 +521,36 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
           </View>
 
           <View style={styles.quoteMetaDetails}>
-            <Text style={styles.quoteTitle}>QUOTATION</Text>
-            <Text style={styles.quoteNumberBadge}>
-              {quotation.quotationNumber}
-            </Text>
-            <Text style={styles.quoteDateText}>
-              Date: <Text style={{ fontFamily: FONT_FAMILY, fontWeight: 'bold' }}>{quotation.quotationDate || '—'}</Text>
-            </Text>
-            <Text style={styles.taxModeBadge}>
-              {isIntra ? 'Intra-State (CGST + SGST)' : 'Inter-State (IGST)'}
-            </Text>
+            <View style={styles.quoteTitleContainer}>
+              <Text style={styles.quoteTitle}>QUOTATION</Text>
+            </View>
+            <View style={styles.quoteNumberBadge}>
+              <Text style={styles.quoteNumberText}>
+                {quotation.quotationNumber}
+              </Text>
+            </View>
+            <View style={styles.quoteMetaBlock}>
+              <View style={styles.quoteMetaRow}>
+                <Text style={styles.quoteMetaLabel}>Date:</Text>
+                <Text style={styles.quoteMetaValue}>{quotation.quotationDate || '—'}</Text>
+              </View>
+              {quotation.widthFactor !== undefined && (
+                <View style={styles.quoteMetaRow}>
+                  <Text style={styles.quoteMetaLabel}>Width Factor:</Text>
+                  <Text style={styles.quoteMetaValue}>{quotation.widthFactor}</Text>
+                </View>
+              )}
+              <View style={styles.quoteMetaRow}>
+                <Text style={styles.quoteMetaLabel}>Tax Status:</Text>
+                <Text style={styles.taxModeBadge}>
+                  {quotation.isGstEnabled === false
+                    ? 'Non-GST Quotation'
+                    : isIntra
+                    ? 'Intra-State (CGST + SGST)'
+                    : 'Inter-State (IGST)'}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -476,8 +560,8 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
         <View style={styles.customerCard}>
           <View style={styles.customerColLeft}>
             <Text style={styles.sectionLabel}>Customer / Billed To</Text>
-            <Text style={styles.customerName}>{customer.name}</Text>
-            {customer.address && (
+            <Text style={styles.customerName}>{customer?.name || '—'}</Text>
+            {customer?.address && (
               <Text style={styles.customerText}>{customer.address}</Text>
             )}
           </View>
@@ -486,13 +570,13 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
             <Text style={styles.sectionLabel}>Tax Details</Text>
             <Text style={styles.customerText}>
               GSTIN:{' '}
-              {customer.gstin ? (
+              {customer?.gstin ? (
                 <Text style={styles.gstinHighlight}>{customer.gstin}</Text>
               ) : (
                 <Text style={{ color: '#64748b' }}>Unregistered Buyer</Text>
               )}
             </Text>
-            {customer.phone && (
+            {customer?.phone && (
               <Text style={styles.customerText}>Phone: {customer.phone}</Text>
             )}
           </View>
@@ -503,7 +587,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
            ========================================================================= */}
         <View style={styles.tableContainer}>
           {/* Header */}
-          <View style={styles.tableHeader}>
+          <View fixed style={styles.tableHeader}>
             <Text style={[styles.tableHeaderCell, styles.colSNo]}>#</Text>
             <Text style={[styles.tableHeaderCell, styles.colDesc]}>Description &amp; Specifications</Text>
             <Text style={[styles.tableHeaderCell, styles.colHsn]}>HSN</Text>
@@ -516,6 +600,9 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
           {/* Lines */}
           {quotation.lines.map((line, index) => {
             const snap = line.snapshot;
+            const isSqm = snap.qtyMethod === 'SQM';
+            const isWeightPerPiece = snap.qtyMethod === 'WEIGHT_PER_PIECE';
+            const isCustom = snap.qtyMethod === 'CUSTOM' || (line as unknown as { isCustomItem?: boolean }).isCustomItem;
             const isSheet = snap.qtyMethod === 'SHEET_WEIGHT';
             const isPipe = snap.qtyMethod === 'SECTION_WEIGHT';
             const isPiece = snap.qtyMethod === 'PIECE';
@@ -531,6 +618,15 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                 <View style={styles.colDesc}>
                   <Text style={styles.productName}>{line.productName}</Text>
                   <Text style={styles.productSpecs}>
+                    {isSqm && (
+                      `${line.lengthValue !== undefined ? line.lengthValue : (line.lengthFeet || 0)} ${line.lengthUnit || 'ft'} × ${line.nos} nos • Width: ${line.widthFactor || snap.widthFactor || quotation.widthFactor || 1.08}`
+                    )}
+                    {isWeightPerPiece && (
+                      `${line.nos} nos × ${line.kgPerPiece || snap.kgPerPiece || 0} kg/pc`
+                    )}
+                    {isCustom && (
+                      line.nos > 1 ? `${line.nos} nos` : 'Custom item'
+                    )}
                     {isSheet && (
                       `${line.lengthFeet || 0}'${line.lengthInches || 0}" × ${line.nos} nos • ${snap.thicknessMm}mm • ${snap.coilWidthM}m coil`
                     )}
@@ -548,7 +644,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
 
                 <View style={styles.colQty}>
                   <Text style={{ fontFamily: FONT_FAMILY, fontWeight: 'bold' }}>
-                    {Number(line.quantity).toFixed(2)} {line.unit}
+                    {line.unit === 'Nos' ? `${Number(line.quantity)} ${line.unit}` : `${Number(line.quantity).toFixed(2)} ${line.unit}`}
                   </Text>
                   {line.isManualQuantity && (
                     <Text style={styles.manualTag}>(Manual)</Text>
@@ -578,22 +674,34 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
           {/* Left Column: Physical Quantities, Amount in Words & Bank */}
           <View style={styles.bottomLeftCol}>
             {/* Physical Quantities Box */}
-            <View style={styles.qtySummaryBox}>
-              <View style={styles.qtyBoxItem}>
-                <Text style={styles.qtyBoxLabel}>Total Weight</Text>
-                <Text style={styles.qtyBoxValue}>
-                  {Number(quotation.totalKgs).toFixed(2)} Kgs
-                </Text>
+            {((Number(quotation.totalSqMtr || 0) > 0) || (Number(quotation.totalKgs || 0) > 0) || (Number(quotation.totalNos || 0) > 0)) && (
+              <View style={styles.qtySummaryBox}>
+                {Number(quotation.totalSqMtr || 0) > 0 && (
+                  <View style={styles.qtyBoxItem}>
+                    <Text style={styles.qtyBoxLabel}>Total Area</Text>
+                    <Text style={styles.qtyBoxValue}>
+                      {Number(quotation.totalSqMtr).toFixed(2)} Sq.Mtr
+                    </Text>
+                  </View>
+                )}
+                {Number(quotation.totalKgs || 0) > 0 && (
+                  <View style={styles.qtyBoxItem}>
+                    <Text style={styles.qtyBoxLabel}>Total Weight</Text>
+                    <Text style={styles.qtyBoxValue}>
+                      {Number(quotation.totalKgs).toFixed(2)} Kgs
+                    </Text>
+                  </View>
+                )}
+                {Number(quotation.totalNos || 0) > 0 && (
+                  <View style={styles.qtyBoxItem}>
+                    <Text style={styles.qtyBoxLabel}>Qty in Nos</Text>
+                    <Text style={styles.qtyBoxValue}>
+                      {Number(quotation.totalNos)} Nos
+                    </Text>
+                  </View>
+                )}
               </View>
-              {Number(quotation.totalNos) > 0 && (
-                <View style={styles.qtyBoxItem}>
-                  <Text style={styles.qtyBoxLabel}>Qty in Nos</Text>
-                  <Text style={styles.qtyBoxValue}>
-                    {Number(quotation.totalNos)} Nos
-                  </Text>
-                </View>
-              )}
-            </View>
+            )}
 
             {/* Amount in Words */}
             <View style={styles.wordsBox}>
@@ -604,7 +712,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
             </View>
 
             {/* Bank Details */}
-            {company?.bankDetails && (
+            {company?.bankDetails && company.bankDetails.bankName && (
               <View style={styles.bankBox}>
                 <Text style={styles.bankTitle}>Bank Details for Payment</Text>
                 <Text style={styles.bankText}>
@@ -624,56 +732,92 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
               <Text style={styles.summaryValue}>₹{Number(quotation.subtotal).toFixed(2)}</Text>
             </View>
 
-            {isIntra ? (
-              <>
+            {quotation.isGstEnabled !== false ? (
+              isIntra ? (
+                <>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>CGST (Central Tax):</Text>
+                    <Text style={styles.summaryValue}>₹{Number(quotation.cgstTotal).toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>SGST (State Tax):</Text>
+                    <Text style={styles.summaryValue}>₹{Number(quotation.sgstTotal).toFixed(2)}</Text>
+                  </View>
+                </>
+              ) : (
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>CGST (Central Tax):</Text>
-                  <Text style={styles.summaryValue}>₹{Number(quotation.cgstTotal).toFixed(2)}</Text>
+                  <Text style={styles.summaryLabel}>IGST (Integrated Tax):</Text>
+                  <Text style={styles.summaryValue}>₹{Number(quotation.igstTotal).toFixed(2)}</Text>
                 </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>SGST (State Tax):</Text>
-                  <Text style={styles.summaryValue}>₹{Number(quotation.sgstTotal).toFixed(2)}</Text>
-                </View>
-              </>
-            ) : (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>IGST (Integrated Tax):</Text>
-                <Text style={styles.summaryValue}>₹{Number(quotation.igstTotal).toFixed(2)}</Text>
-              </View>
-            )}
+              )
+            ) : null}
 
             <View style={styles.summaryRowBold}>
               <Text style={styles.summaryLabelBold}>Grand Total:</Text>
               <Text style={styles.summaryValueBold}>₹{Number(quotation.grandTotal).toFixed(2)}</Text>
             </View>
 
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Round-off:</Text>
-              <Text style={styles.summaryValue}>
-                {formatRoundOff(quotation.roundOff)}
-              </Text>
-            </View>
+            {Number(quotation.roundOff || 0) !== 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Round-off:</Text>
+                <Text style={styles.summaryValue}>
+                  {formatRoundOff(quotation.roundOff)}
+                </Text>
+              </View>
+            )}
 
-            <View style={styles.payableBox}>
-              <Text style={styles.payableLabel}>Total Payable:</Text>
-              <Text style={styles.payableValue}>
-                ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </Text>
-            </View>
+            {quotation.advanceAmount !== undefined && quotation.advanceAmount !== null && Number(quotation.advanceAmount) > 0 ? (
+              <>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Total Payable:</Text>
+                  <Text style={styles.summaryValue}>
+                    ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: '#047857' }]}>Advance Received:</Text>
+                  <Text style={[styles.summaryValue, { color: '#047857', fontFamily: FONT_FAMILY, fontWeight: 'bold' }]}>
+                    ₹{Number(quotation.advanceAmount).toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.payableBox}>
+                  <Text style={styles.payableLabel}>Balance Due:</Text>
+                  <Text style={styles.payableValue}>
+                    ₹{Number(quotation.balanceDue ?? (quotation.payableAmount - Number(quotation.advanceAmount))).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.payableBox}>
+                <Text style={styles.payableLabel}>Total Payable:</Text>
+                <Text style={styles.payableValue}>
+                  ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
         {/* =========================================================================
-            TERMS & CONDITIONS (Uses quotation.terms snapshot)
+            TERMS & CONDITIONS & SIGNATORY (Uses quotation.terms snapshot)
            ========================================================================= */}
         {quotation.terms && quotation.terms.length > 0 && (
-          <View wrap={false} style={styles.termsContainer}>
-            <Text style={styles.termsTitle}>Terms &amp; Conditions:</Text>
-            {quotation.terms.map((term, i) => (
-              <Text key={i} style={styles.termItem}>
-                {i + 1}. {term}
-              </Text>
-            ))}
+          <View wrap={false} style={styles.termsRow}>
+            <View style={styles.termsCol}>
+              <Text style={styles.termsTitle}>Terms &amp; Conditions:</Text>
+              {quotation.terms.map((term, i) => (
+                <Text key={i} style={styles.termItem}>
+                  {i + 1}. {term}
+                </Text>
+              ))}
+            </View>
+            <View style={styles.signatoryCol}>
+              {company?.name && (
+                <Text style={styles.signatoryCompany}>For {company.name}</Text>
+              )}
+              <View style={{ height: 24 }} />
+              <Text style={styles.signatoryLabel}>Authorised Signatory</Text>
+            </View>
           </View>
         )}
 
