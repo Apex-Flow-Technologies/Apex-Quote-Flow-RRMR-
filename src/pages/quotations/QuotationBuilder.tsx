@@ -340,13 +340,14 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={onCancel}
-            className="p-1.5 text-muted hover:text-ink hover:bg-surface-2 rounded-control border border-line-strong transition"
+            className="w-10 h-10 flex items-center justify-center text-muted hover:text-ink hover:bg-surface-2 rounded-control border border-line-strong transition shrink-0"
             title="Return to Quotation Register"
+            aria-label="Return to Quotation Register"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div>
-            <h1 className="text-xl font-bold text-ink tracking-tight flex items-center gap-2.5">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold text-ink tracking-tight flex items-center gap-2">
               <span>New quotation</span>
               <span className="text-[10px] font-mono font-bold uppercase text-brand bg-brand-soft px-2 py-0.5 rounded-control border border-brand/20">
                 Draft
@@ -384,7 +385,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
       )}
 
       {/* Section 1: Customer Selection & Quotation Date */}
-      <div className={`bg-white p-4 sm:p-5 rounded-card border border-line-strong shadow-xs space-y-4 relative ${isCustomerDropdownOpen ? 'z-40' : 'z-20'}`}>
+      <div className={`bg-white p-3.5 sm:p-5 rounded-card border border-line-strong shadow-xs space-y-4 relative ${isCustomerDropdownOpen ? 'z-40' : 'z-20'}`}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Customer Selection */}
           <div className="md:col-span-2 space-y-1.5">
@@ -393,16 +394,16 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
             </label>
 
             {selectedCustomer ? (
-              <div className="p-3.5 rounded-control border border-line-strong bg-surface-2 flex items-start justify-between">
+              <div className="p-3 sm:p-3.5 rounded-control border border-line-strong bg-surface-2 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div className="space-y-1 text-xs">
-                  <div className="font-bold text-ink flex items-center gap-2">
-                    <User className="w-4 h-4 text-brand" />
-                    <span>{selectedCustomer.name}</span>
+                  <div className="font-bold text-ink flex flex-wrap items-center gap-2">
+                    <User className="w-4 h-4 text-brand shrink-0" />
+                    <span className="text-sm">{selectedCustomer.name}</span>
                     <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20">
                       {taxMode === 'intra' ? 'Intra-State (CGST+SGST)' : 'Inter-State (IGST)'}
                     </span>
                   </div>
-                  <div className="text-muted space-x-3 text-[11px]">
+                  <div className="text-muted flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                     {selectedCustomer.gstin ? (
                       <span>
                         GSTIN: <strong className="font-mono text-ink font-semibold">{selectedCustomer.gstin}</strong>
@@ -415,15 +416,16 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setSelectedCustomer(null)}
-                  className="text-xs text-brand hover:text-brand-dark font-semibold underline ml-2"
+                  className="min-h-[38px] text-xs text-brand hover:text-brand-dark font-semibold underline self-start sm:self-auto shrink-0"
                 >
                   Change
                 </button>
               </div>
             ) : (
               <div ref={customerSearchRef} className="relative">
-                <Search className="w-4 h-4 text-faint absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-faint absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Search customer by name, GSTIN, or phone..."
@@ -439,7 +441,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                       setIsCustomerDropdownOpen(false);
                     }
                   }}
-                  className="w-full pl-9 pr-3 py-2 text-[13.5px] rounded-control border border-line-strong focus:border-brand focus:ring-3 focus:ring-brand/15 text-ink bg-white"
+                  className="w-full pl-10 pr-3.5 h-11 text-sm rounded-control border border-line-strong focus:border-brand focus:ring-3 focus:ring-brand/15 text-ink bg-white"
                 />
 
                 {isCustomerDropdownOpen && (
@@ -462,15 +464,15 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                             setIsCustomerDropdownOpen(false);
                             setCustomerSearch('');
                           }}
-                          className="w-full text-left p-3 hover:bg-surface-2 border-b border-line last:border-0 flex items-center justify-between text-xs transition"
+                          className="w-full text-left p-3 hover:bg-surface-2 border-b border-line last:border-0 flex items-center justify-between text-xs transition min-h-[44px]"
                         >
                           <div>
-                            <div className="font-semibold text-ink">{cust.name}</div>
+                            <div className="font-semibold text-ink text-xs">{cust.name}</div>
                             <div className="text-[11px] text-muted">
                               {cust.gstin ? `GSTIN: ${cust.gstin}` : 'Unregistered'} &bull; {cust.phone || 'No phone'}
                             </div>
                           </div>
-                          <span className="text-[10px] text-brand font-bold">Select &rarr;</span>
+                          <span className="text-[10px] text-brand font-bold shrink-0 ml-2">Select &rarr;</span>
                         </button>
                       ))
                     )}
@@ -486,56 +488,62 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
               Quotation Date <span className="text-danger">*</span>
             </label>
             <div className="relative">
-              <Calendar className="w-4 h-4 text-faint absolute left-3 top-1/2 -translate-y-1/2" />
+              <Calendar className="w-4 h-4 text-faint absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 id={fieldIdDate}
                 type="date"
                 value={quotationDate}
                 onChange={(e) => setQuotationDate(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-[13.5px] rounded-control border border-line-strong focus:border-brand focus:ring-3 focus:ring-brand/15 font-mono tabular-nums text-ink bg-white"
+                className="w-full pl-10 pr-3 h-11 text-sm rounded-control border border-line-strong focus:border-brand focus:ring-3 focus:ring-brand/15 font-mono tabular-nums text-ink bg-white max-w-full"
               />
             </div>
           </div>
         </div>
 
         {/* Quotation Parameters & Options Bar */}
-        <div className="pt-3 border-t border-line flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+        <div className="pt-3 border-t border-line flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4">
+            {/* Width Factor */}
+            <div className="flex items-center justify-between sm:justify-start gap-2 bg-surface-2 sm:bg-transparent p-2 sm:p-0 rounded-control border border-line sm:border-0">
               <label htmlFor="quote-width-factor" className="text-xs font-semibold text-ink">
                 Width factor:
               </label>
-              <input
-                id="quote-width-factor"
-                type="number"
-                step="0.001"
-                min="0.1"
-                value={widthFactor}
-                onChange={(e) => handleWidthFactorChange(e.target.value)}
-                className="w-20 py-1 px-2 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
-                placeholder="1.08"
-                title="Quotation-level default width factor for sheet SQM"
-              />
-              <span className="text-[11px] text-muted">(default 1.08)</span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  id="quote-width-factor"
+                  type="number"
+                  step="0.001"
+                  min="0.1"
+                  value={widthFactor}
+                  onChange={(e) => handleWidthFactorChange(e.target.value)}
+                  className="w-20 h-9 py-1 px-2 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
+                  placeholder="1.08"
+                  title="Quotation-level default width factor for sheet SQM"
+                />
+                <span className="text-[11px] text-muted">(default 1.08)</span>
+              </div>
             </div>
 
-            <div className="h-4 w-px bg-line" />
+            <div className="hidden sm:block h-4 w-px bg-line" />
 
-            <label className="relative inline-flex items-center cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={isGstEnabled}
-                onChange={(e) => setIsGstEnabled(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-8 h-4.5 bg-line-strong peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-brand"></div>
-              <span className="ml-2 font-semibold text-ink text-xs">
+            {/* GST Toggle */}
+            <label className="flex items-center justify-between sm:justify-start gap-2.5 cursor-pointer select-none bg-surface-2 sm:bg-transparent p-2 sm:p-0 rounded-control border border-line sm:border-0 min-h-[40px]">
+              <span className="font-semibold text-ink text-xs">
                 {isGstEnabled ? 'GST 18% Enabled' : 'No GST (Exempt / Direct)'}
               </span>
+              <div className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={isGstEnabled}
+                  onChange={(e) => setIsGstEnabled(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-line-strong peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-line after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"></div>
+              </div>
             </label>
           </div>
 
-          <div className="text-[11px] text-muted">
+          <div className="text-[11px] text-muted text-right sm:text-left">
             Length conversion: <strong className="font-mono text-ink">1 ft = {feetToMetreNum} m</strong>
           </div>
         </div>
@@ -561,27 +569,27 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Physical Quantities & Words */}
             <div className="space-y-3">
-              <div className="bg-white p-4 sm:p-5 rounded-card border border-line-strong shadow-xs">
+              <div className="bg-white p-3.5 sm:p-5 rounded-card border border-line-strong shadow-xs">
                 <div className="font-bold text-muted text-[10.5px] uppercase tracking-wider mb-2.5">
                   Quantity Summary
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 text-xs">
                   {totals.totalSqMtr.gt(0) && (
-                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
-                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Area</span>
-                      <span className="text-base font-mono tabular-nums font-bold text-ink">{totals.totalSqMtr.toFixed(2)} Sq.Mtr</span>
+                    <div className="p-2.5 sm:p-3 bg-surface-2 rounded-control border border-line-strong">
+                      <span className="text-[10px] sm:text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Area</span>
+                      <span className="text-sm sm:text-base font-mono tabular-nums font-bold text-ink">{totals.totalSqMtr.toFixed(2)} Sq.Mtr</span>
                     </div>
                   )}
                   {totals.totalKgs.gt(0) && (
-                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
-                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Weight</span>
-                      <span className="text-base font-mono tabular-nums font-bold text-ink">{totals.totalKgs.toFixed(2)} Kgs</span>
+                    <div className="p-2.5 sm:p-3 bg-surface-2 rounded-control border border-line-strong">
+                      <span className="text-[10px] sm:text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Weight</span>
+                      <span className="text-sm sm:text-base font-mono tabular-nums font-bold text-ink">{totals.totalKgs.toFixed(2)} Kgs</span>
                     </div>
                   )}
                   {totals.totalNos.gt(0) && (
-                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
-                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Qty in Nos</span>
-                      <span className="text-base font-mono tabular-nums font-bold text-ink">{totals.totalNos.toString()} Nos</span>
+                    <div className="p-2.5 sm:p-3 bg-surface-2 rounded-control border border-line-strong col-span-2 sm:col-span-1">
+                      <span className="text-[10px] sm:text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Qty in Nos</span>
+                      <span className="text-sm sm:text-base font-mono tabular-nums font-bold text-ink">{totals.totalNos.toString()} Nos</span>
                     </div>
                   )}
                 </div>
@@ -644,7 +652,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                 )}
 
                 {/* Advance Amount Input */}
-                <div className="flex items-center justify-between text-muted border-t border-line pt-2">
+                <div className="flex items-center justify-between text-muted border-t border-line pt-2 gap-2">
                   <span className="font-medium text-ink">Advance Received (₹):</span>
                   <input
                     type="number"
@@ -653,24 +661,24 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                     value={advanceAmount}
                     placeholder="0.00"
                     onChange={(e) => setAdvanceAmount(e.target.value)}
-                    className="w-28 py-1 px-2 text-right font-mono tabular-nums font-bold text-xs rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
+                    className="w-28 sm:w-32 h-10 py-1.5 px-2.5 text-right font-mono tabular-nums font-bold text-xs sm:text-sm rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
                   />
                 </div>
               </div>
 
               {/* Total Payable & Balance Due Banners */}
               <div className="border-t border-line bg-surface-2/60 p-4 space-y-2">
-                <div className="flex justify-between items-baseline">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted">Total payable:</span>
-                  <span className="text-[25px] font-mono tabular-nums text-brand font-bold">
+                <div className="flex justify-between items-baseline gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted shrink-0">Total payable:</span>
+                  <span className="text-xl sm:text-[25px] font-mono tabular-nums text-brand font-bold text-right truncate">
                     ₹{totals.payableAmount.toNumber().toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
 
                 {advanceAmount.trim() !== '' && Number(advanceAmount) > 0 && totals.balanceDue && (
-                  <div className="flex justify-between items-baseline pt-2 border-t border-line">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-900">Balance due:</span>
-                    <span className="text-[20px] font-mono tabular-nums text-amber-900 font-bold">
+                  <div className="flex justify-between items-baseline pt-2 border-t border-line gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-900 shrink-0">Balance due:</span>
+                    <span className="text-lg sm:text-[20px] font-mono tabular-nums text-amber-900 font-bold text-right truncate">
                       ₹{totals.balanceDue.toNumber().toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -680,7 +688,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           </div>
 
           {/* Bottom Final Action Bar */}
-          <div className="bg-white p-4 rounded-card border border-line-strong shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-card border border-line-strong shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="text-xs text-muted">
               {!selectedCustomer ? (
                 <span className="text-warn font-medium flex items-center gap-1.5">
@@ -694,11 +702,11 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2.5">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-2.5 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-4 py-2 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 border border-line-strong rounded-control shadow-xs transition"
+                className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 border border-line-strong rounded-control shadow-xs transition flex items-center justify-center"
               >
                 Cancel Draft
               </button>
@@ -706,7 +714,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                 type="button"
                 onClick={handleSaveQuotation}
                 disabled={isSaving || validLines.length === 0 || !selectedCustomer}
-                className="inline-flex items-center gap-1.5 px-5 py-2 bg-brand hover:bg-brand-dark text-white rounded-control text-xs font-semibold shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center gap-1.5 px-5 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-control text-xs font-semibold shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
                   <>

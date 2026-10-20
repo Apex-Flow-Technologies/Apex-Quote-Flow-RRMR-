@@ -7,7 +7,7 @@ import { Download, ExternalLink, Loader2 } from 'lucide-react';
 
 interface QuotationPdfActionsProps {
   quotation: Quotation;
-  variant?: 'modal' | 'table';
+  variant?: 'modal' | 'table' | 'card';
 }
 
 export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
@@ -54,6 +54,24 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
       setGenerating(false);
     }
   };
+
+  if (variant === 'card') {
+    return (
+      <button
+        onClick={handleDownload}
+        disabled={generating}
+        className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-brand bg-brand-soft hover:bg-brand/10 active:bg-brand/15 rounded-control transition text-xs font-semibold border border-brand/20 disabled:opacity-50"
+        title={`Download ${quotation.quotationNumber} PDF`}
+      >
+        {generating ? (
+          <Loader2 className="w-4 h-4 animate-spin text-brand" />
+        ) : (
+          <Download className="w-4 h-4" />
+        )}
+        <span>PDF</span>
+      </button>
+    );
+  }
 
   if (variant === 'table') {
     return (

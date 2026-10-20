@@ -25,15 +25,15 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-ink/40 backdrop-blur-xs overflow-y-auto">
       <div className="bg-white rounded-card shadow-lg border border-line-strong max-w-5xl w-full my-6 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
         {/* Modal Top Bar */}
-        <div className="p-4 bg-white text-ink flex items-center justify-between border-b border-line">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-control bg-brand-soft text-brand flex items-center justify-center">
+        <div className="p-3.5 sm:p-4 bg-white text-ink flex items-center justify-between border-b border-line gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-control bg-brand-soft text-brand flex items-center justify-center shrink-0">
               <FileText className="w-4 h-4" />
             </div>
-            <div>
-              <div className="font-bold text-sm tracking-tight flex items-center gap-2 text-ink">
+            <div className="min-w-0">
+              <div className="font-bold text-xs sm:text-sm tracking-tight flex flex-wrap items-center gap-1.5 sm:gap-2 text-ink">
                 <span className="font-mono tabular-nums">{quotation.quotationNumber}</span>
-                <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20">
+                <span className="text-[9px] sm:text-[10px] font-mono font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20">
                   {quotation.isGstEnabled === false
                     ? 'Non-GST (Composition / Unregistered)'
                     : quotation.taxMode === 'intra'
@@ -41,14 +41,14 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                       : 'Inter-State (IGST)'}
                 </span>
               </div>
-              <div className="text-[11px] text-muted">
+              <div className="text-[11px] text-muted truncate">
                 Created by {quotation.createdByName}
               </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-muted hover:text-ink hover:bg-surface-2 rounded-control border border-line-strong transition"
+            className="w-9 h-9 flex items-center justify-center text-muted hover:text-ink hover:bg-surface-2 rounded-control border border-line-strong transition shrink-0"
             aria-label="Close modal"
           >
             <X className="w-4 h-4" />
@@ -197,31 +197,31 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Physical Quantities & Amount in Words */}
             <div className="space-y-3">
-              <div className="bg-white p-4 rounded-control border border-line-strong shadow-xs">
+              <div className="bg-white p-3.5 sm:p-4 rounded-control border border-line-strong shadow-xs">
                 <div className="font-bold text-muted text-[10.5px] uppercase tracking-wider mb-2.5">
                   Physical Quantities
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5 text-xs">
                   {Number(quotation.totalSqMtr || 0) > 0 && (
-                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
-                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Area</span>
-                      <span className="text-base font-mono tabular-nums font-bold text-ink">
+                    <div className="p-2.5 sm:p-3 bg-surface-2 rounded-control border border-line-strong">
+                      <span className="text-[10px] sm:text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Area</span>
+                      <span className="text-sm sm:text-base font-mono tabular-nums font-bold text-ink">
                         {Number(quotation.totalSqMtr).toFixed(2)} Sq.Mtr
                       </span>
                     </div>
                   )}
                   {Number(quotation.totalKgs || 0) > 0 && (
-                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
-                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Weight</span>
-                      <span className="text-base font-mono tabular-nums font-bold text-ink">
+                    <div className="p-2.5 sm:p-3 bg-surface-2 rounded-control border border-line-strong">
+                      <span className="text-[10px] sm:text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Total Weight</span>
+                      <span className="text-sm sm:text-base font-mono tabular-nums font-bold text-ink">
                         {Number(quotation.totalKgs).toFixed(2)} Kgs
                       </span>
                     </div>
                   )}
                   {quotation.totalNos != null && quotation.totalNos > 0 && (
-                    <div className="p-3 bg-surface-2 rounded-control border border-line-strong">
-                      <span className="text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Qty in Nos</span>
-                      <span className="text-base font-mono tabular-nums font-bold text-ink">
+                    <div className="p-2.5 sm:p-3 bg-surface-2 rounded-control border border-line-strong col-span-2 sm:col-span-1">
+                      <span className="text-[10px] sm:text-[10.5px] text-faint font-semibold block uppercase tracking-wider">Qty in Nos</span>
+                      <span className="text-sm sm:text-base font-mono tabular-nums font-bold text-ink">
                         {quotation.totalNos} Nos
                       </span>
                     </div>
@@ -312,16 +312,16 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
 
               {/* Total Payable or Balance Due Banner */}
               {quotation.advanceAmount !== undefined && quotation.advanceAmount !== null && Number(quotation.advanceAmount) > 0 ? (
-                <div className="flex justify-between items-baseline border-t border-line bg-amber-50/70 p-4">
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-900">Balance Due:</span>
-                  <span className="text-2xl font-mono tabular-nums text-amber-700 font-bold">
+                <div className="flex justify-between items-baseline border-t border-line bg-amber-50/70 p-4 gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-900 shrink-0">Balance Due:</span>
+                  <span className="text-xl sm:text-2xl font-mono tabular-nums text-amber-700 font-bold text-right truncate">
                     ₹{Number(quotation.balanceDue ?? (quotation.payableAmount - Number(quotation.advanceAmount))).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               ) : (
-                <div className="flex justify-between items-baseline border-t border-line bg-surface-2/60 p-4">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted">Total Payable:</span>
-                  <span className="text-2xl font-mono tabular-nums text-brand font-bold">
+                <div className="flex justify-between items-baseline border-t border-line bg-surface-2/60 p-4 gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted shrink-0">Total Payable:</span>
+                  <span className="text-xl sm:text-2xl font-mono tabular-nums text-brand font-bold text-right truncate">
                     ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -373,11 +373,13 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 bg-white border-t border-line flex flex-wrap items-center justify-between gap-3">
-          <QuotationPdfActions quotation={quotation} variant="modal" />
+        <div className="p-3.5 sm:p-4 bg-white border-t border-line flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3">
+          <div className="w-full sm:w-auto">
+            <QuotationPdfActions quotation={quotation} variant="modal" />
+          </div>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-white hover:bg-surface-2 text-muted hover:text-ink border border-line-strong rounded-control text-xs font-semibold transition"
+            className="w-full sm:w-auto min-h-[44px] sm:min-h-[36px] px-4 py-2 bg-white hover:bg-surface-2 text-muted hover:text-ink border border-line-strong rounded-control text-xs font-semibold transition flex items-center justify-center"
           >
             Close Preview
           </button>

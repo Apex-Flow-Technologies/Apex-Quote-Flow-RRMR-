@@ -340,12 +340,20 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
   const openRow = rows.find((r) => r.isProductDropdownOpen) || null;
 
+  const getActiveInput = (key: string): HTMLInputElement | undefined => {
+    const mob = inputRefs.current.get(`${key}_mobile`);
+    if (mob && mob.offsetParent !== null) return mob;
+    const desk = inputRefs.current.get(key);
+    if (desk && desk.offsetParent !== null) return desk;
+    return mob || desk;
+  };
+
   const updateDropdownPosition = useCallback(() => {
     if (!openRow) {
       setDropdownPos(null);
       return;
     }
-    const inputEl = inputRefs.current.get(`${openRow.id}_productSearch`);
+    const inputEl = getActiveInput(`${openRow.id}_productSearch`);
     if (!inputEl) {
       setDropdownPos(null);
       return;
@@ -357,15 +365,23 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
       return;
     }
 
-    const dropdownWidth = Math.max(rect.width, 340);
+    const isSmallScreen = window.innerWidth < 640;
+    const padding = 12;
+    // On small screens, keep dropdown within viewport with comfortable margins
+    const maxAllowedWidth = Math.max(280, window.innerWidth - (padding * 2));
+    const dropdownWidth = Math.min(maxAllowedWidth, Math.max(rect.width, 300));
+
     let left = rect.left;
-    if (left + dropdownWidth > window.innerWidth - 12) {
-      left = Math.max(12, window.innerWidth - dropdownWidth - 12);
+    if (left + dropdownWidth > window.innerWidth - padding) {
+      left = Math.max(padding, window.innerWidth - dropdownWidth - padding);
+    }
+    if (left < padding) {
+      left = padding;
     }
 
     const spaceBelow = window.innerHeight - rect.bottom - 8;
     const spaceAbove = rect.top - 8;
-    const desiredHeight = 240;
+    const desiredHeight = isSmallScreen ? 220 : 250;
 
     if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
       const maxHeight = Math.min(desiredHeight, Math.max(spaceBelow, 120));
@@ -379,7 +395,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     } else {
       const maxHeight = Math.min(desiredHeight, Math.max(spaceAbove, 120));
       setDropdownPos({
-        top: rect.top - maxHeight - 4,
+        top: Math.max(8, rect.top - maxHeight - 4),
         left,
         width: dropdownWidth,
         placement: 'top',
@@ -562,7 +578,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     );
 
     setTimeout(() => {
-      inputRefs.current.get(`${rowId}_rate`)?.focus();
+      getActiveInput(`${rowId}_rate`)?.focus();
     }, 50);
   };
 
@@ -606,15 +622,15 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     // Auto-advance focus to the next field (Feet, Metres, or Nos)
     setTimeout(() => {
       if (product.qtyMethod === 'SQM') {
-        inputRefs.current.get(`${rowId}_lengthValue`)?.focus();
+        getActiveInput(`${rowId}_lengthValue`)?.focus();
       } else if (product.qtyMethod === 'WEIGHT_PER_PIECE') {
-        inputRefs.current.get(`${rowId}_nos`)?.focus();
+        getActiveInput(`${rowId}_nos`)?.focus();
       } else if (product.qtyMethod === 'SHEET_WEIGHT') {
-        inputRefs.current.get(`${rowId}_lengthFeet`)?.focus();
+        getActiveInput(`${rowId}_lengthFeet`)?.focus();
       } else if (product.qtyMethod === 'SECTION_WEIGHT') {
-        inputRefs.current.get(`${rowId}_lengthMetres`)?.focus();
+        getActiveInput(`${rowId}_lengthMetres`)?.focus();
       } else {
-        inputRefs.current.get(`${rowId}_nos`)?.focus();
+        getActiveInput(`${rowId}_nos`)?.focus();
       }
     }, 50);
   };
@@ -676,7 +692,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         onAddRow();
         setTimeout(() => {
           const nextRowInputs = Array.from(inputRefs.current.entries());
-          const lastSearch = nextRowInputs.filter(([k]) => k.endsWith('_productSearch')).pop();
+          const lastSearch = nextRowInputs.filter(([k]) => k.includes('_productSearch') && !k.endsWith('_mobile')).pop() ||
+            nextRowInputs.filter(([k]) => k.includes('_productSearch')).pop();
           if (lastSearch) lastSearch[1]?.focus();
         }, 60);
       } else {
@@ -684,11 +701,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         const nextRow = rows[rowIndex + 1];
         if (nextRow) {
           if (nextRow.isCustomItem) {
-            inputRefs.current.get(`${nextRow.id}_customDesc`)?.focus();
+            getActiveInput(`${nextRow.id}_customDesc`)?.focus();
           } else if (!nextRow.product) {
-            inputRefs.current.get(`${nextRow.id}_productSearch`)?.focus();
+            getActiveInput(`${nextRow.id}_productSearch`)?.focus();
           } else {
-            inputRefs.current.get(`${nextRow.id}_nos`)?.focus();
+            getActiveInput(`${nextRow.id}_nos`)?.focus();
           }
         }
       }
@@ -698,9 +715,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
   return (
     <div className="bg-white rounded-card border border-line-strong shadow-xs overflow-hidden relative z-20">
       {/* Header bar */}
-      <div className="p-4 bg-surface-2 border-b border-line flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-brand" />
+      <div className="p-3.5 sm:p-4 bg-surface-2 border-b border-line flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Layers className="w-4 h-4 text-brand shrink-0" />
           <span className="font-bold text-ink text-xs uppercase tracking-wider">
             Quotation Line Items ({rows.filter((r) => r.calculatedLine !== null).length} items)
           </span>
@@ -709,11 +726,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={onAddCustomRow ? onAddCustomRow : () => onRowsChange([...rows, createCustomRow()])}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
+            className="flex-1 sm:flex-initial min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
           >
             <Plus className="w-3.5 h-3.5 text-brand" />
             <span>+ Custom Item</span>
@@ -721,7 +738,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           <button
             type="button"
             onClick={onAddRow}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-control font-semibold text-xs shadow-xs transition"
+            className="flex-1 sm:flex-initial min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-control font-semibold text-xs shadow-xs transition"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add item</span>
@@ -729,8 +746,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         </div>
       </div>
 
-      {/* Table Content */}
-      <div className="overflow-x-auto min-w-full">
+      {/* Desktop Table View (hidden on mobile, visible on md and up) */}
+      <div className="hidden md:block overflow-x-auto min-w-full">
         <table className="w-full text-left border-collapse text-xs min-w-[920px]">
           <thead>
             <tr className="bg-surface-2/70 border-b border-line text-faint font-semibold text-[10.5px] uppercase tracking-wider">
@@ -1264,28 +1281,502 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         </table>
       </div>
 
+      {/* Mobile Card View (visible on mobile, hidden on md and up) */}
+      <div className="block md:hidden divide-y divide-line">
+        {rows.map((row, index) => {
+          const filtered = getFilteredProducts(row.productSearch);
+          const isCustom = Boolean(row.isCustomItem);
+          const isSqm = row.product?.qtyMethod === 'SQM';
+          const isWeightPerPiece = row.product?.qtyMethod === 'WEIGHT_PER_PIECE';
+          const isSheet = row.product?.qtyMethod === 'SHEET_WEIGHT';
+          const isPipe = row.product?.qtyMethod === 'SECTION_WEIGHT';
+          const hasError = Boolean(row.validationError);
+
+          return (
+            <div
+              key={`mobile_${row.id}`}
+              className={`p-3.5 space-y-3 transition ${
+                hasError ? 'bg-rose-50/20' : 'bg-white'
+              }`}
+            >
+              {/* Card Header: Item #, Method Badge, Manual Pill, Actions */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="w-6 h-6 rounded-full bg-surface-2 border border-line-strong flex items-center justify-center font-mono text-[11px] font-bold text-ink shrink-0">
+                    {index + 1}
+                  </span>
+                  {isCustom ? (
+                    <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-control bg-amber-50 text-amber-800 border border-amber-300 shrink-0">
+                      Custom Item
+                    </span>
+                  ) : row.product ? (
+                    <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20 shrink-0">
+                      {formatQtyMethodLabel(row.product.qtyMethod)}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-control bg-surface-2 text-muted border border-line shrink-0">
+                      Select Item
+                    </span>
+                  )}
+                  {row.isManualQuantity && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenManualOverride(row)}
+                      className="text-[9px] uppercase font-bold text-warn bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded-control border border-warn/30 cursor-pointer inline-flex items-center gap-1 shrink-0"
+                    >
+                      <SlidersHorizontal className="w-2.5 h-2.5" />
+                      <span>Manual Override</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => onDuplicateRow(row.id)}
+                    className="w-9 h-9 flex items-center justify-center text-muted hover:text-brand hover:bg-surface-2 rounded-control border border-line transition"
+                    title="Duplicate this item"
+                    aria-label={`Duplicate item ${index + 1}`}
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveRow(row.id)}
+                    disabled={rows.length === 1 && !row.product}
+                    className="w-9 h-9 flex items-center justify-center text-muted hover:text-danger hover:bg-rose-50 rounded-control border border-line transition disabled:opacity-30 disabled:hover:text-muted"
+                    title="Delete this item"
+                    aria-label={`Delete item ${index + 1}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Product / Description Field */}
+              {isCustom ? (
+                <div className="space-y-2">
+                  <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                    Item Description <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    ref={(el) => {
+                      if (el) inputRefs.current.set(`${row.id}_customDesc_mobile`, el);
+                      else inputRefs.current.delete(`${row.id}_customDesc_mobile`);
+                    }}
+                    type="text"
+                    placeholder="Custom item description..."
+                    value={row.customDescription || ''}
+                    onChange={(e) => updateRow(row.id, { customDescription: e.target.value })}
+                    className="w-full h-11 px-3 text-sm font-semibold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                  />
+                  <div className="flex items-center justify-between text-xs gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-faint text-[11px] font-semibold">HSN:</span>
+                      <input
+                        type="text"
+                        placeholder="73089090"
+                        value={row.customHsn || ''}
+                        onChange={(e) => updateRow(row.id, { customHsn: e.target.value })}
+                        className="w-24 h-8 px-2 text-xs font-mono rounded-control border border-line text-ink bg-surface-2 focus:bg-white focus:border-brand"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRow(row.id, {
+                          isCustomItem: false,
+                          product: null,
+                          productSearch: '',
+                          isProductDropdownOpen: true,
+                        })
+                      }
+                      className="min-h-[36px] text-xs text-brand hover:underline font-semibold"
+                    >
+                      Select Catalog Item &rarr;
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  ref={(el) => {
+                    if (el) dropdownRefs.current.set(`${row.id}_mobile`, el);
+                    else dropdownRefs.current.delete(`${row.id}_mobile`);
+                  }}
+                  className="space-y-1.5"
+                >
+                  <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                    Product <span className="text-danger">*</span>
+                  </label>
+                  {!row.product ? (
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-faint absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        ref={(el) => {
+                          if (el) inputRefs.current.set(`${row.id}_productSearch_mobile`, el);
+                          else inputRefs.current.delete(`${row.id}_productSearch_mobile`);
+                        }}
+                        type="text"
+                        placeholder="Search product name or HSN..."
+                        value={row.productSearch}
+                        onFocus={() => updateRow(row.id, { isProductDropdownOpen: true })}
+                        onClick={() => updateRow(row.id, { isProductDropdownOpen: true })}
+                        onChange={(e) =>
+                          updateRow(row.id, {
+                            productSearch: e.target.value,
+                            isProductDropdownOpen: true,
+                            highlightedProductIndex: 0,
+                          })
+                        }
+                        onKeyDown={(e) => handleKeyDownProductSearch(e, row, filtered)}
+                        className="w-full pl-9 pr-3 h-11 text-sm rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white font-medium"
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-control bg-surface-2 border border-line flex items-center justify-between gap-2">
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="font-bold text-ink text-sm truncate" title={row.product.name}>
+                          {row.product.name}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted">
+                          <span className="font-mono">HSN: {row.product.hsn}</span>
+                          <span>&bull;</span>
+                          <span>{row.product.category}</span>
+                          {isSheet && 'thicknessMm' in row.product && (
+                            <>
+                              <span>&bull;</span>
+                              <span>{row.product.thicknessMm}mm</span>
+                            </>
+                          )}
+                          {isPipe && 'kgPerMetre' in row.product && (
+                            <>
+                              <span>&bull;</span>
+                              <span>{row.product.kgPerMetre} kg/m</span>
+                            </>
+                          )}
+                          {isWeightPerPiece && 'kgPerPiece' in row.product && (
+                            <>
+                              <span>&bull;</span>
+                              <span>{row.product.kgPerPiece} kg/pc</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateRow(row.id, {
+                            product: null,
+                            productSearch: '',
+                            isProductDropdownOpen: true,
+                          })
+                        }
+                        className="min-h-[38px] text-xs text-brand hover:text-brand-dark font-semibold underline shrink-0 px-1"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Validation error */}
+              {row.validationError && (
+                <div className="p-2 bg-rose-50 border border-rose-200 rounded-control text-danger text-xs flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{row.validationError}</span>
+                </div>
+              )}
+
+              {/* Dimensions Section (if applicable) */}
+              {isCustom ? (
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <label className="text-xs font-semibold text-muted">Measurement Unit:</label>
+                  <select
+                    value={row.customUnit || 'Nos'}
+                    onChange={(e) => updateRow(row.id, { customUnit: e.target.value as ProductUnit })}
+                    className="h-10 px-3 text-xs font-semibold rounded-control border border-line-strong bg-white text-ink focus:border-brand"
+                  >
+                    <option value="Nos">Nos</option>
+                    <option value="Sq.Mtr">Sq.Mtr</option>
+                    <option value="Kgs">Kgs</option>
+                    <option value="Ft">Ft</option>
+                    <option value="R.Mtr">R.Mtr</option>
+                    <option value="Metre">Metre</option>
+                  </select>
+                </div>
+              ) : isSqm ? (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                      Length Dimension
+                    </label>
+                    <span className="text-[11px] text-muted">
+                      Width: {widthFactor ?? ('widthFactor' in (row.product || {}) && (row.product as any).widthFactor ? (row.product as any).widthFactor : 1.08)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={(el) => {
+                        if (el) inputRefs.current.set(`${row.id}_lengthValue_mobile`, el);
+                        else inputRefs.current.delete(`${row.id}_lengthValue_mobile`);
+                      }}
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={row.lengthValue ?? ''}
+                      placeholder="17.4"
+                      onChange={(e) => updateRow(row.id, { lengthValue: e.target.value })}
+                      className="flex-1 h-10 px-3 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                      title="Length value"
+                    />
+                    <select
+                      value={row.lengthUnit && ['ft', 'in', 'mm', 'm'].includes(row.lengthUnit) ? row.lengthUnit : 'ft'}
+                      onChange={(e) => updateRow(row.id, { lengthUnit: e.target.value as LengthUnit })}
+                      className="w-20 h-10 px-2 text-xs font-semibold rounded-control border border-line-strong bg-surface-2 text-ink focus:border-brand"
+                    >
+                      <option value="ft">ft</option>
+                      <option value="in">in</option>
+                      <option value="mm">mm</option>
+                      <option value="m">m</option>
+                    </select>
+                  </div>
+                </div>
+              ) : isWeightPerPiece ? (
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <label className="text-xs font-semibold text-muted">Weight per Piece:</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={row.kgPerPiece ?? ''}
+                      placeholder="40.00"
+                      onChange={(e) => updateRow(row.id, { kgPerPiece: e.target.value })}
+                      className="w-24 h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                    />
+                    <span className="font-semibold text-muted text-xs">kg/pc</span>
+                  </div>
+                </div>
+              ) : isSheet ? (
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                    Sheet Length
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        ref={(el) => {
+                          if (el) inputRefs.current.set(`${row.id}_lengthFeet_mobile`, el);
+                          else inputRefs.current.delete(`${row.id}_lengthFeet_mobile`);
+                        }}
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={row.lengthFeet}
+                        onChange={(e) => updateRow(row.id, { lengthFeet: e.target.value })}
+                        className="flex-1 h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                        placeholder="8"
+                      />
+                      <span className="font-semibold text-muted text-xs">ft</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        ref={(el) => {
+                          if (el) inputRefs.current.set(`${row.id}_lengthInches_mobile`, el);
+                          else inputRefs.current.delete(`${row.id}_lengthInches_mobile`);
+                        }}
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="11.9"
+                        value={row.lengthInches}
+                        onChange={(e) => updateRow(row.id, { lengthInches: e.target.value })}
+                        className="flex-1 h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                        placeholder="0"
+                      />
+                      <span className="font-semibold text-muted text-xs">in</span>
+                    </div>
+                  </div>
+                </div>
+              ) : isPipe ? (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                      Pipe Length
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRow(row.id, {
+                          lengthUnit: row.lengthUnit === 'metres' ? 'ft_in' : 'metres',
+                        })
+                      }
+                      className="min-h-[30px] text-[11px] px-2 py-0.5 rounded-control bg-surface-2 border border-line text-brand font-semibold"
+                    >
+                      {row.lengthUnit === 'metres' ? 'Switch to ft/in' : 'Switch to metres'}
+                    </button>
+                  </div>
+                  {row.lengthUnit === 'metres' ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={(el) => {
+                          if (el) inputRefs.current.set(`${row.id}_lengthMetres_mobile`, el);
+                          else inputRefs.current.delete(`${row.id}_lengthMetres_mobile`);
+                        }}
+                        type="number"
+                        step="0.01"
+                        min="0.1"
+                        value={row.lengthMetres}
+                        onChange={(e) => updateRow(row.id, { lengthMetres: e.target.value })}
+                        className="flex-1 h-10 px-3 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                        placeholder="6.0"
+                      />
+                      <span className="font-semibold text-muted text-xs">m</span>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          ref={(el) => {
+                            if (el) inputRefs.current.set(`${row.id}_lengthFeet_mobile`, el);
+                            else inputRefs.current.delete(`${row.id}_lengthFeet_mobile`);
+                          }}
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={row.lengthFeet}
+                          onChange={(e) => updateRow(row.id, { lengthFeet: e.target.value })}
+                          className="flex-1 h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                          placeholder="20"
+                        />
+                        <span className="font-semibold text-muted text-xs">ft</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          ref={(el) => {
+                            if (el) inputRefs.current.set(`${row.id}_lengthInches_mobile`, el);
+                            else inputRefs.current.delete(`${row.id}_lengthInches_mobile`);
+                          }}
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="11.9"
+                          value={row.lengthInches}
+                          onChange={(e) => updateRow(row.id, { lengthInches: e.target.value })}
+                          className="flex-1 h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                          placeholder="0"
+                        />
+                        <span className="font-semibold text-muted text-xs">in</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {/* Pieces (Nos) and Rate Grid */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1">
+                  <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                    Pieces (Nos) <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    ref={(el) => {
+                      if (el) inputRefs.current.set(`${row.id}_nos_mobile`, el);
+                      else inputRefs.current.delete(`${row.id}_nos_mobile`);
+                    }}
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={row.nos}
+                    onChange={(e) => updateRow(row.id, { nos: e.target.value })}
+                    className="w-full h-10 px-2.5 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                    Rate / Unit (₹)
+                  </label>
+                  <input
+                    ref={(el) => {
+                      if (el) inputRefs.current.set(`${row.id}_rate_mobile`, el);
+                      else inputRefs.current.delete(`${row.id}_rate_mobile`);
+                    }}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={row.rate}
+                    placeholder={row.product ? String(row.product.ratePerUnit) : '0.00'}
+                    onChange={(e) => updateRow(row.id, { rate: e.target.value })}
+                    className="w-full h-10 px-2.5 text-right text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Calculated Summary Box */}
+              <div className="p-3 bg-surface-2 rounded-control border border-line flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="text-[10px] text-faint font-semibold uppercase tracking-wider block">
+                    Total Quantity
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-mono tabular-nums font-bold text-ink text-sm">
+                      {row.calculatedLine
+                        ? `${Number(row.calculatedLine.quantity).toFixed(2)} ${row.calculatedLine.unit}`
+                        : '—'}
+                    </span>
+                    {row.calculatedLine && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenManualOverride(row)}
+                        className="p-1 rounded-control text-muted hover:text-brand hover:bg-white border border-transparent hover:border-line-strong transition"
+                        title="Override quantity manually"
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="text-[10px] text-faint font-semibold uppercase tracking-wider block">
+                    Taxable Amount
+                  </span>
+                  <span className="font-mono tabular-nums font-bold text-brand text-base">
+                    {row.calculatedLine
+                      ? `₹${Number(row.calculatedLine.taxableAmount).toFixed(2)}`
+                      : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Table Footer with Quick Add Button and Keyboard Hints */}
-      <div className="p-3 bg-surface-2 border-t border-line flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2">
+      <div className="p-3.5 bg-surface-2 border-t border-line flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={onAddRow}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
+            className="w-full sm:w-auto min-h-[44px] sm:min-h-[36px] inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
           >
-            <Plus className="w-3.5 h-3.5 text-brand" />
-            <span>Add item row</span>
+            <Plus className="w-4 h-4 text-brand" />
+            <span>+ Add Item Row</span>
           </button>
           <button
             type="button"
             onClick={onAddCustomRow ? onAddCustomRow : () => onRowsChange([...rows, createCustomRow()])}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
+            className="w-full sm:w-auto min-h-[44px] sm:min-h-[36px] inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
           >
-            <Plus className="w-3.5 h-3.5 text-brand" />
-            <span>+ Custom item</span>
+            <Plus className="w-4 h-4 text-brand" />
+            <span>+ Custom Item</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-muted text-[11px]">
+        <div className="hidden sm:flex items-center gap-2 text-muted text-[11px]">
           <span className="flex items-center gap-1">
             <CornerDownLeft className="w-3 h-3 text-brand" />
             <span className="font-medium">Press <strong className="font-semibold text-ink">Enter</strong> on Rate to add next row</span>
@@ -1391,13 +1882,13 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   <button
                     type="button"
                     onClick={handleCancelManualModal}
-                    className="px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 border border-line-strong rounded-control transition"
+                    className="min-h-[40px] px-3.5 py-2 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 border border-line-strong rounded-control transition"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-1 px-4 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-control text-xs font-semibold shadow-xs transition"
+                    className="min-h-[40px] inline-flex items-center gap-1.5 px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-control text-xs font-semibold shadow-xs transition"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>Apply</span>
@@ -1409,9 +1900,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     <button
                       type="button"
                       onClick={handleResetToCalculated}
-                      className="inline-flex items-center gap-1 text-[11px] text-brand hover:text-brand-dark font-semibold transition"
+                      className="min-h-[38px] inline-flex items-center gap-1 text-xs text-brand hover:text-brand-dark font-semibold transition"
                     >
-                      <RotateCcw className="w-3 h-3" />
+                      <RotateCcw className="w-3.5 h-3.5" />
                       <span>Return to calculated quantity</span>
                     </button>
                   </div>
@@ -1439,16 +1930,16 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           className="bg-white border border-line-strong rounded-control shadow-xl overflow-y-auto divide-y divide-line animate-in fade-in zoom-in-95 duration-100"
         >
           {getFilteredProducts(openRow.productSearch).length === 0 ? (
-            <div className="p-3 text-xs text-muted text-center space-y-2">
+            <div className="p-3.5 text-xs text-muted text-center space-y-2.5">
               <div>No catalog products match &quot;{openRow.productSearch}&quot;.</div>
               {openRow.productSearch.trim() && (
                 <button
                   type="button"
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     e.preventDefault();
                     handleConvertToCustom(openRow.id, openRow.productSearch.trim());
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand text-white rounded-control font-semibold text-xs hover:bg-brand-dark transition shadow-xs"
+                  className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-brand text-white rounded-control font-semibold text-xs hover:bg-brand-dark transition shadow-xs w-full"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add &quot;{openRow.productSearch.trim()}&quot; as custom item</span>
@@ -1463,18 +1954,18 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   role="option"
                   aria-selected={pIdx === openRow.highlightedProductIndex}
                   data-product-index={pIdx}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     e.preventDefault();
                     handleSelectProduct(openRow.id, p);
                   }}
-                  className={`p-2.5 cursor-pointer text-xs flex items-center justify-between transition ${
+                  className={`min-h-[44px] p-3 cursor-pointer text-xs flex items-center justify-between transition ${
                     pIdx === openRow.highlightedProductIndex
                       ? 'bg-brand-soft text-brand-deep font-semibold'
-                      : 'hover:bg-surface-2 text-ink'
+                      : 'hover:bg-surface-2 text-ink active:bg-surface-2'
                   }`}
                 >
                   <div className="pr-2 min-w-0">
-                    <div className="font-semibold truncate">{p.name}</div>
+                    <div className="font-semibold truncate text-xs">{p.name}</div>
                     <div className="text-[10px] text-muted flex items-center gap-1.5">
                       <span>{p.category}</span>
                       <span>&bull;</span>
@@ -1491,8 +1982,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               ))}
               {openRow.productSearch.trim() && (
                 <div
-                  className="p-2 border-t border-line bg-surface-2/60 hover:bg-surface-2 cursor-pointer text-xs flex items-center justify-between text-brand font-semibold"
-                  onMouseDown={(e) => {
+                  className="min-h-[44px] p-3 border-t border-line bg-surface-2/60 hover:bg-surface-2 active:bg-surface-2 cursor-pointer text-xs flex items-center justify-between text-brand font-semibold"
+                  onPointerDown={(e) => {
                     e.preventDefault();
                     handleConvertToCustom(openRow.id, openRow.productSearch.trim());
                   }}
