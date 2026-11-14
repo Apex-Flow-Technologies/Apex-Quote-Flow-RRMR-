@@ -53,6 +53,8 @@ const PRODUCT_CATEGORIES = [
   'L Sheet',
   'Fixing',
   'Pipe',
+  'Plate',
+  'Bar',
   'Other',
 ];
 
