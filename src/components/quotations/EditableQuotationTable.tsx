@@ -52,6 +52,14 @@ export interface EditableRowState {
   validationError: string | null;
 }
 
+/** Steel products carry their own default length (6 m, chequered plate 2.5 m). */
+function productDefaultLengthM(product?: Product | null): string | undefined {
+  if (product && product.qtyMethod === 'SECTION_WEIGHT' && product.defaultLengthM && product.defaultLengthM > 0) {
+    return String(product.defaultLengthM);
+  }
+  return undefined;
+}
+
 export function createInitialRow(customId?: string, product?: Product): EditableRowState {
   const id = customId || `row_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const defaultRate = product ? String(product.ratePerUnit) : '';
@@ -76,7 +84,7 @@ export function createInitialRow(customId?: string, product?: Product): Editable
     lengthValue: product?.qtyMethod === 'SQM' ? '17.4' : '',
     lengthFeet: '8',
     lengthInches: '0',
-    lengthMetres: '6',
+    lengthMetres: productDefaultLengthM(product) ?? '6',
     lengthUnit: defaultUnit,
     kgPerPiece: defaultKgPerPiece,
     nos: '1',
@@ -607,7 +615,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           kgPerPiece: defaultKgPerPiece || r.kgPerPiece || '',
           lengthFeet: r.lengthFeet || '8',
           lengthInches: r.lengthInches || '0',
-          lengthMetres: r.lengthMetres || '6',
+          lengthMetres: productDefaultLengthM(product) ?? (r.lengthMetres || '6'),
           nos: r.nos || '1',
         };
         const { calculatedLine, validationError } = computeRowCalculation(updated, taxMode, widthFactor, feetToMetre);

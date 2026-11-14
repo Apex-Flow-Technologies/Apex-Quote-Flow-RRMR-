@@ -1,0 +1,168 @@
+import Decimal from 'decimal.js';
+
+/**
+ * Structural steel weight engine (IS standard formulas, bare MS steel 7.85 g/cm³).
+ *
+ * Every shape resolves to a weight per metre (kg/m). The product is then sold as a
+ * SECTION_WEIGHT line: per-piece kg = length (m) × kg/m, line kg = per-piece × Nos.
+ *
+ * All dimensions are in millimetres.
+ */
+
+export type SteelShape =
+  | 'ROUND_PIPE' // CHS — IS 1161 / IS 4923 style
+  | 'SQUARE_PIPE' // SHS — IS 4923
+  | 'RECT_PIPE' // RHS — IS 4923
+  | 'PLATE'
+  | 'CHEQUERED_PLATE'
+  | 'FLAT'
+  | 'ROUND_BAR'
+  | 'SQUARE_BAR'
+  | 'CHART'; // Angle / Channel / Beam — kg/m typed from the IS chart
+
+export interface SteelDims {
+  odMm?: number; // round pipe outside diameter
+  sideMm?: number; // square pipe / square bar side
+  widthMm?: number; // rect pipe width, plate / flat width
+  heightMm?: number; // rect pipe height
+  thicknessMm?: number; // wall / plate / flat thickness
+  diameterMm?: number; // round bar diameter
+  kgPerSqm?: number; // chequered plate chart weight (optional override)
+}
+
+export const STEEL_DENSITY_KG_PER_M_PER_MM2 = new Decimal('0.00785'); // 7.85 g/cm³
+export const ROUND_PIPE_FACTOR = new Decimal('0.02466'); // π × 0.00785
+export const ROUND_BAR_FACTOR = new Decimal('0.00617'); // π/4 × 0.00785 (IS d²/162)
+export const DEFAULT_STEEL_LENGTH_M = 6;
+export const DEFAULT_CHEQUERED_PLATE_LENGTH_M = 2.5;
+
+export const STEEL_SHAPE_LABELS: Record<SteelShape, string> = {
+  ROUND_PIPE: 'Round pipe (CHS)',
+  SQUARE_PIPE: 'Square pipe (SHS)',
+  RECT_PIPE: 'Rectangular pipe (RHS)',
+  PLATE: 'MS plate',
+  CHEQUERED_PLATE: 'Chequered plate',
+  FLAT: 'MS flat',
+  ROUND_BAR: 'Round bar',
+  SQUARE_BAR: 'Square bar',
+  CHART: 'Angle / Channel / Beam (chart kg/m)',
+};
+
+/** Which dimension inputs each shape needs (in display order). */
+export const STEEL_SHAPE_FIELDS: Record<SteelShape, (keyof SteelDims)[]> = {
+  ROUND_PIPE: ['odMm', 'thicknessMm'],
+  SQUARE_PIPE: ['sideMm', 'thicknessMm'],
+  RECT_PIPE: ['widthMm', 'heightMm', 'thicknessMm'],
+  PLATE: ['widthMm', 'thicknessMm'],
+  CHEQUERED_PLATE: ['widthMm', 'thicknessMm', 'kgPerSqm'],
+  FLAT: ['widthMm', 'thicknessMm'],
+  ROUND_BAR: ['diameterMm'],
+  SQUARE_BAR: ['sideMm'],
+  CHART: [],
+};
+
+export const STEEL_DIM_LABELS: Record<keyof SteelDims, string> = {
+  odMm: 'Outside dia (mm)',
+  sideMm: 'Side (mm)',
+  widthMm: 'Width (mm)',
+  heightMm: 'Height (mm)',
+  thicknessMm: 'Thickness (mm)',
+  diameterMm: 'Diameter (mm)',
+  kgPerSqm: 'Chart kg/m² (optional)',
+};
+
+export function defaultLengthForShape(shape: SteelShape): number {
+  return shape === 'CHEQUERED_PLATE' ? DEFAULT_CHEQUERED_PLATE_LENGTH_M : DEFAULT_STEEL_LENGTH_M;
+}
+
+function pos(v: number | undefined): Decimal | null {
+  if (v === undefined || v === null || !isFinite(v) || v <= 0) return null;
+  return new Decimal(v);
+}
+
+/**
+ * Unrounded kg/m for a shape, or null if the dimensions are missing / impossible.
+ */
+export function calculateSteelKgPerMetreRaw(shape: SteelShape, dims: SteelDims): Decimal | null {
+  const t = pos(dims.thicknessMm);
+
+  switch (shape) {
+    case 'ROUND_PIPE': {
+      const od = pos(dims.odMm);
+      if (!od || !t || t.times(2).gte(od)) return null;
+      return od.minus(t).times(t).times(ROUND_PIPE_FACTOR);
+    }
+
+    case 'SQUARE_PIPE':
+    case 'RECT_PIPE': {
+      const b = shape === 'SQUARE_PIPE' ? pos(dims.sideMm) : pos(dims.widthMm);
+      const h = shape === 'SQUARE_PIPE' ? pos(dims.sideMm) : pos(dims.heightMm);
+      if (!b || !h || !t || t.times(2).gte(Decimal.min(b, h))) return null;
+      // IS 4923: A = 2t(B + H − 2t) − (4 − π)(ro² − ri²), with ro = 2t, ri = t → (4 − π)·3t²
+      const flat = t.times(2).times(b.plus(h).minus(t.times(2)));
+      const corner = new Decimal(4).minus(Decimal.acos(-1)).times(t.pow(2).times(3));
+      return flat.minus(corner).times(STEEL_DENSITY_KG_PER_M_PER_MM2);
+    }
+
+    case 'PLATE':
+    case 'FLAT': {
+      const w = pos(dims.widthMm);
+      if (!w || !t) return null;
+      return w.times(t).times(STEEL_DENSITY_KG_PER_M_PER_MM2);
+    }
+
+    case 'CHEQUERED_PLATE': {
+      const w = pos(dims.widthMm);
+      if (!w) return null;
+      const chart = pos(dims.kgPerSqm);
+      if (chart) return w.dividedBy(1000).times(chart);
+      if (!t) return null;
+      return w.times(t).times(STEEL_DENSITY_KG_PER_M_PER_MM2);
+    }
+
+    case 'ROUND_BAR': {
+      const d = pos(dims.diameterMm);
+      if (!d) return null;
+      return d.pow(2).times(ROUND_BAR_FACTOR);
+    }
+
+    case 'SQUARE_BAR': {
+      const a = pos(dims.sideMm);
+      if (!a) return null;
+      return a.pow(2).times(STEEL_DENSITY_KG_PER_M_PER_MM2);
+    }
+
+    case 'CHART':
+    default:
+      return null;
+  }
+}
+
+/** kg/m rounded to 3 decimals (stored on the product as kgPerMetre). */
+export function calculateSteelKgPerMetre(shape: SteelShape, dims: SteelDims): number | null {
+  const raw = calculateSteelKgPerMetreRaw(shape, dims);
+  return raw ? raw.toDecimalPlaces(3, Decimal.ROUND_HALF_UP).toNumber() : null;
+}
+
+/** Short size text, e.g. "48.3 OD × 3.2", "60 × 60 × 3.2", "1250 × 5". */
+export function formatSteelSize(shape: SteelShape, dims: SteelDims): string {
+  const n = (v?: number) => (v === undefined ? '?' : String(v));
+  switch (shape) {
+    case 'ROUND_PIPE':
+      return `${n(dims.odMm)} OD × ${n(dims.thicknessMm)}`;
+    case 'SQUARE_PIPE':
+      return `${n(dims.sideMm)} × ${n(dims.sideMm)} × ${n(dims.thicknessMm)}`;
+    case 'RECT_PIPE':
+      return `${n(dims.widthMm)} × ${n(dims.heightMm)} × ${n(dims.thicknessMm)}`;
+    case 'PLATE':
+    case 'CHEQUERED_PLATE':
+    case 'FLAT':
+      return `${n(dims.widthMm)} × ${n(dims.thicknessMm)}`;
+    case 'ROUND_BAR':
+      return `Ø${n(dims.diameterMm)}`;
+    case 'SQUARE_BAR':
+      return `${n(dims.sideMm)} × ${n(dims.sideMm)}`;
+    default:
+      return '';
+  }
+}

@@ -1,3 +1,5 @@
+import type { SteelShape, SteelDims } from '../engine/steel';
+
 export type QuantityMethod =
   | 'SQM'
   | 'WEIGHT_PER_PIECE'
@@ -70,6 +72,11 @@ export interface SectionProduct extends BaseProduct {
   kgPerMetre: number;
   thicknessMm?: number;
   thickness?: number;
+  // Structural steel: shape + dimensions the kg/m was derived from (IS formula)
+  steelShape?: SteelShape;
+  steelDims?: SteelDims;
+  // Length pre-filled on new quotation lines (metres). Default 6 m; chequered plate 2.5 m.
+  defaultLengthM?: number;
 }
 
 export interface PieceProduct extends BaseProduct {

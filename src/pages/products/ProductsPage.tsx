@@ -15,6 +15,16 @@ import {
 } from '../../types/product';
 import { Decimal } from 'decimal.js';
 import {
+  type SteelShape,
+  type SteelDims,
+  STEEL_SHAPE_LABELS,
+  STEEL_SHAPE_FIELDS,
+  STEEL_DIM_LABELS,
+  calculateSteelKgPerMetre,
+  defaultLengthForShape,
+  formatSteelSize,
+} from '../../engine/steel';
+import {
   Package,
   Plus,
   Sparkles,
@@ -62,7 +72,20 @@ interface ProductFormData {
   kgPerMetre: string;
   kgPerPiece: string;
   widthFactor: string;
+  steelShape: SteelShape;
+  steelDims: Partial<Record<keyof SteelDims, string>>;
+  defaultLengthM: string;
   active: boolean;
+}
+
+/** Parses the string dimension inputs into numbers (blank → undefined). */
+function parseSteelDims(dims: Partial<Record<keyof SteelDims, string>>): SteelDims {
+  const out: SteelDims = {};
+  (Object.keys(dims) as (keyof SteelDims)[]).forEach((k) => {
+    const v = dims[k];
+    if (v !== undefined && v.trim() !== '' && isFinite(Number(v))) out[k] = Number(v);
+  });
+  return out;
 }
 
 const INITIAL_FORM_STATE: ProductFormData = {
@@ -81,6 +104,9 @@ const INITIAL_FORM_STATE: ProductFormData = {
   kgPerMetre: '2.34',
   kgPerPiece: '',
   widthFactor: '1.08',
+  steelShape: 'CHART',
+  steelDims: {},
+  defaultLengthM: '6',
   active: true,
 };
 
@@ -124,6 +150,8 @@ export const ProductsPage: React.FC = () => {
   const fieldIdCoilWidth = useId();
   const fieldIdDensity = useId();
   const fieldIdKgPerMetre = useId();
+  const fieldIdSteelShape = useId();
+  const fieldIdDefaultLength = useId();
   const fieldIdWidthFactor = useId();
   const fieldIdKgPerPiece = useId();
   const fieldIdBaseRate = useId();
@@ -246,10 +274,36 @@ export const ProductsPage: React.FC = () => {
         'widthFactor' in product && product.widthFactor !== undefined
           ? String(product.widthFactor)
           : '1.08',
+      steelShape: ('steelShape' in product && product.steelShape) || 'CHART',
+      steelDims:
+        'steelDims' in product && product.steelDims
+          ? Object.fromEntries(
+              Object.entries(product.steelDims).map(([k, v]) => [k, v === undefined ? '' : String(v)])
+            )
+          : {},
+      defaultLengthM:
+        'defaultLengthM' in product && product.defaultLengthM !== undefined
+          ? String(product.defaultLengthM)
+          : '6',
       active: product.active,
     });
     setFormErrors({});
     setIsAddEditOpen(true);
+  };
+
+  // Live kg/m from the IS formula for the steel shape currently in the form
+  const computedSteelKgPerMetre = useMemo(() => {
+    if (formData.qtyMethod !== 'SECTION_WEIGHT' || formData.steelShape === 'CHART') return null;
+    return calculateSteelKgPerMetre(formData.steelShape, parseSteelDims(formData.steelDims));
+  }, [formData.qtyMethod, formData.steelShape, formData.steelDims]);
+
+  const handleSteelShapeChange = (shape: SteelShape) => {
+    setFormData((prev) => ({
+      ...prev,
+      steelShape: shape,
+      steelDims: {},
+      defaultLengthM: String(defaultLengthForShape(shape)),
+    }));
   };
 
   // Handle method change in form
@@ -354,7 +408,19 @@ export const ProductsPage: React.FC = () => {
       } catch {
         errors.coilWidthM = 'Invalid coil width number';
       }
+    } else if (formData.qtyMethod === 'SECTION_WEIGHT' && formData.steelShape !== 'CHART') {
+      if (computedSteelKgPerMetre === null) {
+        errors.steelDims = 'Enter valid dimensions — weight per metre could not be calculated';
+      }
+      const len = Number(formData.defaultLengthM);
+      if (formData.defaultLengthM.trim() !== '' && (!isFinite(len) || len <= 0)) {
+        errors.defaultLengthM = 'Default length must be greater than 0 m';
+      }
     } else if (formData.qtyMethod === 'SECTION_WEIGHT') {
+      const len = Number(formData.defaultLengthM);
+      if (formData.defaultLengthM.trim() !== '' && (!isFinite(len) || len <= 0)) {
+        errors.defaultLengthM = 'Default length must be greater than 0 m';
+      }
       try {
         if (!formData.kgPerMetre || formData.kgPerMetre.trim() === '') {
           errors.kgPerMetre = 'Weight per metre is required for pipe calculation';
@@ -442,10 +508,19 @@ export const ProductsPage: React.FC = () => {
           stockMethod: 'WEIGHT',
         };
       } else if (formData.qtyMethod === 'SECTION_WEIGHT') {
+        const isFormulaShape = formData.steelShape !== 'CHART';
+        const dims = parseSteelDims(formData.steelDims);
         finalPayload = {
           ...basePayload,
           qtyMethod: 'SECTION_WEIGHT',
-          kgPerMetre: new Decimal(formData.kgPerMetre).toNumber(),
+          unit: 'Kgs',
+          kgPerMetre: isFormulaShape && computedSteelKgPerMetre !== null
+            ? computedSteelKgPerMetre
+            : new Decimal(formData.kgPerMetre).toNumber(),
+          steelShape: formData.steelShape,
+          steelDims: isFormulaShape ? dims : {},
+          thicknessMm: isFormulaShape ? dims.thicknessMm : undefined,
+          defaultLengthM: formData.defaultLengthM.trim() ? Number(formData.defaultLengthM) : 6,
           stockMethod: 'WEIGHT',
         };
       } else if (formData.qtyMethod === 'PIECE') {
@@ -737,7 +812,13 @@ export const ProductsPage: React.FC = () => {
                             </span>
                           )}
                           {isPipe && 'kgPerMetre' in product && (
-                            <span>Weight: <strong className="font-mono tabular-nums text-ink">{product.kgPerMetre} kg/m</strong></span>
+                            <span>
+                              {'steelShape' in product && product.steelShape && product.steelShape !== 'CHART' && product.steelDims && (
+                                <>{STEEL_SHAPE_LABELS[product.steelShape]} {formatSteelSize(product.steelShape, product.steelDims)} &bull; </>
+                              )}
+                              Weight: <strong className="font-mono tabular-nums text-ink">{product.kgPerMetre} kg/m</strong>
+                              {'defaultLengthM' in product && product.defaultLengthM ? <> &bull; {product.defaultLengthM} m length</> : null}
+                            </span>
                           )}
                           {isPiece && <span>Fixed unit count</span>}
                           {isCustom && <span>Custom / Service item</span>}
@@ -1140,29 +1221,106 @@ export const ProductsPage: React.FC = () => {
               {formData.qtyMethod === 'SECTION_WEIGHT' && (
                 <div className="bg-surface-2 p-3.5 rounded-card border border-line space-y-3">
                   <div className="font-semibold text-ink text-xs flex items-center justify-between">
-                    <span>Pipe / Section Weight Parameters</span>
+                    <span>Steel / Section Weight Parameters</span>
                     <span className="text-[10px] text-muted font-normal">
-                      Formula: Length (ft) × 0.3048 × Weight per Metre (kg/m)
+                      Kgs = Length (m) × kg/m × Nos
                     </span>
                   </div>
 
-                  <div>
-                    <label htmlFor={fieldIdKgPerMetre} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
-                      Weight per Metre (kg/m) <span className="text-danger">*</span>
-                    </label>
-                    <input
-                      id={fieldIdKgPerMetre}
-                      type="number"
-                      step="0.01"
-                      value={formData.kgPerMetre}
-                      onChange={(e) => setFormData({ ...formData, kgPerMetre: e.target.value })}
-                      placeholder="e.g. 2.34 (from IS 4923 table)"
-                      className="w-full py-1.5 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-semibold text-ink focus:outline-none focus:border-brand max-w-xs"
-                    />
-                    {formErrors.kgPerMetre && (
-                      <p className="text-danger text-[10px] mt-0.5">{formErrors.kgPerMetre}</p>
-                    )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor={fieldIdSteelShape} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Steel Shape
+                      </label>
+                      <select
+                        id={fieldIdSteelShape}
+                        value={formData.steelShape}
+                        onChange={(e) => handleSteelShapeChange(e.target.value as SteelShape)}
+                        className="w-full py-1.5 px-3 rounded-control border border-line-strong bg-white font-medium text-ink focus:outline-none focus:border-brand"
+                      >
+                        {(Object.keys(STEEL_SHAPE_LABELS) as SteelShape[]).map((s) => (
+                          <option key={s} value={s}>{STEEL_SHAPE_LABELS[s]}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor={fieldIdDefaultLength} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Default Length (m)
+                      </label>
+                      <input
+                        id={fieldIdDefaultLength}
+                        type="number"
+                        step="0.01"
+                        value={formData.defaultLengthM}
+                        onChange={(e) => setFormData({ ...formData, defaultLengthM: e.target.value })}
+                        placeholder="6"
+                        className="w-full py-1.5 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums text-ink focus:outline-none focus:border-brand"
+                      />
+                      <span className="text-[10px] text-muted mt-0.5 block">Pre-filled on quotes; editable per line.</span>
+                      {formErrors.defaultLengthM && (
+                        <p className="text-danger text-[10px] mt-0.5">{formErrors.defaultLengthM}</p>
+                      )}
+                    </div>
                   </div>
+
+                  {formData.steelShape !== 'CHART' ? (
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {STEEL_SHAPE_FIELDS[formData.steelShape].map((key) => (
+                          <div key={key}>
+                            <label className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                              {STEEL_DIM_LABELS[key]}
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={formData.steelDims[key] ?? ''}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    steelDims: { ...formData.steelDims, [key]: e.target.value },
+                                  })
+                                }
+                                className="mt-1 w-full py-1.5 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums text-ink normal-case tracking-normal font-normal focus:outline-none focus:border-brand"
+                              />
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-xs text-ink">
+                        Weight per metre (IS formula):{' '}
+                        <strong className="font-mono tabular-nums">
+                          {computedSteelKgPerMetre !== null ? `${computedSteelKgPerMetre} kg/m` : '—'}
+                        </strong>
+                        {computedSteelKgPerMetre !== null && formData.defaultLengthM.trim() !== '' && Number(formData.defaultLengthM) > 0 && (
+                          <span className="text-muted">
+                            {' '}&bull; {formData.defaultLengthM} m piece ≈{' '}
+                            {new Decimal(computedSteelKgPerMetre).times(formData.defaultLengthM).toDecimalPlaces(2).toString()} kg
+                          </span>
+                        )}
+                      </div>
+                      {formErrors.steelDims && (
+                        <p className="text-danger text-[10px] mt-0.5">{formErrors.steelDims}</p>
+                      )}
+                    </>
+                  ) : (
+                    <div>
+                      <label htmlFor={fieldIdKgPerMetre} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">
+                        Weight per Metre (kg/m) <span className="text-danger">*</span>
+                      </label>
+                      <input
+                        id={fieldIdKgPerMetre}
+                        type="number"
+                        step="0.01"
+                        value={formData.kgPerMetre}
+                        onChange={(e) => setFormData({ ...formData, kgPerMetre: e.target.value })}
+                        placeholder="From IS chart, e.g. ISA 50×50×6 = 4.5"
+                        className="w-full py-1.5 px-3 rounded-control border border-line-strong bg-white font-mono tabular-nums font-semibold text-ink focus:outline-none focus:border-brand max-w-xs"
+                      />
+                      {formErrors.kgPerMetre && (
+                        <p className="text-danger text-[10px] mt-0.5">{formErrors.kgPerMetre}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
