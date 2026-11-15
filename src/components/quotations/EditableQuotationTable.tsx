@@ -33,6 +33,7 @@ import {
   computeRowCalculation,
   isRateHint,
   productDefaultLengthM,
+  weightPreview,
 } from './quotationRows';
 
 interface DropdownPosition {
@@ -922,7 +923,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                         }
                       }}
                       className="w-14 py-1.5 px-1.5 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
-                      title="Number of pieces (Nos)"
+                      title={row.product?.qtyMethod === 'SECTION_WEIGHT' ? 'Number of lengths (pieces)' : 'Number of pieces (Nos)'}
                     />
                   </td>
 
@@ -972,9 +973,19 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <span className="text-faint text-xs">—</span>
-                    )}
+                    ) : (() => {
+                      const wp = weightPreview(row, widthFactor, feetToMetre);
+                      return wp ? (
+                        <div className="text-right">
+                          <div className="font-mono tabular-nums font-bold text-ink text-xs">
+                            {wp.quantity.toFixed(2)} <span className="font-medium text-muted text-[11px]">{wp.unit}</span>
+                          </div>
+                          <div className="text-[10px] text-faint font-mono tabular-nums">{wp.perPiece} {wp.unit}/pc</div>
+                        </div>
+                      ) : (
+                        <span className="text-faint text-xs">—</span>
+                      );
+                    })()}
                   </td>
 
                   {/* Rate Input */}
@@ -990,11 +1001,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                         step="0.01"
                         min="0"
                         value={row.rate}
-                        placeholder={row.product && row.product.ratePerUnit > 0 ? String(row.product.ratePerUnit) : 'Enter rate'}
+                        placeholder={row.product && row.product.ratePerUnit > 0 ? String(row.product.ratePerUnit) : /^kg/i.test(row.product?.unit || '') ? '₹ per kg' : 'Enter rate'}
                         onChange={(e) => updateRow(row.id, { rate: e.target.value })}
                         onKeyDown={(e) => handleKeyDownRate(e, index)}
                         className="w-full py-1.5 px-2 text-right text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
-                        title="Rate per unit (₹). Press Enter to add next line."
+                        title={`Rate per ${row.product && !row.isCustomItem ? (/^kg/i.test(row.product.unit) ? 'kg' : row.product.unit) : 'unit'} (₹). Press Enter to add next line.`}
                       />
                     </div>
                   </td>
@@ -1441,7 +1452,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1">
                   <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
-                    Pieces (Nos) <span className="text-danger">*</span>
+                    {row.product?.qtyMethod === 'SECTION_WEIGHT' ? 'No. of lengths' : 'Pieces (Nos)'} <span className="text-danger">*</span>
                   </label>
                   <input
                     ref={(el) => {
@@ -1460,7 +1471,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
                 <div className="space-y-1">
                   <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
-                    Rate / Unit (₹)
+                    {row.product && !row.isCustomItem ? `Rate / ${/^kg/i.test(row.product.unit) ? 'kg' : row.product.unit} (₹)` : 'Rate / Unit (₹)'}
                   </label>
                   <input
                     ref={(el) => {
@@ -1472,7 +1483,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     step="0.01"
                     min="0"
                     value={row.rate}
-                    placeholder={row.product && row.product.ratePerUnit > 0 ? String(row.product.ratePerUnit) : 'Enter rate'}
+                    placeholder={row.product && row.product.ratePerUnit > 0 ? String(row.product.ratePerUnit) : /^kg/i.test(row.product?.unit || '') ? '₹ per kg' : 'Enter rate'}
                     onChange={(e) => updateRow(row.id, { rate: e.target.value })}
                     className="w-full h-10 px-2.5 text-right text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
                   />
@@ -1483,13 +1494,15 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               <div className="p-3 bg-surface-2 rounded-control border border-line flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <span className="text-[10px] text-faint font-semibold uppercase tracking-wider block">
-                    Total Quantity
+                    {row.product?.qtyMethod === 'SECTION_WEIGHT' ? 'Total Weight' : 'Total Quantity'}
                   </span>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-mono tabular-nums font-bold text-ink text-sm">
-                      {row.calculatedLine
-                        ? `${Number(row.calculatedLine.quantity).toFixed(2)} ${row.calculatedLine.unit}`
-                        : '—'}
+                      {(() => {
+                        if (row.calculatedLine) return `${Number(row.calculatedLine.quantity).toFixed(2)} ${row.calculatedLine.unit}`;
+                        const wp = weightPreview(row, widthFactor, feetToMetre);
+                        return wp ? `${wp.quantity.toFixed(2)} ${wp.unit}` : '—';
+                      })()}
                     </span>
                     {row.calculatedLine && (
                       <button
@@ -1502,6 +1515,15 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       </button>
                     )}
                   </div>
+                  {(() => {
+                    const wp = weightPreview(row, widthFactor, feetToMetre);
+                    if (!wp || row.isManualQuantity) return null;
+                    return (
+                      <span className="block text-[11px] text-muted font-mono tabular-nums mt-0.5">
+                        {wp.perPiece} kg per length × {row.nos || 1}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="text-right shrink-0">

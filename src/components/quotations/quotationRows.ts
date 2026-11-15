@@ -358,3 +358,22 @@ export function computeRowCalculation(
     return { calculatedLine: null, validationError: msg };
   }
 }
+
+/**
+ * Weight preview for a by-weight (steel) row before a rate is entered.
+ * Runs the same calculation with a placeholder rate so the kg shown matches what will be saved.
+ */
+export function weightPreview(
+  row: EditableRowState,
+  widthFactor?: number,
+  feetToMetre?: number
+): { quantity: number; unit: string; perPiece: number } | null {
+  if (row.isCustomItem || !row.product || row.product.qtyMethod !== 'SECTION_WEIGHT') return null;
+  if (row.calculatedLine) {
+    return { quantity: row.calculatedLine.quantity, unit: row.calculatedLine.unit, perPiece: row.calculatedLine.perPieceQuantity };
+  }
+  const { calculatedLine } = computeRowCalculation({ ...row, rate: '1' }, 'intra', widthFactor, feetToMetre);
+  return calculatedLine
+    ? { quantity: calculatedLine.quantity, unit: calculatedLine.unit, perPiece: calculatedLine.perPieceQuantity }
+    : null;
+}
