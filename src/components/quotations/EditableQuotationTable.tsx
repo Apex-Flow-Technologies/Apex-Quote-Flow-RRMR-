@@ -428,7 +428,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
   useEffect(() => {
     if (openRow) {
       updateDropdownPosition();
-      const handleScrollOrResize = () => {
+      const handleScrollOrResize = (e?: Event) => {
+        // Scrolling the list itself must not trigger a re-position
+        if (e && e.target instanceof Node && portalDropdownRef.current?.contains(e.target)) return;
         updateDropdownPosition();
       };
       window.addEventListener('scroll', handleScrollOrResize, true);
@@ -1978,7 +1980,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
             maxHeight: `${dropdownPos.maxHeight}px`,
             zIndex: 9999,
           }}
-          className="bg-white border border-line-strong rounded-control shadow-xl overflow-y-auto divide-y divide-line animate-in fade-in zoom-in-95 duration-100"
+          className="bg-white border border-line-strong rounded-card shadow-xl overflow-y-auto overscroll-contain touch-pan-y divide-y divide-line animate-in fade-in zoom-in-95 duration-100"
         >
           {getFilteredProducts(openRow.productSearch).length === 0 ? (
             <div className="p-3.5 text-xs text-muted text-center space-y-2.5">
@@ -1986,8 +1988,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               {openRow.productSearch.trim() && (
                 <button
                   type="button"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
                     handleConvertToCustom(openRow.id, openRow.productSearch.trim());
                   }}
                   className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-brand text-white rounded-control font-semibold text-xs hover:bg-brand-dark transition shadow-xs w-full"
@@ -2005,8 +2007,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   role="option"
                   aria-selected={pIdx === openRow.highlightedProductIndex}
                   data-product-index={pIdx}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
                     handleSelectProduct(openRow.id, p);
                   }}
                   className={`min-h-[44px] p-3 cursor-pointer text-xs flex items-center justify-between transition ${
@@ -2042,8 +2044,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               {openRow.productSearch.trim() && (
                 <div
                   className="min-h-[44px] p-3 border-t border-line bg-surface-2/60 hover:bg-surface-2 active:bg-surface-2 cursor-pointer text-xs flex items-center justify-between text-brand font-semibold"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
                     handleConvertToCustom(openRow.id, openRow.productSearch.trim());
                   }}
                 >
