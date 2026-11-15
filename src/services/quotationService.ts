@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDocsFromCache,
   getDoc,
   runTransaction,
   serverTimestamp,
@@ -24,6 +25,22 @@ export interface SavedQuotationResult {
  * Retrieves all saved quotations from Firestore.
  * Sorts client-side by quotationNumber descending (or createdAt desc).
  */
+function sortQuotations(quotations: Quotation[]): Quotation[] {
+  return quotations.sort((a, b) =>
+    a.quotationNumber && b.quotationNumber ? b.quotationNumber.localeCompare(a.quotationNumber) : 0
+  );
+}
+
+/** Quotations from the on-device cache (instant; may be slightly stale). Empty if nothing cached. */
+export async function getQuotationsFromDevice(): Promise<Quotation[]> {
+  try {
+    const snap = await getDocsFromCache(collection(db, QUOTATIONS_COLLECTION));
+    return sortQuotations(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Quotation));
+  } catch {
+    return [];
+  }
+}
+
 export async function getQuotations(): Promise<Quotation[]> {
   const colRef = collection(db, QUOTATIONS_COLLECTION);
   const snap = await getDocs(colRef);

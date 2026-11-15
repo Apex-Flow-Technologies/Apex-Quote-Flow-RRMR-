@@ -494,6 +494,8 @@ export const CustomersPage: React.FC = () => {
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="+91 98765 43210"
+                    inputMode="tel"
+                    autoComplete="tel"
                     className="w-full h-9 py-1.5 px-3 rounded-control border border-line-strong focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand text-xs text-ink bg-white font-medium"
                   />
                 </div>

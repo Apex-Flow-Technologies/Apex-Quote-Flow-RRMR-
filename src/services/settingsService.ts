@@ -6,6 +6,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { invalidateMasterData } from './masterDataCache';
 import type { CompanySettings } from '../types/settings';
 
 const SETTINGS_COLLECTION = 'settings';
@@ -19,6 +20,7 @@ export async function getCompanySettings(): Promise<CompanySettings | null> {
 }
 
 export async function setCompanySettings(settings: CompanySettings): Promise<void> {
+  invalidateMasterData('company');
   const docRef = doc(db, SETTINGS_COLLECTION, COMPANY_SETTINGS_DOC);
   await setDoc(docRef, {
     ...settings,
@@ -27,6 +29,7 @@ export async function setCompanySettings(settings: CompanySettings): Promise<voi
 }
 
 export async function updateCompanySettings(updates: Partial<CompanySettings>): Promise<void> {
+  invalidateMasterData('company');
   const docRef = doc(db, SETTINGS_COLLECTION, COMPANY_SETTINGS_DOC);
   await updateDoc(docRef, {
     ...updates,

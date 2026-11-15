@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useId, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { getCustomers } from '../../services/customerService';
-import { getProducts } from '../../services/productService';
-import { getCompanySettings } from '../../services/settingsService';
+import {
+  getCustomersCached,
+  getProductsCached,
+  getCompanySettingsCached,
+} from '../../services/masterDataCache';
 import { createQuotation } from '../../services/quotationService';
 import {
   calculateQuotationTotals,
@@ -104,10 +106,11 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
       try {
         setLoadingMasters(true);
         setMasterError(null);
+        // Cached (instant) with background refresh from the server
         const [loadedCustomers, loadedProducts, loadedCompany] = await Promise.all([
-          getCustomers(),
-          getProducts(),
-          getCompanySettings(),
+          getCustomersCached((fresh) => setCustomers(fresh)),
+          getProductsCached((fresh) => setProducts(fresh.filter((p) => p.active))),
+          getCompanySettingsCached((fresh) => setCompanySettings(fresh)),
         ]);
         setCustomers(loadedCustomers);
         // Only active products can be added to new quotes
@@ -512,6 +515,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                 <input
                   id="quote-width-factor"
                   type="number"
+                  inputMode="decimal"
                   step="0.001"
                   min="0.1"
                   value={widthFactor}
@@ -656,6 +660,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                   <span className="font-medium text-ink">Advance Received (₹):</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="0"
                     value={advanceAmount}

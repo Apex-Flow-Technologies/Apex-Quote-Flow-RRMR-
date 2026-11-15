@@ -442,6 +442,8 @@ export const SettingsPage: React.FC = () => {
                           value={phone}
                           onChange={(e) => handlePhoneChange(idx, e.target.value)}
                           placeholder="+91 98422 12345"
+                    inputMode="tel"
+                    autoComplete="tel"
                           className="flex-1 h-9 py-1.5 px-3 rounded-control border border-line-strong focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand disabled:bg-surface-2 disabled:text-muted text-ink font-mono tabular-nums text-xs"
                         />
                         {isAdmin && settings.phones.length > 1 && (
@@ -636,6 +638,7 @@ export const SettingsPage: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.001"
                   disabled={!isAdmin}
                   value={settings.defaultWidthFactor ?? 1.08}
@@ -656,6 +659,7 @@ export const SettingsPage: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.0001"
                   disabled={!isAdmin}
                   value={settings.feetToMetre ?? 0.305}

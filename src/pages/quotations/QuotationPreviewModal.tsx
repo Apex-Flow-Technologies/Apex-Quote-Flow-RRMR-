@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Quotation } from '../../types/quotation';
+import type { Quotation, QuotationLine } from '../../types/quotation';
 import { formatRoundOff } from '../../engine';
 import { QuotationPdfActions } from './QuotationPdfActions';
 import {
@@ -12,6 +12,32 @@ import {
   Calendar,
 } from 'lucide-react';
 
+const formatINR = (n: number) =>
+  Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** One-line description of how a line's quantity was derived (shown under the product name). */
+function describeLine(line: QuotationLine, quotation: Quotation): string {
+  const m = line.snapshot.qtyMethod;
+  let s = '';
+  if (m === 'SQM') {
+    s = `${line.lengthValue !== undefined ? line.lengthValue : line.lengthFeet || 0} ${line.lengthUnit || 'ft'} × ${line.nos} nos · Width ${line.widthFactor || line.snapshot.widthFactor || quotation.widthFactor || 1.08}`;
+  } else if (m === 'WEIGHT_PER_PIECE') {
+    s = `${line.nos} nos × ${line.kgPerPiece || line.snapshot.kgPerPiece || 0} kg/pc`;
+  } else if (m === 'CUSTOM') {
+    s = line.nos > 1 ? `${line.nos} nos` : 'Custom item';
+  } else if (m === 'SHEET_WEIGHT') {
+    s = `${line.lengthFeet || 0}'${line.lengthInches || 0}" × ${line.nos} nos · ${line.snapshot.thicknessMm}mm · ${line.snapshot.coilWidthM}m`;
+  } else if (m === 'SECTION_WEIGHT') {
+    const len = line.lengthFeet !== undefined && line.lengthFeet !== null
+      ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
+      : `${line.lengthM || 0}m`;
+    s = `${len} × ${line.nos} nos · ${line.snapshot.kgPerMetre} kg/m`;
+  } else if (m === 'PIECE') {
+    s = `${line.nos} nos`;
+  }
+  return line.isManualQuantity ? `${s} · Manual qty` : s;
+}
+
 interface QuotationPreviewModalProps {
   quotation: Quotation;
   onClose: () => void;
@@ -22,10 +48,10 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
   onClose,
 }) => {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-ink/40 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white rounded-card shadow-lg border border-line-strong max-w-5xl w-full my-6 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center p-0 sm:p-4 bg-ink/40 backdrop-blur-xs">
+      <div className="bg-white sm:rounded-card shadow-lg sm:border border-line-strong max-w-5xl w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
         {/* Modal Top Bar */}
-        <div className="p-3.5 sm:p-4 bg-white text-ink flex items-center justify-between border-b border-line gap-2">
+        <div className="p-3.5 sm:p-4 pt-[max(0.875rem,env(safe-area-inset-top))] sm:pt-4 bg-white text-ink flex items-center justify-between border-b border-line gap-2 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-control bg-brand-soft text-brand flex items-center justify-center shrink-0">
               <FileText className="w-4 h-4" />
@@ -56,7 +82,7 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
         </div>
 
         {/* Quotation Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs max-h-[80vh]">
+        <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain space-y-5 text-xs flex-1 min-h-0">
           {/* Header Grid: Company & Customer Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-line">
             {/* Company Block */}
@@ -111,8 +137,53 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
             </div>
           </div>
 
-          {/* Quotation Lines Table */}
-          <div className="border border-line-strong rounded-control overflow-hidden shadow-xs bg-white">
+          {/* Quotation Lines — mobile cards */}
+          <div className="md:hidden space-y-2.5">
+            <div className="flex items-center justify-between text-[10.5px] font-bold uppercase tracking-wider text-faint px-0.5">
+              <span>Items ({quotation.lines.length})</span>
+              <span>Taxable value</span>
+            </div>
+            {quotation.lines.map((line, idx) => (
+              <div key={line.id || idx} className="bg-white border border-line-strong rounded-card p-3.5 shadow-xs">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex gap-2.5">
+                    <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-brand-soft text-brand text-[10px] font-bold font-mono flex items-center justify-center">
+                      {idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-ink text-[13px] leading-snug break-words">{line.productName}</div>
+                      <div className="text-[11px] text-muted mt-0.5">{describeLine(line, quotation)}</div>
+                      <div className="text-[10.5px] text-faint font-mono mt-0.5">HSN {line.hsn}</div>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 font-mono tabular-nums font-bold text-ink text-[13px]">
+                    ₹{formatINR(line.taxableAmount)}
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+                  <div className="bg-surface-2 rounded-control px-2 py-1.5 border border-line">
+                    <div className="text-faint uppercase tracking-wider text-[9.5px] font-semibold">Qty</div>
+                    <div className="font-mono tabular-nums font-semibold text-ink">
+                      {line.unit === 'Nos' ? Number(line.quantity) : Number(line.quantity).toFixed(2)} {line.unit}
+                    </div>
+                  </div>
+                  <div className="bg-surface-2 rounded-control px-2 py-1.5 border border-line">
+                    <div className="text-faint uppercase tracking-wider text-[9.5px] font-semibold">Rate</div>
+                    <div className="font-mono tabular-nums font-semibold text-ink">₹{Number(line.rate).toFixed(2)}</div>
+                  </div>
+                  <div className="bg-surface-2 rounded-control px-2 py-1.5 border border-line">
+                    <div className="text-faint uppercase tracking-wider text-[9.5px] font-semibold">GST</div>
+                    <div className="font-mono tabular-nums font-semibold text-ink">
+                      {quotation.isGstEnabled === false ? '0%' : `${line.gstRate}%`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Quotation Lines Table — tablet / desktop */}
+          <div className="hidden md:block border border-line-strong rounded-control overflow-hidden shadow-xs bg-white">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
@@ -373,7 +444,7 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-3.5 sm:p-4 bg-white border-t border-line flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3">
+        <div className="p-3.5 sm:p-4 pb-[max(0.875rem,env(safe-area-inset-bottom))] bg-white border-t border-line shadow-[0_-4px_16px_rgba(16,24,40,0.06)] sm:shadow-none flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 shrink-0">
           <div className="w-full sm:w-auto">
             <QuotationPdfActions quotation={quotation} variant="modal" />
           </div>

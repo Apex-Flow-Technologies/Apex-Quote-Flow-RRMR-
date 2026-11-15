@@ -8,6 +8,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { invalidateMasterData } from './masterDataCache';
 import type { Customer, CreateCustomerInput } from '../types/customer';
 
 const CUSTOMERS_COLLECTION = 'customers';
@@ -26,6 +27,7 @@ export async function getCustomerById(id: string): Promise<Customer | null> {
 }
 
 export async function createCustomer(customer: CreateCustomerInput): Promise<string> {
+  invalidateMasterData('customers');
   const id = customer.id || doc(collection(db, CUSTOMERS_COLLECTION)).id;
   const docRef = doc(db, CUSTOMERS_COLLECTION, id);
   await setDoc(docRef, {
@@ -38,6 +40,7 @@ export async function createCustomer(customer: CreateCustomerInput): Promise<str
 }
 
 export async function updateCustomer(id: string, updates: Partial<Customer>): Promise<void> {
+  invalidateMasterData('customers');
   const docRef = doc(db, CUSTOMERS_COLLECTION, id);
   await updateDoc(docRef, {
     ...updates,

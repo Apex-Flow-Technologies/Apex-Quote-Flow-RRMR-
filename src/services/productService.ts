@@ -8,6 +8,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { invalidateMasterData } from './masterDataCache';
 import type { Product, CreateProductInput } from '../types/product';
 
 const PRODUCTS_COLLECTION = 'products';
@@ -26,6 +27,7 @@ export async function getProductById(id: string): Promise<Product | null> {
 }
 
 export async function createProduct(product: CreateProductInput): Promise<string> {
+  invalidateMasterData('products');
   const id = product.id || doc(collection(db, PRODUCTS_COLLECTION)).id;
   const docRef = doc(db, PRODUCTS_COLLECTION, id);
   await setDoc(docRef, {
@@ -38,6 +40,7 @@ export async function createProduct(product: CreateProductInput): Promise<string
 }
 
 export async function updateProduct(id: string, updates: Partial<Product>): Promise<void> {
+  invalidateMasterData('products');
   const docRef = doc(db, PRODUCTS_COLLECTION, id);
   await updateDoc(docRef, {
     ...updates,

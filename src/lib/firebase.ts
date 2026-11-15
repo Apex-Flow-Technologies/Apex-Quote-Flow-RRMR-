@@ -1,6 +1,12 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, type Firestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from 'firebase/firestore';
 
 export interface FirebaseConfigValidation {
   isConfigured: boolean;
@@ -51,8 +57,14 @@ if (envValidation.isConfigured) {
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   auth = getAuth(app);
   try {
+    // On-device cache (IndexedDB) so lists and masters open instantly on repeat visits.
+    // Falls back to the default memory cache where IndexedDB is unavailable (e.g. tests).
+    const canPersist = typeof window !== 'undefined' && typeof indexedDB !== 'undefined';
     db = initializeFirestore(app, {
       ignoreUndefinedProperties: true,
+      ...(canPersist
+        ? { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }
+        : {}),
     });
   } catch {
     db = getFirestore(app);

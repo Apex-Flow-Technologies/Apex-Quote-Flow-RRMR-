@@ -60,9 +60,14 @@ function productDefaultLengthM(product?: Product | null): string | undefined {
   return undefined;
 }
 
+/** A missing rate on a freshly picked product is a prompt, not an error. */
+function isRateHint(row: EditableRowState): boolean {
+  return row.validationError === 'Rate must be greater than 0.' && (!row.rate || Number(row.rate) === 0);
+}
+
 export function createInitialRow(customId?: string, product?: Product): EditableRowState {
   const id = customId || `row_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  const defaultRate = product ? String(product.ratePerUnit) : '';
+  const defaultRate = product && product.ratePerUnit > 0 ? String(product.ratePerUnit) : '';
   let defaultUnit: RowLengthUnit = 'ft_in';
   if (product?.qtyMethod === 'SECTION_WEIGHT') {
     defaultUnit = 'metres';
@@ -373,23 +378,31 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
       return;
     }
 
-    const isSmallScreen = window.innerWidth < 640;
-    const padding = 12;
-    // On small screens, keep dropdown within viewport with comfortable margins
-    const maxAllowedWidth = Math.max(280, window.innerWidth - (padding * 2));
-    const dropdownWidth = Math.min(maxAllowedWidth, Math.max(rect.width, 300));
+    // Use the visual viewport where available: on phones the on-screen keyboard shrinks it,
+    // and layout-viewport numbers would place the list under the keyboard.
+    const vv = window.visualViewport;
+    const viewW = document.documentElement.clientWidth || window.innerWidth;
+    const viewTop = vv ? vv.offsetTop : 0;
+    const viewBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
 
-    let left = rect.left;
-    if (left + dropdownWidth > window.innerWidth - padding) {
-      left = Math.max(padding, window.innerWidth - dropdownWidth - padding);
+    const isSmallScreen = viewW < 640;
+    const padding = isSmallScreen ? 10 : 12;
+    // Phones: span the screen width (minus gutters) so names are not truncated.
+    const dropdownWidth = isSmallScreen
+      ? viewW - padding * 2
+      : Math.min(viewW - padding * 2, Math.max(rect.width, 360));
+
+    let left = isSmallScreen ? padding : rect.left;
+    if (left + dropdownWidth > viewW - padding) {
+      left = Math.max(padding, viewW - dropdownWidth - padding);
     }
     if (left < padding) {
       left = padding;
     }
 
-    const spaceBelow = window.innerHeight - rect.bottom - 8;
-    const spaceAbove = rect.top - 8;
-    const desiredHeight = isSmallScreen ? 220 : 250;
+    const spaceBelow = viewBottom - rect.bottom - 8;
+    const spaceAbove = rect.top - viewTop - 8;
+    const desiredHeight = isSmallScreen ? 300 : 320;
 
     if (spaceBelow >= 160 || spaceBelow >= spaceAbove) {
       const maxHeight = Math.min(desiredHeight, Math.max(spaceBelow, 120));
@@ -403,7 +416,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     } else {
       const maxHeight = Math.min(desiredHeight, Math.max(spaceAbove, 120));
       setDropdownPos({
-        top: Math.max(8, rect.top - maxHeight - 4),
+        top: Math.max(viewTop + 8, rect.top - maxHeight - 4),
         left,
         width: dropdownWidth,
         placement: 'top',
@@ -420,9 +433,13 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
       };
       window.addEventListener('scroll', handleScrollOrResize, true);
       window.addEventListener('resize', handleScrollOrResize);
+      window.visualViewport?.addEventListener('resize', handleScrollOrResize);
+      window.visualViewport?.addEventListener('scroll', handleScrollOrResize);
       return () => {
         window.removeEventListener('scroll', handleScrollOrResize, true);
         window.removeEventListener('resize', handleScrollOrResize);
+        window.visualViewport?.removeEventListener('resize', handleScrollOrResize);
+        window.visualViewport?.removeEventListener('scroll', handleScrollOrResize);
       };
     } else {
       setDropdownPos(null);
@@ -594,7 +611,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     onRowsChange(
       rows.map((r) => {
         if (r.id !== rowId) return r;
-        const defaultRate = String(product.ratePerUnit);
+        const defaultRate = product.ratePerUnit > 0 ? String(product.ratePerUnit) : '';
         let defaultUnit: RowLengthUnit = 'ft_in';
         if (product.qtyMethod === 'SECTION_WEIGHT') {
           defaultUnit = 'metres';
@@ -645,13 +662,20 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
   const getFilteredProducts = (query: string) => {
     if (!query.trim()) return products.slice(0, 15);
-    const q = query.toLowerCase().trim();
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.hsn.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
-    ).slice(0, 15);
+    // Token search: every word must appear somewhere ("60 square 3.2", "angle 50x6", "ismc 100").
+    const norm = (s: string) =>
+      s.toLowerCase().replace(/[×*]/g, 'x').replace(/(\d)\s*x\s*(?=\d)/g, '$1 ');
+    const tokens = norm(query).split(/[\s,]+/).filter(Boolean);
+    const isNum = (t: string) => /^\d+(\.\d+)?$/.test(t);
+    return products.filter((p) => {
+      const text = `${norm(p.name)} ${norm(p.category)}`;
+      const words = text.split(/[\s()]+/).filter(Boolean);
+      return tokens.every((t) => {
+        if (t.length >= 4 && /^\d+$/.test(t) && p.hsn.startsWith(t)) return true; // HSN search
+        // Numbers match whole sizes only ("12" ≠ "125"; "3.2" = "3.2"); words match anywhere.
+        return isNum(t) ? words.some((w) => w === t || Number(w) === Number(t)) : text.includes(t);
+      });
+    }).slice(0, 25);
   };
 
   const handleKeyDownProductSearch = (
@@ -741,7 +765,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
             className="flex-1 sm:flex-initial min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
           >
             <Plus className="w-3.5 h-3.5 text-brand" />
-            <span>+ Custom Item</span>
+            <span>Custom Item</span>
           </button>
           <button
             type="button"
@@ -839,9 +863,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           </button>
                         </div>
                         {row.validationError && (
-                          <div className="mt-1 flex items-center gap-1 text-[10px] text-danger font-medium">
+                          <div className={isRateHint(row) ? "p-2 bg-brand-soft border border-brand/20 rounded-control text-brand-deep text-xs flex items-center gap-1.5" : "mt-1 flex items-center gap-1 text-[10px] text-danger font-medium"}>
                             <AlertCircle className="w-3 h-3 shrink-0" />
-                            <span>{row.validationError}</span>
+                            <span>{isRateHint(row) ? 'Enter the rate to price this line.' : row.validationError}</span>
                           </div>
                         )}
                       </div>
@@ -930,9 +954,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
                         {/* Row-level validation message */}
                         {row.validationError && (
-                          <div className="mt-1 flex items-center gap-1 text-[10px] text-danger font-medium">
+                          <div className={isRateHint(row) ? "p-2 bg-brand-soft border border-brand/20 rounded-control text-brand-deep text-xs flex items-center gap-1.5" : "mt-1 flex items-center gap-1 text-[10px] text-danger font-medium"}>
                             <AlertCircle className="w-3 h-3 shrink-0" />
-                            <span>{row.validationError}</span>
+                            <span>{isRateHint(row) ? 'Enter the rate to price this line.' : row.validationError}</span>
                           </div>
                         )}
                       </div>
@@ -968,6 +992,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                               else inputRefs.current.delete(`${row.id}_lengthValue`);
                             }}
                             type="number"
+                            inputMode="decimal"
                             step="any"
                             min="0"
                             value={row.lengthValue ?? ''}
@@ -1002,6 +1027,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       <div className="flex items-center gap-1.5 pt-1">
                         <input
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           min="0"
                           value={row.kgPerPiece ?? ''}
@@ -1022,6 +1048,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                                 else inputRefs.current.delete(`${row.id}_lengthFeet`);
                               }}
                               type="number"
+                              inputMode="numeric"
                               step="1"
                               min="0"
                               value={row.lengthFeet}
@@ -1045,6 +1072,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                                 else inputRefs.current.delete(`${row.id}_lengthInches`);
                               }}
                               type="number"
+                              inputMode="decimal"
                               step="0.5"
                               min="0"
                               max="11.9"
@@ -1074,6 +1102,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                                   else inputRefs.current.delete(`${row.id}_lengthMetres`);
                                 }}
                                 type="number"
+                                inputMode="decimal"
                                 step="0.01"
                                 min="0.1"
                                 value={row.lengthMetres}
@@ -1097,6 +1126,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                                   else inputRefs.current.delete(`${row.id}_lengthFeet`);
                                 }}
                                 type="number"
+                                inputMode="numeric"
                                 step="1"
                                 min="0"
                                 value={row.lengthFeet}
@@ -1117,6 +1147,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                                   else inputRefs.current.delete(`${row.id}_lengthInches`);
                                 }}
                                 type="number"
+                                inputMode="decimal"
                                 step="0.5"
                                 min="0"
                                 max="11.9"
@@ -1164,6 +1195,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                         else inputRefs.current.delete(`${row.id}_nos`);
                       }}
                       type="number"
+                      inputMode="numeric"
                       step="1"
                       min="1"
                       value={row.nos}
@@ -1239,6 +1271,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           else inputRefs.current.delete(`${row.id}_rate`);
                         }}
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         min="0"
                         value={row.rate}
@@ -1254,7 +1287,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   {/* Amount before GST */}
                   <td className="py-3 px-3 text-right align-top font-mono tabular-nums font-bold text-ink text-xs pt-4">
                     {row.calculatedLine ? (
-                      `₹${Number(row.calculatedLine.taxableAmount).toFixed(2)}`
+                      `₹${Number(row.calculatedLine.taxableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     ) : (
                       <span className="text-faint font-normal">—</span>
                     )}
@@ -1443,7 +1476,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   ) : (
                     <div className="p-2.5 rounded-control bg-surface-2 border border-line flex items-center justify-between gap-2">
                       <div className="min-w-0 space-y-0.5">
-                        <div className="font-bold text-ink text-sm truncate" title={row.product.name}>
+                        <div className="font-bold text-ink text-sm leading-snug break-words" title={row.product.name}>
                           {row.product.name}
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted">
@@ -1490,9 +1523,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
               {/* Validation error */}
               {row.validationError && (
-                <div className="p-2 bg-rose-50 border border-rose-200 rounded-control text-danger text-xs flex items-center gap-1.5">
+                <div className={isRateHint(row) ? "p-2 bg-brand-soft border border-brand/20 rounded-control text-brand-deep text-xs flex items-center gap-1.5" : "p-2 bg-rose-50 border border-rose-200 rounded-control text-danger text-xs flex items-center gap-1.5"}>
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{row.validationError}</span>
+                  <span>{isRateHint(row) ? 'Enter the rate to price this line.' : row.validationError}</span>
                 </div>
               )}
 
@@ -1530,12 +1563,13 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                         else inputRefs.current.delete(`${row.id}_lengthValue_mobile`);
                       }}
                       type="number"
+                      inputMode="decimal"
                       step="any"
                       min="0"
                       value={row.lengthValue ?? ''}
                       placeholder="17.4"
                       onChange={(e) => updateRow(row.id, { lengthValue: e.target.value })}
-                      className="flex-1 h-10 px-3 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                      className="flex-1 min-w-0 w-full h-10 px-3 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
                       title="Length value"
                     />
                     <select
@@ -1556,6 +1590,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   <div className="flex items-center gap-1.5">
                     <input
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
                       min="0"
                       value={row.kgPerPiece ?? ''}
@@ -1579,11 +1614,12 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           else inputRefs.current.delete(`${row.id}_lengthFeet_mobile`);
                         }}
                         type="number"
+                        inputMode="numeric"
                         step="1"
                         min="0"
                         value={row.lengthFeet}
                         onChange={(e) => updateRow(row.id, { lengthFeet: e.target.value })}
-                        className="flex-1 h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                        className="flex-1 min-w-0 w-full h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
                         placeholder="8"
                       />
                       <span className="font-semibold text-muted text-xs">ft</span>
@@ -1595,12 +1631,13 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           else inputRefs.current.delete(`${row.id}_lengthInches_mobile`);
                         }}
                         type="number"
+                        inputMode="decimal"
                         step="0.5"
                         min="0"
                         max="11.9"
                         value={row.lengthInches}
                         onChange={(e) => updateRow(row.id, { lengthInches: e.target.value })}
-                        className="flex-1 h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                        className="flex-1 min-w-0 w-full h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
                         placeholder="0"
                       />
                       <span className="font-semibold text-muted text-xs">in</span>
@@ -1633,11 +1670,12 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           else inputRefs.current.delete(`${row.id}_lengthMetres_mobile`);
                         }}
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         min="0.1"
                         value={row.lengthMetres}
                         onChange={(e) => updateRow(row.id, { lengthMetres: e.target.value })}
-                        className="flex-1 h-10 px-3 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                        className="flex-1 min-w-0 w-full h-10 px-3 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
                         placeholder="6.0"
                       />
                       <span className="font-semibold text-muted text-xs">m</span>
@@ -1651,11 +1689,12 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                             else inputRefs.current.delete(`${row.id}_lengthFeet_mobile`);
                           }}
                           type="number"
+                          inputMode="numeric"
                           step="1"
                           min="0"
                           value={row.lengthFeet}
                           onChange={(e) => updateRow(row.id, { lengthFeet: e.target.value })}
-                          className="flex-1 h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                          className="flex-1 min-w-0 w-full h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
                           placeholder="20"
                         />
                         <span className="font-semibold text-muted text-xs">ft</span>
@@ -1667,12 +1706,13 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                             else inputRefs.current.delete(`${row.id}_lengthInches_mobile`);
                           }}
                           type="number"
+                          inputMode="decimal"
                           step="0.5"
                           min="0"
                           max="11.9"
                           value={row.lengthInches}
                           onChange={(e) => updateRow(row.id, { lengthInches: e.target.value })}
-                          className="flex-1 h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                          className="flex-1 min-w-0 w-full h-10 px-2 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
                           placeholder="0"
                         />
                         <span className="font-semibold text-muted text-xs">in</span>
@@ -1694,6 +1734,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       else inputRefs.current.delete(`${row.id}_nos_mobile`);
                     }}
                     type="number"
+                    inputMode="numeric"
                     step="1"
                     min="1"
                     value={row.nos}
@@ -1712,6 +1753,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       else inputRefs.current.delete(`${row.id}_rate_mobile`);
                     }}
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="0"
                     value={row.rate}
@@ -1753,7 +1795,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   </span>
                   <span className="font-mono tabular-nums font-bold text-brand text-base">
                     {row.calculatedLine
-                      ? `₹${Number(row.calculatedLine.taxableAmount).toFixed(2)}`
+                      ? `₹${Number(row.calculatedLine.taxableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : '—'}
                   </span>
                 </div>
@@ -1780,7 +1822,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
             className="w-full sm:w-auto min-h-[44px] sm:min-h-[36px] inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
           >
             <Plus className="w-4 h-4 text-brand" />
-            <span>+ Custom Item</span>
+            <span>Custom Item</span>
           </button>
         </div>
 
@@ -1859,6 +1901,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                 <input
                   id="manual-qty-input"
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0.01"
                   autoFocus
@@ -1973,18 +2016,26 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   }`}
                 >
                   <div className="pr-2 min-w-0">
-                    <div className="font-semibold truncate text-xs">{p.name}</div>
-                    <div className="text-[10px] text-muted flex items-center gap-1.5">
+                    <div className="font-semibold text-[13px] sm:text-xs leading-snug break-words">{p.name}</div>
+                    <div className="text-[10.5px] text-muted flex flex-wrap items-center gap-x-1.5">
                       <span>{p.category}</span>
                       <span>&bull;</span>
-                      <span className="font-mono">HSN {p.hsn}</span>
+                      {p.qtyMethod === 'SECTION_WEIGHT' && 'kgPerMetre' in p && p.kgPerMetre ? (
+                        <span className="font-mono">{p.kgPerMetre} kg/m</span>
+                      ) : (
+                        <span className="font-mono">HSN {p.hsn}</span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="font-mono tabular-nums font-bold text-xs text-ink">
-                      ₹{p.ratePerUnit}
-                    </span>
-                    <span className="block text-[9px] text-muted">/{p.unit}</span>
+                    {p.ratePerUnit > 0 ? (
+                      <>
+                        <span className="font-mono tabular-nums font-bold text-xs text-ink">₹{p.ratePerUnit}</span>
+                        <span className="block text-[9px] text-muted">/{p.unit}</span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-muted">per {p.unit}</span>
+                    )}
                   </div>
                 </div>
               ))}

@@ -1061,6 +1061,7 @@ export const ProductsPage: React.FC = () => {
                   <input
                     id={fieldIdRate}
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="0"
                     value={formData.ratePerUnit}
@@ -1082,6 +1083,7 @@ export const ProductsPage: React.FC = () => {
                   <input
                     id={fieldIdGst}
                     type="number"
+                    inputMode="decimal"
                     step="0.5"
                     min="0"
                     value={formData.gstRate}
@@ -1114,6 +1116,7 @@ export const ProductsPage: React.FC = () => {
                     <input
                       id={fieldIdWidthFactor}
                       type="number"
+                      inputMode="decimal"
                       step="0.001"
                       value={formData.widthFactor}
                       onChange={(e) => setFormData({ ...formData, widthFactor: e.target.value })}
@@ -1143,6 +1146,7 @@ export const ProductsPage: React.FC = () => {
                     <input
                       id={fieldIdKgPerPiece}
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
                       value={formData.kgPerPiece}
                       onChange={(e) => setFormData({ ...formData, kgPerPiece: e.target.value })}
@@ -1173,6 +1177,7 @@ export const ProductsPage: React.FC = () => {
                       <input
                         id={fieldIdThickness}
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         value={formData.thicknessMm}
                         onChange={(e) => setFormData({ ...formData, thicknessMm: e.target.value })}
@@ -1191,6 +1196,7 @@ export const ProductsPage: React.FC = () => {
                       <input
                         id={fieldIdCoilWidth}
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         value={formData.coilWidthM}
                         onChange={(e) => setFormData({ ...formData, coilWidthM: e.target.value })}
@@ -1209,6 +1215,7 @@ export const ProductsPage: React.FC = () => {
                       <input
                         id={fieldIdDensity}
                         type="number"
+                        inputMode="decimal"
                         step="0.001"
                         value={formData.densityFactor}
                         onChange={(e) => setFormData({ ...formData, densityFactor: e.target.value })}
@@ -1252,6 +1259,7 @@ export const ProductsPage: React.FC = () => {
                       <input
                         id={fieldIdDefaultLength}
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         value={formData.defaultLengthM}
                         onChange={(e) => setFormData({ ...formData, defaultLengthM: e.target.value })}
@@ -1274,6 +1282,7 @@ export const ProductsPage: React.FC = () => {
                               {STEEL_DIM_LABELS[key]}
                               <input
                                 type="number"
+                                inputMode="decimal"
                                 step="0.01"
                                 value={formData.steelDims[key] ?? ''}
                                 onChange={(e) =>
@@ -1312,6 +1321,7 @@ export const ProductsPage: React.FC = () => {
                       <input
                         id={fieldIdKgPerMetre}
                         type="number"
+                        inputMode="decimal"
                         step="0.01"
                         value={formData.kgPerMetre}
                         onChange={(e) => setFormData({ ...formData, kgPerMetre: e.target.value })}
@@ -1342,6 +1352,7 @@ export const ProductsPage: React.FC = () => {
                   <input
                     id={fieldIdBaseRate}
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={formData.baseRate}
                     onChange={(e) => setFormData({ ...formData, baseRate: e.target.value })}
@@ -1355,6 +1366,7 @@ export const ProductsPage: React.FC = () => {
                   <input
                     id={fieldIdMinRate}
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     value={formData.minRate}
                     onChange={(e) => setFormData({ ...formData, minRate: e.target.value })}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getQuotations } from '../../services/quotationService';
+import { getQuotations, getQuotationsFromDevice } from '../../services/quotationService';
 import type { Quotation } from '../../types/quotation';
 import { QuotationBuilder } from './QuotationBuilder';
 import { QuotationPreviewModal } from './QuotationPreviewModal';
@@ -32,8 +32,15 @@ export const QuotationsPage: React.FC = () => {
 
   const fetchQuotations = async () => {
     try {
-      setLoading(true);
       setError(null);
+      // Show the on-device copy straight away, then refresh from the server.
+      const local = await getQuotationsFromDevice();
+      if (local.length > 0) {
+        setQuotations(local);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
       const data = await getQuotations();
       setQuotations(data);
     } catch (err: unknown) {

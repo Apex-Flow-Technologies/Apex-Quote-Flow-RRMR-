@@ -92,7 +92,7 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
       {error && (
         <span className="text-[11px] text-danger font-semibold mr-2">
           {error}
@@ -103,7 +103,7 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
         type="button"
         onClick={handleOpenInNewTab}
         disabled={generating}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 rounded-control border border-line-strong transition disabled:opacity-50"
+        className="min-h-[44px] sm:min-h-0 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 rounded-control border border-line-strong transition disabled:opacity-50"
         title="Open A4 PDF preview in new browser tab"
       >
         {generating ? (
@@ -118,7 +118,7 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
         type="button"
         onClick={handleDownload}
         disabled={generating}
-        className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-brand hover:bg-brand-dark rounded-control shadow-xs transition disabled:opacity-50"
+        className="min-h-[44px] sm:min-h-0 inline-flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-brand hover:bg-brand-dark rounded-control shadow-xs transition disabled:opacity-50"
         title={`Download ${getQuotationPdfFilename(quotation.quotationNumber)}`}
       >
         {generating ? (

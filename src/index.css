@@ -56,8 +56,15 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     margin: 0;
+    overflow-x: hidden;
     min-height: 100vh;
     background-color: #ffffff;
     color: var(--color-ink);
@@ -88,6 +95,22 @@
     -webkit-text-fill-color: var(--color-ink) !important;
     caret-color: var(--color-ink) !important;
     transition: background-color 5000s ease-in-out 0s;
+  }
+}
+
+/* ── Mobile: stop iOS auto-zoom on focus (iOS zooms any field < 16px) ── */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Comfortable touch targets */
+  button,
+  [role='button'],
+  select {
+    touch-action: manipulation;
   }
 }
 

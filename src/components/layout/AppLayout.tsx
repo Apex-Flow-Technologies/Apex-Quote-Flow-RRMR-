@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { LogOut, Menu, X, ChevronDown } from 'lucide-react';
+import { prefetchMasterData } from '../../services/masterDataCache';
 
 export const AppLayout: React.FC = () => {
   const { profile, user, isAdmin, logout } = useAuth();
@@ -15,6 +16,11 @@ export const AppLayout: React.FC = () => {
     await logout();
     navigate('/login');
   };
+
+  // Warm product / customer / company caches once signed in, so New Quotation opens instantly
+  useEffect(() => {
+    if (profile?.active) prefetchMasterData();
+  }, [profile?.active]);
 
   // Close dropdown on outside click
   useEffect(() => {
