@@ -1,228 +1,222 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { getQuotations } from '../../services/quotationService';
-import { getCustomers } from '../../services/customerService';
-import { getProducts } from '../../services/productService';
+import { getQuotations, getQuotationsFromDevice } from '../../services/quotationService';
+import { getCustomersCached, getProductsCached } from '../../services/masterDataCache';
 import type { Quotation } from '../../types/quotation';
-import { QuotationPreviewModal } from '../quotations/QuotationPreviewModal';
-import { Plus, ArrowRight } from 'lucide-react';
-import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { QuotationPreviewModal, StatusPill } from '../quotations/QuotationPreviewModal';
+import { useAuth } from '../../hooks/useAuth';
+import { Plus, ArrowRight, TrendingUp, Clock3, Trophy, Users, Package } from 'lucide-react';
+
+const inr = (n: number) =>
+  `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+
+const Metric: React.FC<{
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+  icon: React.ReactNode;
+  tone?: 'brand' | 'ok' | 'warn' | 'ink';
+  loading?: boolean;
+}> = ({ label, value, sub, icon, tone = 'ink', loading }) => {
+  const toneCls = { brand: 'text-brand', ok: 'text-emerald-700', warn: 'text-amber-700', ink: 'text-ink' }[tone];
+  return (
+    <div className="bg-white border border-line-strong rounded-card p-4 shadow-xs min-w-0">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10.5px] font-semibold text-faint uppercase tracking-wider truncate">{label}</span>
+        <span className="text-faint shrink-0">{icon}</span>
+      </div>
+      {loading ? (
+        <div className="h-7 w-20 mt-1.5 bg-surface-2 rounded animate-pulse" />
+      ) : (
+        <div className={`font-mono tabular-nums text-xl sm:text-2xl font-bold mt-1 truncate ${toneCls}`}>{value}</div>
+      )}
+      {sub && <div className="text-[11px] text-muted mt-0.5 truncate">{sub}</div>}
+    </div>
+  );
+};
 
 export const DashboardPage: React.FC = () => {
+  const { profile } = useAuth();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [customerCount, setCustomerCount] = useState<number>(0);
-  const [activeProductCount, setActiveProductCount] = useState<number>(0);
+  const [customerCount, setCustomerCount] = useState<number | null>(null);
+  const [activeProductCount, setActiveProductCount] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [previewQuotation, setPreviewQuotation] = useState<Quotation | null>(null);
 
   useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        setLoading(true);
-        const [quotesData, customersData, productsData] = await Promise.all([
-          getQuotations(),
-          getCustomers(),
-          getProducts(),
-        ]);
-
-        setQuotations(quotesData);
-        setCustomerCount(customersData.length);
-        setActiveProductCount(productsData.filter((p) => p.active !== false).length);
-      } catch (err) {
-        console.error('Error loading dashboard data:', err);
-      } finally {
+    let alive = true;
+    (async () => {
+      // Instant: last-known copy on this device
+      const local = await getQuotationsFromDevice();
+      if (alive && local.length) {
+        setQuotations(local);
         setLoading(false);
       }
+      try {
+        const fresh = await getQuotations();
+        if (alive) setQuotations(fresh);
+      } catch (err) {
+        console.error('Error loading dashboard quotations:', err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    getCustomersCached((c) => alive && setCustomerCount(c.length)).then((c) => alive && setCustomerCount(c.length)).catch(() => {});
+    const countActive = (p: { active?: boolean }[]) => p.filter((x) => x.active !== false).length;
+    getProductsCached((p) => alive && setActiveProductCount(countActive(p))).then((p) => alive && setActiveProductCount(countActive(p))).catch(() => {});
+    return () => {
+      alive = false;
     };
-
-    loadDashboardData();
   }, []);
 
-  const currentYearMonth = new Date().toISOString().slice(0, 7);
-  const thisMonthQuotes = quotations.filter((q) => {
-    if (!q.quotationDate) return false;
-    return q.quotationDate.startsWith(currentYearMonth);
-  });
+  const stats = useMemo(() => {
+    const ym = new Date().toISOString().slice(0, 7);
+    const live = quotations.filter((q) => q.status !== 'cancelled');
+    const month = live.filter((q) => q.quotationDate?.startsWith(ym));
+    const open = live.filter((q) => (q.status || 'draft') === 'draft' || q.status === 'sent');
+    const won = live.filter((q) => q.status === 'won');
+    const lost = live.filter((q) => q.status === 'lost');
+    const wonMonth = won.filter((q) => q.quotationDate?.startsWith(ym));
+    const sum = (list: Quotation[]) => list.reduce((t, q) => t + Number(q.payableAmount || 0), 0);
+    const decided = won.length + lost.length;
+    return {
+      monthCount: month.length,
+      monthValue: sum(month),
+      openCount: open.length,
+      openValue: sum(open),
+      wonMonthValue: sum(wonMonth),
+      wonMonthCount: wonMonth.length,
+      winRate: decided ? Math.round((won.length / decided) * 100) : null,
+      decided,
+    };
+  }, [quotations]);
 
-  const recentQuotations = quotations.slice(0, 5);
+  const recent = quotations.slice(0, 6);
+  const firstName = (profile?.name || '').split(' ')[0];
 
   return (
     <div className="space-y-5">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-line pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-ink tracking-tight">
-            Dashboard
+          <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
+            {firstName ? `Hello, ${firstName}` : 'Dashboard'}
           </h1>
           <p className="text-xs text-muted mt-0.5">
-            Operational summary of quotations, customers, and product price list
+            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
+        <Link
+          to="/app/quotations"
+          state={{ newQuote: true }}
+          className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 bg-brand hover:bg-brand-dark text-white text-sm font-semibold rounded-control shadow-xs transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          New Quotation
+        </Link>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <Link
-            to="/app/quotations"
-            className="inline-flex items-center justify-center px-4 py-2 bg-brand hover:bg-brand-dark text-white text-xs font-semibold rounded-control shadow-xs transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />
-            <span>New Quotation</span>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Metric
+          label="This month"
+          icon={<TrendingUp className="w-4 h-4" />}
+          tone="brand"
+          loading={loading}
+          value={inr(stats.monthValue)}
+          sub={`${stats.monthCount} quotation${stats.monthCount === 1 ? '' : 's'}`}
+        />
+        <Metric
+          label="Open (draft + sent)"
+          icon={<Clock3 className="w-4 h-4" />}
+          tone="warn"
+          loading={loading}
+          value={inr(stats.openValue)}
+          sub={`${stats.openCount} awaiting a decision`}
+        />
+        <Metric
+          label="Won this month"
+          icon={<Trophy className="w-4 h-4" />}
+          tone="ok"
+          loading={loading}
+          value={inr(stats.wonMonthValue)}
+          sub={stats.winRate === null ? 'Mark quotes Won / Lost to see win rate' : `Win rate ${stats.winRate}% (${stats.decided} decided)`}
+        />
+        <div className="grid grid-rows-2 gap-3">
+          <Link to="/app/customers" className="bg-white border border-line-strong rounded-card px-4 py-2.5 shadow-xs flex items-center justify-between hover:border-brand/40">
+            <span className="text-xs text-muted flex items-center gap-1.5"><Users className="w-4 h-4 text-faint" /> Customers</span>
+            <span className="font-mono font-bold text-ink">{customerCount ?? '—'}</span>
+          </Link>
+          <Link to="/app/products" className="bg-white border border-line-strong rounded-card px-4 py-2.5 shadow-xs flex items-center justify-between hover:border-brand/40">
+            <span className="text-xs text-muted flex items-center gap-1.5"><Package className="w-4 h-4 text-faint" /> Products</span>
+            <span className="font-mono font-bold text-ink">{activeProductCount ?? '—'}</span>
           </Link>
         </div>
       </div>
 
-      {/* Operational Summary Strip */}
-      <div className="bg-white border border-line-strong rounded-card shadow-xs grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-line">
-        {/* Metric 1: Quotations Issued */}
-        <div className="p-4 sm:p-5">
-          <div className="text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-            Quotations Issued
-          </div>
-          <div className="font-mono tabular-nums text-2xl font-bold text-ink">
-            {loading ? '—' : quotations.length}
-          </div>
-          <div className="text-[11px] text-muted mt-0.5">
-            All-time sales ledger
-          </div>
-        </div>
-
-        {/* Metric 2: Quotations This Month */}
-        <div className="p-4 sm:p-5">
-          <div className="text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-            Quotations This Month
-          </div>
-          <div className="font-mono tabular-nums text-2xl font-bold text-brand">
-            {loading ? '—' : thisMonthQuotes.length}
-          </div>
-          <div className="text-[11px] text-muted mt-0.5">
-            Issued in {new Date().toLocaleString('default', { month: 'short', year: 'numeric' })}
-          </div>
-        </div>
-
-        {/* Metric 3: Customers */}
-        <div className="p-4 sm:p-5">
-          <div className="text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-            Customers
-          </div>
-          <div className="font-mono tabular-nums text-2xl font-bold text-ink">
-            {loading ? '—' : customerCount}
-          </div>
-          <div className="text-[11px] text-muted mt-0.5">
-            Registered buyers
-          </div>
-        </div>
-
-        {/* Metric 4: Products in Price List */}
-        <div className="p-4 sm:p-5">
-          <div className="text-[10.5px] font-semibold text-faint uppercase tracking-wider mb-1">
-            Active Products
-          </div>
-          <div className="font-mono tabular-nums text-2xl font-bold text-ink">
-            {loading ? '—' : activeProductCount}
-          </div>
-          <div className="text-[11px] text-muted mt-0.5">
-            Catalog price list
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Quotations Panel */}
       <div className="bg-white border border-line-strong rounded-card shadow-xs overflow-hidden">
-        <div className="px-5 py-3.5 bg-surface-2 border-b border-line flex items-center justify-between">
-          <h2 className="text-[11px] font-bold uppercase tracking-wider text-muted">
-            Recent Quotations
-          </h2>
-          <Link
-            to="/app/quotations"
-            className="text-xs font-semibold text-brand hover:text-brand-dark flex items-center gap-1 transition-colors"
-          >
-            <span>View All</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+        <div className="px-4 sm:px-5 py-3.5 border-b border-line flex items-center justify-between">
+          <h2 className="text-sm font-bold text-ink">Recent quotations</h2>
+          <Link to="/app/quotations" className="text-xs font-semibold text-brand hover:text-brand-dark flex items-center gap-1">
+            View all <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
         {loading ? (
-          <div className="p-10 text-center">
-            <LoadingSpinner label="Loading recent quotations..." size="md" />
+          <div className="divide-y divide-line">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-4 flex justify-between animate-pulse">
+                <div className="space-y-2">
+                  <div className="h-4 w-40 bg-surface-2 rounded" />
+                  <div className="h-3 w-28 bg-surface-2 rounded" />
+                </div>
+                <div className="h-5 w-24 bg-surface-2 rounded" />
+              </div>
+            ))}
           </div>
-        ) : recentQuotations.length === 0 ? (
-          <div className="p-8 text-center text-muted">
-            <p className="text-sm font-semibold text-ink">No quotations recorded yet</p>
-            <p className="text-xs text-muted mt-0.5 mb-3">
-              Create your first roofing quotation to begin the sales register.
-            </p>
-            <Link
-              to="/app/quotations"
-              className="inline-flex items-center px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-control text-xs font-semibold transition-colors shadow-xs"
-            >
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              <span>Create First Quotation</span>
+        ) : recent.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm font-semibold text-ink">No quotations yet</p>
+            <p className="text-xs text-muted mt-0.5 mb-3">Create your first quotation to start the register.</p>
+            <Link to="/app/quotations" className="inline-flex items-center gap-1 px-4 min-h-[44px] bg-brand text-white rounded-control text-sm font-semibold">
+              <Plus className="w-4 h-4" /> Create quotation
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-surface-2 border-b border-line text-faint font-semibold text-[10.5px] uppercase tracking-wider">
-                  <th className="py-3 px-4 font-semibold">Quotation No.</th>
-                  <th className="py-3 px-4 font-semibold">Date</th>
-                  <th className="py-3 px-4 font-semibold">Customer</th>
-                  <th className="py-3 px-4 text-center font-semibold">Tax Mode</th>
-                  <th className="py-3 px-4 text-right font-semibold">Qty in Nos</th>
-                  <th className="py-3 px-4 text-right font-semibold">Total Weight</th>
-                  <th className="py-3 px-4 text-right font-semibold">Payable Amount</th>
-                  <th className="py-3 px-4 text-center font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {recentQuotations.map((quotation) => (
-                  <tr key={quotation.id} className="hover:bg-surface-2/60 transition-colors">
-                    <td className="py-3 px-4 font-mono tabular-nums font-bold text-brand">
-                      {quotation.quotationNumber}
-                    </td>
-                    <td className="py-3 px-4 font-mono tabular-nums text-[11px] text-muted">
-                      {quotation.quotationDate || '—'}
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-ink">
-                      {quotation.customer.name}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="inline-block px-2 py-0.5 text-[10px] font-mono font-bold tracking-wider uppercase border border-line-strong bg-surface-2 text-muted rounded-control">
-                        {quotation.taxMode === 'intra' ? 'INTRA' : 'INTER'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono tabular-nums text-muted">
-                      {quotation.totalNos != null && quotation.totalNos > 0 ? `${quotation.totalNos} Nos` : '—'}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono tabular-nums text-muted">
-                      {Number(quotation.totalKgs).toFixed(2)} Kgs
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono tabular-nums font-bold text-ink">
-                      ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewQuotation(quotation)}
-                        className="text-xs font-semibold text-brand hover:text-brand-dark hover:underline"
-                        title="View Quotation Details"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="divide-y divide-line">
+            {recent.map((q) => (
+              <li key={q.id}>
+                <button
+                  type="button"
+                  onClick={() => setPreviewQuotation(q)}
+                  className="w-full text-left px-4 sm:px-5 py-3.5 hover:bg-surface-2/60 active:bg-surface-2 transition flex items-center gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-ink text-sm truncate">{q.customer.name}</span>
+                      <StatusPill status={q.status} />
+                    </div>
+                    <div className="text-[11px] text-muted font-mono mt-0.5 truncate">
+                      {q.quotationNumber}
+                      {(q.revision || 1) > 1 ? ` · R${q.revision}` : ''} · {q.quotationDate || '—'} · {q.lines.length} item
+                      {q.lines.length === 1 ? '' : 's'}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono tabular-nums font-bold text-ink text-sm">
+                      ₹{Number(q.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    {Number(q.totalKgs) > 0 && (
+                      <div className="text-[11px] text-faint font-mono">{Number(q.totalKgs).toFixed(2)} kg</div>
+                    )}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
-      {/* Preview Modal */}
       {previewQuotation && (
-        <QuotationPreviewModal
-          quotation={previewQuotation}
-          onClose={() => setPreviewQuotation(null)}
-        />
+        <QuotationPreviewModal quotation={previewQuotation} onClose={() => setPreviewQuotation(null)} />
       )}
     </div>
   );

@@ -7,7 +7,7 @@ export function getQuotationPdfFilename(quotationNumber?: string): string {
   if (!quotationNumber || !quotationNumber.trim()) {
     return 'QUOTATION.pdf';
   }
-  const sanitized = quotationNumber.trim().replace(/[\/\\:*?"<>|]/g, '-');
+  const sanitized = quotationNumber.trim().replace(/[/\\:*?"<>|]/g, '-');
   return `${sanitized}.pdf`;
 }
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import type { Quotation, QuotationLine } from '../../types/quotation';
+import React, { useState } from 'react';
+import { QUOTATION_STATUS_LABELS, type Quotation, type QuotationLine, type QuotationStatus } from '../../types/quotation';
 import { formatRoundOff } from '../../engine';
 import { QuotationPdfActions } from './QuotationPdfActions';
 import {
@@ -10,6 +10,8 @@ import {
   CreditCard,
   FileCheck2,
   Calendar,
+  PencilLine,
+  CopyPlus,
 } from 'lucide-react';
 
 const formatINR = (n: number) =>
@@ -41,12 +43,52 @@ function describeLine(line: QuotationLine, quotation: Quotation): string {
 interface QuotationPreviewModalProps {
   quotation: Quotation;
   onClose: () => void;
+  onRevise?: () => void;
+  onDuplicate?: () => void;
+  onStatusChange?: (status: QuotationStatus) => Promise<void>;
 }
+
+const STATUS_STYLES: Record<QuotationStatus, string> = {
+  draft: 'bg-surface-2 text-muted border-line-strong',
+  sent: 'bg-brand-soft text-brand border-brand/25',
+  won: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  lost: 'bg-rose-50 text-rose-700 border-rose-200',
+  cancelled: 'bg-zinc-100 text-zinc-500 border-zinc-200 line-through',
+};
+
+export const StatusPill: React.FC<{ status?: QuotationStatus; className?: string }> = ({ status = 'draft', className = '' }) => (
+  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-wide border ${STATUS_STYLES[status]} ${className}`}>
+    {QUOTATION_STATUS_LABELS[status]}
+  </span>
+);
 
 export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
   quotation,
   onClose,
+  onRevise,
+  onDuplicate,
+  onStatusChange,
 }) => {
+  const [status, setStatus] = useState<QuotationStatus>(quotation.status || 'draft');
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  const changeStatus = async (next: QuotationStatus) => {
+    if (!onStatusChange || next === status) return;
+    const prev = status;
+    setStatus(next);
+    setStatusSaving(true);
+    setStatusError(null);
+    try {
+      await onStatusChange(next);
+    } catch {
+      setStatus(prev);
+      setStatusError('Could not update status. Check your connection and try again.');
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center p-0 sm:p-4 bg-ink/40 backdrop-blur-xs">
       <div className="bg-white sm:rounded-card shadow-lg sm:border border-line-strong max-w-5xl w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
@@ -59,6 +101,11 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
             <div className="min-w-0">
               <div className="font-bold text-xs sm:text-sm tracking-tight flex flex-wrap items-center gap-1.5 sm:gap-2 text-ink">
                 <span className="font-mono tabular-nums">{quotation.quotationNumber}</span>
+                {(quotation.revision || 1) > 1 && (
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-control bg-amber-50 text-amber-700 border border-amber-200">
+                    Rev {quotation.revision}
+                  </span>
+                )}
                 <span className="text-[9px] sm:text-[10px] font-mono font-bold uppercase px-1.5 sm:px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20">
                   {quotation.isGstEnabled === false
                     ? 'Non-GST (Composition / Unregistered)'
@@ -69,6 +116,7 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
               </div>
               <div className="text-[11px] text-muted truncate">
                 Created by {quotation.createdByName}
+                {quotation.revisedByName ? ` · revised by ${quotation.revisedByName}` : ''}
               </div>
             </div>
           </div>
@@ -83,6 +131,54 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
 
         {/* Quotation Body */}
         <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain space-y-5 text-xs flex-1 min-h-0">
+          {(onStatusChange || onRevise || onDuplicate) && (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-card border border-line-strong bg-surface-2/60">
+              {onStatusChange && (
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10.5px] font-bold uppercase tracking-wider text-faint mb-1.5">Status</div>
+                  <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Quotation status">
+                    {(Object.keys(QUOTATION_STATUS_LABELS) as QuotationStatus[]).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        role="radio"
+                        aria-checked={status === s}
+                        disabled={statusSaving}
+                        onClick={() => changeStatus(s)}
+                        className={`min-h-[36px] px-3 rounded-full text-xs font-semibold border transition ${
+                          status === s ? `${STATUS_STYLES[s].replace('line-through', '')} ring-2 ring-brand/25` : 'bg-white text-muted border-line-strong hover:bg-surface-2'
+                        }`}
+                      >
+                        {QUOTATION_STATUS_LABELS[s]}
+                      </button>
+                    ))}
+                  </div>
+                  {statusError && <p className="text-danger text-[11px] mt-1.5">{statusError}</p>}
+                </div>
+              )}
+              <div className="grid grid-cols-2 sm:flex gap-2 shrink-0">
+                {onRevise && (
+                  <button
+                    type="button"
+                    onClick={onRevise}
+                    className="min-h-[40px] inline-flex items-center justify-center gap-1.5 px-3.5 rounded-control border border-line-strong bg-white text-xs font-semibold text-ink hover:bg-surface-2"
+                  >
+                    <PencilLine className="w-4 h-4 text-brand" /> Revise
+                  </button>
+                )}
+                {onDuplicate && (
+                  <button
+                    type="button"
+                    onClick={onDuplicate}
+                    className="min-h-[40px] inline-flex items-center justify-center gap-1.5 px-3.5 rounded-control border border-line-strong bg-white text-xs font-semibold text-ink hover:bg-surface-2"
+                  >
+                    <CopyPlus className="w-4 h-4 text-brand" /> Duplicate
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Header Grid: Company & Customer Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-line">
             {/* Company Block */}

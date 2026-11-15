@@ -1,3 +1,4 @@
+import { validateGstin } from '../../engine/gstin';
 import React, { useState, useEffect, useMemo, useId } from 'react';
 import {
   getCustomers,
@@ -136,11 +137,9 @@ export const CustomersPage: React.FC = () => {
       errors.name = 'Customer name is required';
     }
 
-    if (formData.gstin.trim()) {
-      const gstinVal = formData.gstin.trim().toUpperCase();
-      if (gstinVal.length > 0 && gstinVal.length !== 15) {
-        errors.gstin = 'GSTIN must be 15 characters (e.g. 33AAAAA0000A1Z5) or left blank';
-      }
+    const gstinCheck = validateGstin(formData.gstin);
+    if (!gstinCheck.valid) {
+      errors.gstin = `${gstinCheck.error} Leave blank for unregistered buyers.`;
     }
 
     setFormErrors(errors);
@@ -314,7 +313,56 @@ export const CustomersPage: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-card border border-line shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Phone: customer cards (tap to call, edit) */}
+          <ul className="md:hidden divide-y divide-line">
+            {filteredCustomers.map((customer) => {
+              const gst = validateGstin(customer.gstin);
+              return (
+                <li key={customer.id} className="p-4 flex gap-3">
+                  <div className="w-10 h-10 shrink-0 rounded-full bg-brand-soft text-brand font-bold flex items-center justify-center">
+                    {customer.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-ink text-sm leading-snug break-words">{customer.name}</div>
+                    <div className="text-[11px] font-mono mt-0.5">
+                      {customer.gstin ? (
+                        <span className={gst.valid ? 'text-muted' : 'text-danger'}>
+                          {customer.gstin}
+                          {!gst.valid && ' · check GSTIN'}
+                        </span>
+                      ) : (
+                        <span className="text-faint italic font-sans">Unregistered buyer</span>
+                      )}
+                    </div>
+                    {(customer.address || customer.city) && (
+                      <div className="text-[11px] text-muted mt-0.5 line-clamp-2">
+                        {[customer.address, customer.city, customer.state, customer.pincode].filter(Boolean).join(', ')}
+                      </div>
+                    )}
+                    <div className="flex gap-2 mt-2.5">
+                      {customer.phone && (
+                        <a
+                          href={`tel:${customer.phone.replace(/[^\d+]/g, '')}`}
+                          className="min-h-[38px] inline-flex items-center gap-1.5 px-3 rounded-control border border-line-strong text-xs font-semibold text-ink"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-brand" /> {customer.phone}
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(customer)}
+                        className="min-h-[38px] inline-flex items-center gap-1.5 px-3 rounded-control border border-line-strong text-xs font-semibold text-ink"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 text-brand" /> Edit
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-surface-2 border-b border-line text-faint font-semibold uppercase tracking-wider text-[11px]">

@@ -5,7 +5,7 @@ import {
   getProductsCached,
   getCompanySettingsCached,
 } from '../../services/masterDataCache';
-import { createQuotation } from '../../services/quotationService';
+import { createQuotation, reviseQuotation } from '../../services/quotationService';
 import {
   calculateQuotationTotals,
   determineTaxMode,
@@ -26,6 +26,7 @@ import {
   createInitialRow,
   createCustomRow,
   computeRowCalculation,
+  rowFromSavedLine,
   type EditableRowState,
 } from '../../components/quotations/EditableQuotationTable';
 import {
@@ -40,15 +41,24 @@ import {
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 
+export interface QuotationBuilderSource {
+  quotation: Quotation;
+  /** revise = same number, revision + 1; duplicate = new quotation with a new number */
+  mode: 'revise' | 'duplicate';
+}
+
 interface QuotationBuilderProps {
   onCancel: () => void;
   onSaved: (quotation: Quotation) => void;
+  source?: QuotationBuilderSource;
 }
 
 export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   onCancel,
   onSaved,
+  source,
 }) => {
+  const isRevise = source?.mode === 'revise';
   const { user, profile } = useAuth();
 
   // Master Data
@@ -61,14 +71,22 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   // Quotation Document Metadata
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [quotationDate, setQuotationDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    isRevise && source?.quotation.quotationDate ? source.quotation.quotationDate : new Date().toISOString().split('T')[0]
   );
-  const [widthFactor, setWidthFactor] = useState<string>('1.08');
-  const [isGstEnabled, setIsGstEnabled] = useState<boolean>(true);
-  const [advanceAmount, setAdvanceAmount] = useState<string>('');
+  const [widthFactor, setWidthFactor] = useState<string>(
+    source?.quotation.widthFactor ? String(source.quotation.widthFactor) : '1.08'
+  );
+  const [isGstEnabled, setIsGstEnabled] = useState<boolean>(source?.quotation.isGstEnabled ?? true);
+  const [advanceAmount, setAdvanceAmount] = useState<string>(
+    isRevise && source?.quotation.advanceAmount ? String(source.quotation.advanceAmount) : ''
+  );
 
-  // Editable Table Rows
-  const [rows, setRows] = useState<EditableRowState[]>([createInitialRow()]);
+  // Editable Table Rows (pre-filled from the source quotation when revising / duplicating)
+  const [rows, setRows] = useState<EditableRowState[]>(() =>
+    source && source.quotation.lines.length > 0
+      ? source.quotation.lines.map((l) => rowFromSavedLine(l))
+      : [createInitialRow()]
+  );
 
   // Customer Search & Selector
   const [customerSearch, setCustomerSearch] = useState<string>('');
@@ -113,10 +131,15 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           getCompanySettingsCached((fresh) => setCompanySettings(fresh)),
         ]);
         setCustomers(loadedCustomers);
+        if (source) {
+          const c = source.quotation.customer;
+          const match = loadedCustomers.find((x) => x.id && x.id === c.id);
+          setSelectedCustomer(match || ({ id: c.id || '', name: c.name, gstin: c.gstin, phone: c.phone, address: c.address } as Customer));
+        }
         // Only active products can be added to new quotes
         setProducts(loadedProducts.filter((p) => p.active));
         setCompanySettings(loadedCompany);
-        if (loadedCompany?.defaultWidthFactor) {
+        if (loadedCompany?.defaultWidthFactor && !source?.quotation.widthFactor) {
           setWidthFactor(String(loadedCompany.defaultWidthFactor));
         }
       } catch (err: unknown) {
@@ -304,12 +327,21 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         engineVersion: ENGINE_VERSION,
       };
 
-      const result = await createQuotation(quotationPayload);
+      const result =
+        isRevise && source
+          ? await reviseQuotation(source.quotation, quotationPayload, profile?.name || user?.email || 'Sales Team')
+          : await createQuotation(quotationPayload);
+      if (isRevise && source) quotationPayload.revision = (source.quotation.revision || 1) + 1;
 
-      setSaveSuccessMessage(`Quotation ${result.quotationNumber} saved successfully.`);
+      setSaveSuccessMessage(
+        isRevise
+          ? `Revision ${quotationPayload.revision} of ${result.quotationNumber} saved.`
+          : `Quotation ${result.quotationNumber} saved successfully.`
+      );
 
       const completeSavedQuote: Quotation = {
         ...quotationPayload,
+        status: isRevise ? source?.quotation.status || 'draft' : 'draft',
         id: result.id,
         quotationNumber: result.quotationNumber,
         createdAt: new Date().toISOString(),
@@ -337,7 +369,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   }
 
   return (
-    <div className="space-y-5 pb-8">
+    <div className="space-y-5 pb-28 md:pb-8">
       {/* Top Navigation Header */}
       <div className="border-b border-line pb-4">
         <div className="flex items-center gap-3">
@@ -351,9 +383,15 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           </button>
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-bold text-ink tracking-tight flex items-center gap-2">
-              <span>New quotation</span>
+              <span>
+                {isRevise
+                  ? `Revise ${source?.quotation.quotationNumber}`
+                  : source
+                    ? 'New quotation (copy)'
+                    : 'New quotation'}
+              </span>
               <span className="text-[10px] font-mono font-bold uppercase text-brand bg-brand-soft px-2 py-0.5 rounded-control border border-brand/20">
-                Draft
+                {isRevise ? `Rev ${(source?.quotation.revision || 1) + 1}` : 'Draft'}
               </span>
             </h1>
           </div>
@@ -729,7 +767,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                 ) : (
                   <>
                     <Save className="w-4 h-4" />
-                    <span>Save Quotation</span>
+                    <span>{isRevise ? 'Save Revision' : 'Save Quotation'}</span>
                   </>
                 )}
               </button>
@@ -737,6 +775,28 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           </div>
         </div>
       )}
+
+      {/* Phone: always-visible total + save */}
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur border-t border-line-strong shadow-[0_-6px_20px_rgba(16,24,40,0.08)] px-4 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[10.5px] text-muted font-semibold uppercase tracking-wider truncate">
+            {validLines.length} item{validLines.length === 1 ? '' : 's'}
+            {totals.totalKgs.toNumber() > 0 ? ` · ${totals.totalKgs.toNumber().toFixed(2)} kg` : ''}
+          </div>
+          <div className="font-mono tabular-nums font-bold text-lg text-brand leading-tight truncate">
+            ₹{totals.payableAmount.toNumber().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveQuotation}
+          disabled={isSaving || validLines.length === 0 || !selectedCustomer}
+          className="min-h-[46px] inline-flex items-center justify-center gap-1.5 px-5 bg-brand hover:bg-brand-dark text-white rounded-control text-sm font-semibold shadow-xs disabled:opacity-50"
+        >
+          <Save className="w-4 h-4" />
+          {isSaving ? 'Saving…' : !selectedCustomer ? 'Pick customer' : isRevise ? 'Save revision' : 'Save'}
+        </button>
+      </div>
     </div>
   );
 };

@@ -125,6 +125,8 @@ export const ProductsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [showInactive, setShowInactive] = useState<boolean>(false);
+  const [mobileLimit, setMobileLimit] = useState<number>(40);
+  useEffect(() => setMobileLimit(40), [searchQuery, categoryFilter, showInactive]);
 
   // Modals
   const [isAddEditOpen, setIsAddEditOpen] = useState<boolean>(false);
@@ -608,14 +610,7 @@ export const ProductsPage: React.FC = () => {
         <div className="flex items-center gap-2">
           {isAdmin && (
             <>
-              <button
-                onClick={() => setIsSeedModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-surface-2 text-ink rounded-control text-xs font-semibold border border-line-strong shadow-xs transition"
-                title="Synchronize standard 20 demo catalogue products if missing"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-warn" />
-                <span>Seed Demo Products</span>
-              </button>
+              {/* Demo seeding is only offered for an empty catalogue (never next to live products) */}
 
               <button
                 onClick={handleOpenAddModal}
@@ -758,7 +753,67 @@ export const ProductsPage: React.FC = () => {
         </div>
       ) : (
         <div className="bg-white rounded-card border border-line shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Phone: compact product cards, 40 at a time */}
+          <ul className="md:hidden divide-y divide-line">
+            {filteredProducts.slice(0, mobileLimit).map((product) => (
+              <li key={product.id} className={`p-3.5 flex gap-3 ${!product.active ? 'opacity-60 bg-surface-2/50' : ''}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-ink text-sm leading-snug break-words">
+                    {product.name}
+                    {product.isPlaceholder && (
+                      <span className="ml-1.5 align-middle text-[9px] font-bold uppercase bg-surface-2 text-muted px-1.5 py-0.5 rounded-control border border-line">
+                        Demo
+                      </span>
+                    )}
+                    {!product.active && (
+                      <span className="ml-1.5 align-middle text-[9px] font-bold uppercase bg-surface-2 text-muted px-1.5 py-0.5 rounded-control border border-line">
+                        Off
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-muted mt-0.5 flex flex-wrap gap-x-1.5">
+                    <span>{product.category}</span>
+                    <span>&bull;</span>
+                    <span>{formatQtyMethodLabel(product.qtyMethod)}</span>
+                    {product.qtyMethod === 'SECTION_WEIGHT' && 'kgPerMetre' in product && (
+                      <>
+                        <span>&bull;</span>
+                        <span className="font-mono">{product.kgPerMetre} kg/m</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                  <span className="font-mono tabular-nums font-bold text-sm text-ink">
+                    {product.ratePerUnit > 0 ? `₹${product.ratePerUnit}` : 'Rate on quote'}
+                    {product.ratePerUnit > 0 && <span className="text-[10px] text-muted font-normal">/{product.unit}</span>}
+                  </span>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditModal(product)}
+                      className="min-h-[34px] inline-flex items-center gap-1 px-2.5 rounded-control border border-line-strong text-xs font-semibold text-ink"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-brand" /> Edit
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+            {filteredProducts.length > mobileLimit && (
+              <li className="p-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileLimit((n) => n + 40)}
+                  className="w-full min-h-[44px] rounded-control border border-line-strong text-sm font-semibold text-brand"
+                >
+                  Show more ({filteredProducts.length - mobileLimit} left)
+                </button>
+              </li>
+            )}
+          </ul>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-surface-2 border-b border-line text-faint font-semibold uppercase tracking-wider text-[11px]">
@@ -985,7 +1040,7 @@ export const ProductsPage: React.FC = () => {
                     <option value="PIECE">Per piece (Fixed Nos rate)</option>
                     <option value="CUSTOM">Custom line / Service charge</option>
                     <option value="SHEET_WEIGHT">Sheet · by weight (Thickness × Coil Width)</option>
-                    <option value="SECTION_WEIGHT">Pipe · by weight (kg per metre)</option>
+                    <option value="SECTION_WEIGHT">Steel / Pipe · by weight (kg per metre)</option>
                     <option value="AREA">By area (Sq.Mtr)</option>
                     <option value="RUNNING_LENGTH">By running metre (R.Mtr)</option>
                     <option value="LENGTH_FT">By feet (Ft)</option>

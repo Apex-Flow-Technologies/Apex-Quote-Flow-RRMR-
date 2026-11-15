@@ -2,7 +2,40 @@ import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { LogOut, Menu, X, ChevronDown } from 'lucide-react';
-import { prefetchMasterData } from '../../services/masterDataCache';
+import { prefetchMasterData, getCompanySettingsCached } from '../../services/masterDataCache';
+import { validateGstin } from '../../engine/gstin';
+
+/** Admin-only reminder while Company Settings still hold placeholder details (they print on every PDF). */
+const CompanySetupWarning: React.FC = () => {
+  const [issues, setIssues] = useState<string[]>([]);
+  const navigate = useNavigate();
+  useEffect(() => {
+    const check = (c: Awaited<ReturnType<typeof getCompanySettingsCached>>) => {
+      const found: string[] = [];
+      if (!c?.gstin || /X{3,}/i.test(c.gstin) || !validateGstin(c.gstin).valid) found.push('GSTIN');
+      if (!c?.phones?.length || c.phones.some((p) => /0{5}/.test(p))) found.push('phone numbers');
+      const bank = c?.bankDetails;
+      if (!bank?.accountNumber || /^0+$|X{3,}/i.test(bank.accountNumber)) found.push('bank details');
+      setIssues(found);
+    };
+    getCompanySettingsCached(check).then(check).catch(() => {});
+  }, []);
+  if (issues.length === 0) return null;
+  return (
+    <div className="mb-4 p-3 rounded-card border border-amber-200 bg-amber-50 text-amber-900 text-sm flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+      <span className="flex-1">
+        <strong>Company details incomplete:</strong> the {issues.join(', ')} printed on quotation PDFs {issues.length > 1 ? 'are' : 'is'} still a placeholder.
+      </span>
+      <button
+        type="button"
+        onClick={() => navigate('/app/settings')}
+        className="min-h-[40px] px-3.5 rounded-control bg-amber-600 hover:bg-amber-700 text-white font-semibold text-sm shrink-0"
+      >
+        Fix in Settings
+      </button>
+    </div>
+  );
+};
 
 export const AppLayout: React.FC = () => {
   const { profile, user, isAdmin, logout } = useAuth();
@@ -39,6 +72,7 @@ export const AppLayout: React.FC = () => {
     { to: '/app/products', label: 'Products', adminOnly: true },
     { to: '/app/customers', label: 'Customers' },
     { to: '/app/settings', label: 'Company Settings', adminOnly: true },
+    { to: '/app/users', label: 'Users', adminOnly: true },
   ];
 
   const userName = profile?.name || user?.email?.split('@')[0] || 'User';
@@ -233,6 +267,7 @@ export const AppLayout: React.FC = () => {
 
       {/* Main Content Workspace */}
       <main className="flex-1 w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-5">
+        {isAdmin && <CompanySetupWarning />}
         <Outlet />
       </main>
 

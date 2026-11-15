@@ -778,7 +778,7 @@ describe('Phase 5 — A4 Quotation PDF Generation & Presentation Integrity', () 
 
     it('formats calculation methods accurately matching CEO review table', () => {
       expect(formatQtyMethodLabel('SHEET_WEIGHT')).toBe('Sheet · by weight');
-      expect(formatQtyMethodLabel('SECTION_WEIGHT')).toBe('Pipe · by weight');
+      expect(formatQtyMethodLabel('SECTION_WEIGHT')).toBe('Steel · by weight');
       expect(formatQtyMethodLabel('PIECE')).toBe('Per piece');
       expect(formatQtyMethodLabel('AREA')).toBe('By area');
       expect(formatQtyMethodLabel('RUNNING_LENGTH')).toBe('By running metre');

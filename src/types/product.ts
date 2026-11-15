@@ -133,7 +133,7 @@ export function formatQtyMethodLabel(method: QuantityMethod | string): string {
     case 'SHEET_WEIGHT':
       return 'Sheet · by weight';
     case 'SECTION_WEIGHT':
-      return 'Pipe · by weight';
+      return 'Steel · by weight';
 
     case 'AREA':
       return 'By area';

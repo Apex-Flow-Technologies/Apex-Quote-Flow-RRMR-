@@ -14,6 +14,8 @@ export * from './totals';
 export * from './words';
 export * from './line';
 export * from './steel';
+export * from './gstin';
+export * from './financialYear';
 export { formatQtyMethodLabel } from '../types/product';
 
 export const ENGINE_VERSION = '2.0.0-decimal-precision';

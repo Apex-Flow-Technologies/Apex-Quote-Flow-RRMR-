@@ -77,8 +77,19 @@ service cloud.firestore {
     // Active users (sales/admin) can read and create quotations.
     match /quotations/{quotationId} {
       allow read: if isActiveUser();
-      allow create: if isSalesOrAdmin();
-      allow update, delete: if isAdmin();
+      allow create: if isSalesOrAdmin() &&
+        request.resource.data.createdByUid == request.auth.uid;
+      // Admins: full edit. Sales: change status only, or revise their own quotation
+      // (same number, revision + 1, original creator kept).
+      allow update: if isAdmin() || (isSalesOrAdmin() && (
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'statusUpdatedBy', 'statusUpdatedAt', 'updatedAt']) ||
+        (resource.data.createdByUid == request.auth.uid &&
+          request.resource.data.createdByUid == resource.data.createdByUid &&
+          request.resource.data.quotationNumber == resource.data.quotationNumber &&
+          request.resource.data.revision == resource.data.get('revision', 1) + 1)
+      ));
+      allow delete: if isAdmin();
     }
 
     // =========================================================================
@@ -94,13 +105,21 @@ service cloud.firestore {
     // =========================================================================
     match /counters/{counterId} {
       allow read: if isActiveUser();
-      allow create: if isAdmin() &&
+      // Original 26-27 counter bootstrap (admin only)
+      allow create: if (isAdmin() &&
         counterId == 'quotation' &&
         request.resource.data.next == 1 &&
         request.resource.data.prefix == 'RR/QT' &&
-        request.resource.data.financialYear is string;
+        request.resource.data.financialYear is string) ||
+      // New financial year: first quotation of the year creates counters/quotation-YY-YY at next = 2
+        (isSalesOrAdmin() &&
+        request.resource.data.financialYear is string &&
+        request.resource.data.financialYear.matches('^[0-9]{2}-[0-9]{2}$') &&
+        counterId == 'quotation-' + request.resource.data.financialYear &&
+        request.resource.data.next == 2 &&
+        request.resource.data.prefix == 'RR/QT');
       allow update: if isSalesOrAdmin() &&
-        counterId == 'quotation' &&
+        (counterId == 'quotation' || counterId.matches('^quotation-[0-9]{2}-[0-9]{2}$')) &&
         request.resource.data.next == resource.data.next + 1 &&
         request.resource.data.prefix == resource.data.prefix &&
         request.resource.data.financialYear == resource.data.financialYear;

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { pdf } from '@react-pdf/renderer';
 import type { Quotation } from '../../types/quotation';
-import { QuotationPdfDocument } from './QuotationPdfDocument';
 import { getQuotationPdfFilename, triggerBlobDownload } from '../../utils/pdfGenerator';
 import { Download, ExternalLink, Loader2 } from 'lucide-react';
+
+// The PDF engine is fetched the first time someone generates a PDF, then cached.
+const renderPdf = async (q: Quotation): Promise<Blob> =>
+  (await import('./pdfRender')).renderQuotationPdfBlob(q);
 
 interface QuotationPdfActionsProps {
   quotation: Quotation;
@@ -23,7 +25,7 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
       setGenerating(true);
       setError(null);
 
-      const blob = await pdf(<QuotationPdfDocument quotation={quotation} />).toBlob();
+      const blob = await renderPdf(quotation);
       const filename = getQuotationPdfFilename(quotation.quotationNumber);
 
       triggerBlobDownload(blob, filename);
@@ -38,15 +40,22 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
 
   const handleOpenInNewTab = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Open the tab synchronously (inside the tap) — iPhone Safari blocks window.open after an await.
+    const tab = window.open('', '_blank');
     try {
       setGenerating(true);
       setError(null);
 
-      const blob = await pdf(<QuotationPdfDocument quotation={quotation} />).toBlob();
+      const blob = await renderPdf(quotation);
       const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      if (tab) {
+        tab.location.href = url;
+      } else {
+        window.location.assign(url);
+      }
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (err: unknown) {
+      tab?.close();
       console.error('PDF preview error:', err);
       const msg = err instanceof Error ? err.message : 'Failed to open PDF';
       setError(msg);

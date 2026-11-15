@@ -1,3 +1,4 @@
+import { validateGstin } from '../../engine/gstin';
 import React, { useState, useEffect, useId } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -119,9 +120,9 @@ export const SettingsPage: React.FC = () => {
     if (!settings.gstin.trim()) {
       errors.gstin = 'Company GSTIN is required';
     } else {
-      const gstinClean = settings.gstin.trim().toUpperCase();
-      if (gstinClean.length !== 15) {
-        errors.gstin = 'GSTIN must be 15 alphanumeric characters (e.g. 33AAAAA0000A1Z5)';
+      const gstinCheck = validateGstin(settings.gstin);
+      if (!gstinCheck.valid) {
+        errors.gstin = gstinCheck.error || 'Invalid GSTIN';
       }
     }
 

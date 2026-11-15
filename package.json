@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-rr-rules \"vitest run --config vitest.rules.config.ts\"",
+    "lint": "oxlint",
+    "check": "tsc -b && oxlint && vitest run"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
@@ -21,11 +24,13 @@
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "oxlint": "1.89.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.3",

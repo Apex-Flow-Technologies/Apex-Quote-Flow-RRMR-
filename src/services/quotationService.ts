@@ -5,11 +5,13 @@ import {
   getDocsFromCache,
   getDoc,
   runTransaction,
+  updateDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ensureQuotationCounter } from './counterService';
-import type { Quotation, CreateQuotationInput } from '../types/quotation';
+import { financialYearFor, counterDocIdFor } from '../engine/financialYear';
+import type { Quotation, CreateQuotationInput, QuotationStatus } from '../types/quotation';
 import type { QuotationCounter } from '../types/counter';
 
 const QUOTATIONS_COLLECTION = 'quotations';
@@ -107,31 +109,37 @@ export function sanitizeForFirestore<T>(data: T): T {
 export async function createQuotation(
   input: CreateQuotationInput
 ): Promise<SavedQuotationResult> {
-  const counterRef = doc(db, COUNTER_COLLECTION, QUOTATION_COUNTER_DOC);
+  // Financial year comes from the quotation date (April → March); numbers restart each year.
+  const financialYear = financialYearFor(input.quotationDate || new Date());
+  const counterRef = doc(db, COUNTER_COLLECTION, counterDocIdFor(financialYear));
   const newQuotationDocRef = doc(collection(db, QUOTATIONS_COLLECTION));
+  const isLegacyCounter = counterRef.id === QUOTATION_COUNTER_DOC;
 
-  // Seed counter idempotently if not already created
-  const counterSnapPre = await getDoc(counterRef);
-  if (!counterSnapPre.exists()) {
-    await ensureQuotationCounter();
+  // Seed the original 26-27 counter idempotently if it was never created (admin bootstrap)
+  if (isLegacyCounter) {
+    const counterSnapPre = await getDoc(counterRef);
+    if (!counterSnapPre.exists()) {
+      await ensureQuotationCounter();
+    }
   }
 
   let generatedNumber = '';
 
   await runTransaction(db, async (transaction) => {
-    // 1. Transaction Read: Read quotation counter
+    // 1. Transaction Read: this financial year's counter
     const counterSnap = await transaction.get(counterRef);
 
-    if (!counterSnap.exists()) {
+    let currentNext = 1;
+    let prefix = 'RR/QT';
+    if (counterSnap.exists()) {
+      const counter = counterSnap.data() as QuotationCounter;
+      currentNext = typeof counter.next === 'number' ? counter.next : 1;
+      prefix = counter.prefix || 'RR/QT';
+    } else if (isLegacyCounter) {
       throw new Error(
         'Quotation counter (counters/quotation) is not initialized. Please ensure the counter is seeded.'
       );
     }
-
-    const counter = counterSnap.data() as QuotationCounter;
-    const currentNext = typeof counter.next === 'number' ? counter.next : 1;
-    const prefix = counter.prefix || 'RR/QT';
-    const financialYear = counter.financialYear || '26-27';
 
     // 2. Format 4-digit sequential quotation number
     const paddedSequence = String(currentNext).padStart(4, '0');
@@ -142,6 +150,7 @@ export async function createQuotation(
       ...input,
       id: newQuotationDocRef.id,
       quotationNumber: generatedNumber,
+      status: input.status || 'draft',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -151,18 +160,70 @@ export async function createQuotation(
     // 4. Transaction Write: Set quotation document
     transaction.set(newQuotationDocRef, quotationPayload);
 
-    // 5. Transaction Write: Atomically increment counter next by exactly 1
-    // Keep prefix and financialYear identical to satisfy firestore security rules
-    transaction.update(counterRef, {
-      next: currentNext + 1,
-      prefix,
-      financialYear,
-      updatedAt: serverTimestamp(),
-    });
+    // 5. Counter: first quote of a new financial year creates that year's counter at next = 2;
+    //    otherwise increment by exactly 1 (both enforced by Firestore rules).
+    if (counterSnap.exists()) {
+      transaction.update(counterRef, {
+        next: currentNext + 1,
+        prefix,
+        financialYear,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      transaction.set(counterRef, {
+        next: 2,
+        prefix,
+        financialYear,
+        updatedAt: serverTimestamp(),
+      });
+    }
   });
 
   return {
     id: newQuotationDocRef.id,
     quotationNumber: generatedNumber,
   };
+}
+
+/**
+ * Changes a quotation's status (Draft / Sent / Won / Lost / Cancelled).
+ * Firestore rules let any active sales/admin user change ONLY these fields.
+ */
+export async function updateQuotationStatus(
+  id: string,
+  status: QuotationStatus,
+  byName: string
+): Promise<void> {
+  await updateDoc(doc(db, QUOTATIONS_COLLECTION, id), {
+    status,
+    statusUpdatedBy: byName,
+    statusUpdatedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Saves a revision of an existing quotation: same quotation number, revision + 1,
+ * lines / totals / customer replaced. Allowed for admins and for the quotation's creator.
+ */
+export async function reviseQuotation(
+  existing: Quotation,
+  input: CreateQuotationInput,
+  byName: string
+): Promise<SavedQuotationResult> {
+  const ref = doc(db, QUOTATIONS_COLLECTION, existing.id);
+  const payload = sanitizeForFirestore({
+    ...input,
+    id: existing.id,
+    quotationNumber: existing.quotationNumber,
+    revision: (existing.revision || 1) + 1,
+    status: existing.status || 'draft',
+    createdByUid: existing.createdByUid,
+    createdByName: existing.createdByName,
+    revisedByName: byName,
+    revisedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  await updateDoc(ref, payload as Record<string, unknown>);
+  return { id: existing.id, quotationNumber: existing.quotationNumber };
 }

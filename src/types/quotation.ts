@@ -76,10 +76,25 @@ export interface TaxGroupSummary {
   totalTax: number;
 }
 
+export type QuotationStatus = 'draft' | 'sent' | 'won' | 'lost' | 'cancelled';
+
+export const QUOTATION_STATUS_LABELS: Record<QuotationStatus, string> = {
+  draft: 'Draft',
+  sent: 'Sent',
+  won: 'Won',
+  lost: 'Lost',
+  cancelled: 'Cancelled',
+};
+
 export interface Quotation {
   id: string;
   quotationNumber: string; // e.g., RR/QT/26-27/0001
-  revision: number; // default 1
+  revision: number; // default 1, +1 on every revise (same quotation number)
+  status?: QuotationStatus; // default 'draft' (older quotes have none → treated as draft)
+  statusUpdatedAt?: string | number | Record<string, unknown>;
+  statusUpdatedBy?: string;
+  revisedAt?: string | number | Record<string, unknown>;
+  revisedByName?: string;
   quotationDate?: string; // e.g., "2026-10-08"
   customer: QuotationCustomerSnapshot;
   company?: CompanySettings;
