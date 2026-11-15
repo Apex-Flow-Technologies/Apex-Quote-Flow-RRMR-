@@ -9,6 +9,7 @@ import {
 } from '@react-pdf/renderer';
 import type { Quotation } from '../../types/quotation';
 import { formatRoundOff } from '../../engine';
+import { describeSteelLine, isSteelByKg } from '../../utils/steelLine';
 
 export const FONT_FAMILY = 'Noto Sans';
 
@@ -630,12 +631,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                     {isSheet && (
                       `${line.lengthFeet || 0}'${line.lengthInches || 0}" × ${line.nos} nos • ${snap.thicknessMm}mm • ${snap.coilWidthM}m coil`
                     )}
-                    {isPipe && (
-                      `${line.lengthFeet !== undefined && line.lengthFeet !== null
-                        ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
-                        : `${line.lengthM || 0}m`
-                      } × ${line.nos} nos • ${snap.kgPerMetre} kg/m`
-                    )}
+                    {isPipe && describeSteelLine(line, '•')}
                     {isPiece && `${line.nos} nos • Per piece`}
                   </Text>
                 </View>
@@ -646,7 +642,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                   <Text style={{ fontFamily: FONT_FAMILY, fontWeight: 'bold' }}>
                     {line.unit === 'Nos' ? `${Number(line.quantity)} ${line.unit}` : `${Number(line.quantity).toFixed(2)} ${line.unit}`}
                   </Text>
-                  {line.isManualQuantity && (
+                  {line.isManualQuantity && !isSteelByKg(line) && (
                     <Text style={styles.manualTag}>(Manual)</Text>
                   )}
                 </View>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { QUOTATION_STATUS_LABELS, type Quotation, type QuotationLine, type QuotationStatus } from '../../types/quotation';
 import { formatRoundOff } from '../../engine';
 import { QuotationPdfActions } from './QuotationPdfActions';
+import { describeSteelLine, isSteelByKg } from '../../utils/steelLine';
 import {
   FileText,
   X,
@@ -30,10 +31,7 @@ function describeLine(line: QuotationLine, quotation: Quotation): string {
   } else if (m === 'SHEET_WEIGHT') {
     s = `${line.lengthFeet || 0}'${line.lengthInches || 0}" × ${line.nos} nos · ${line.snapshot.thicknessMm}mm · ${line.snapshot.coilWidthM}m`;
   } else if (m === 'SECTION_WEIGHT') {
-    const len = line.lengthFeet !== undefined && line.lengthFeet !== null
-      ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
-      : `${line.lengthM || 0}m`;
-    s = `${len} × ${line.nos} nos · ${line.snapshot.kgPerMetre} kg/m`;
+    return describeSteelLine(line);
   } else if (m === 'PIECE') {
     s = `${line.nos} nos`;
   }
@@ -319,16 +317,9 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                               {line.lengthFeet || 0}&apos;{line.lengthInches || 0}&quot; &times; {line.nos} nos &bull; Thick: {line.snapshot.thicknessMm}mm &bull; Coil: {line.snapshot.coilWidthM}m
                             </span>
                           )}
-                          {line.snapshot.qtyMethod === 'SECTION_WEIGHT' && (
-                            <span>
-                              {line.lengthFeet !== undefined && line.lengthFeet !== null
-                                ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
-                                : `${line.lengthM || 0}m`
-                              } &times; {line.nos} nos &bull; Section: {line.snapshot.kgPerMetre} kg/m
-                            </span>
-                          )}
+                          {line.snapshot.qtyMethod === 'SECTION_WEIGHT' && <span>{describeSteelLine(line, '•')}</span>}
                           {line.snapshot.qtyMethod === 'PIECE' && <span>{line.nos} nos &bull; Per piece</span>}
-                          {line.isManualQuantity && (
+                          {line.isManualQuantity && !isSteelByKg(line) && (
                             <span className="ml-1.5 text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
                               (Manual)
                             </span>
@@ -339,7 +330,7 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                         {line.hsn}
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono text-ink">
-                        {line.nos ?? '—'}
+                        {isSteelByKg(line) ? '—' : (line.nos ?? '—')}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-medium text-ink">
                         {line.unit === 'Nos' ? `${Number(line.quantity)} ${line.unit}` : `${Number(line.quantity).toFixed(2)} ${line.unit}`}

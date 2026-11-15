@@ -349,6 +349,9 @@ export function computeRowCalculation(
     });
 
     if (!validation.isValid) {
+      if (row.product.qtyMethod === 'SECTION_WEIGHT' && row.isManualQuantity && validation.error === 'Manual quantity must be greater than 0.') {
+        return { calculatedLine: null, validationError: 'Enter the weight in kg.' };
+      }
       return { calculatedLine: null, validationError: validation.error || 'Invalid line values' };
     }
 

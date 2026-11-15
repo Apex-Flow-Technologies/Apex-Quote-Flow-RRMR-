@@ -35,6 +35,7 @@ import {
   productDefaultLengthM,
   weightPreview,
 } from './quotationRows';
+import { approxLengths } from '../../utils/steelLine';
 
 interface DropdownPosition {
   top: number;
@@ -228,6 +229,18 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeManualRowId]);
+
+  /** Steel lines: sell by number of lengths, or type the weight in kg directly. */
+  const setSteelEntry = (row: EditableRowState, mode: 'lengths' | 'kg') => {
+    if (mode === 'kg') {
+      if (row.isManualQuantity) return;
+      const wp = weightPreview(row, widthFactor, feetToMetre);
+      updateRow(row.id, { isManualQuantity: true, manualQuantity: wp ? String(wp.quantity) : '', nos: '1' });
+    } else {
+      if (!row.isManualQuantity) return;
+      updateRow(row.id, { isManualQuantity: false, manualQuantity: '' });
+    }
+  };
 
   const updateRow = (rowId: string, updates: Partial<EditableRowState>) => {
     onRowsChange(
@@ -905,6 +918,47 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
                   {/* Nos Input */}
                   <td className="py-3 px-3 text-center align-top">
+                    {isPipe && (
+                      <div className="flex justify-center mb-1">
+                        <div role="radiogroup" aria-label="Sell by" className="inline-flex p-0.5 bg-surface-2 border border-line rounded-control">
+                          {(['lengths', 'kg'] as const).map((m) => {
+                            const on = (m === 'kg') === row.isManualQuantity;
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                role="radio"
+                                aria-checked={on}
+                                onClick={() => setSteelEntry(row, m)}
+                                title={m === 'kg' ? 'Type the weight in kg' : 'Enter number of lengths'}
+                                className={`px-1.5 py-0.5 text-[10px] rounded-[4px] font-semibold ${on ? 'bg-white text-brand shadow-xs' : 'text-muted'}`}
+                              >
+                                {m === 'kg' ? 'kg' : 'pcs'}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {isPipe && row.isManualQuantity ? (
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={row.manualQuantity}
+                        placeholder="kg"
+                        onChange={(e) => updateRow(row.id, { manualQuantity: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            inputRefs.current.get(`${row.id}_rate`)?.focus();
+                          }
+                        }}
+                        className="w-[72px] py-1.5 px-1.5 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-brand/40 focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
+                        title="Weight in kg"
+                      />
+                    ) : (
                     <input
                       ref={(el) => {
                         if (el) inputRefs.current.set(`${row.id}_nos`, el);
@@ -925,6 +979,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       className="w-14 py-1.5 px-1.5 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
                       title={row.product?.qtyMethod === 'SECTION_WEIGHT' ? 'Number of lengths (pieces)' : 'Number of pieces (Nos)'}
                     />
+                    )}
                   </td>
 
                   {/* Quantity & Unit */}
@@ -940,6 +995,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                             {row.calculatedLine.perPieceQuantity > 0 && !row.isManualQuantity && (
                               <div className="text-[10px] text-faint font-mono tabular-nums">
                                 {row.calculatedLine.perPieceQuantity} {row.calculatedLine.unit}/pc
+                              </div>
+                            )}
+                            {isPipe && row.isManualQuantity && approxLengths(row.calculatedLine.quantity, row.calculatedLine.perPieceQuantity) !== null && (
+                              <div className="text-[10px] text-faint font-mono tabular-nums">
+                                ≈ {approxLengths(row.calculatedLine.quantity, row.calculatedLine.perPieceQuantity)} lengths
                               </div>
                             )}
                           </div>
@@ -960,7 +1020,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           </button>
                         </div>
 
-                        {row.isManualQuantity && (
+                        {row.isManualQuantity && !isPipe && (
                           <div className="flex items-center justify-end mt-1">
                             <button
                               type="button"
@@ -1372,9 +1432,29 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                 </div>
               ) : isPipe ? (
                 <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between gap-2 pb-1.5">
+                    <span className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">Sell by</span>
+                    <div role="radiogroup" aria-label="Sell by" className="inline-flex p-0.5 bg-surface-2 border border-line rounded-control">
+                    {(['lengths', 'kg'] as const).map((m) => {
+                      const on = (m === 'kg') === row.isManualQuantity;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          role="radio"
+                          aria-checked={on}
+                          onClick={() => setSteelEntry(row, m)}
+                          className={`min-h-[34px] text-xs px-2.5 rounded-[5px] font-semibold transition ${on ? 'bg-white text-brand shadow-xs border border-line-strong' : 'text-muted border border-transparent'}`}
+                        >
+                          {m === 'kg' ? 'By kg' : 'By lengths'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  </div>
                   <div className="flex items-center justify-between">
                     <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
-                      Length
+                      {row.isManualQuantity ? 'Bar length' : 'Length'}
                     </label>
                     <button
                       type="button"
@@ -1450,6 +1530,23 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
               {/* Pieces (Nos) and Rate Grid */}
               <div className="grid grid-cols-2 gap-3 pt-1">
+                {isPipe && row.isManualQuantity ? (
+                <div className="space-y-1">
+                  <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                    Weight (kg) <span className="text-danger">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    value={row.manualQuantity}
+                    placeholder="e.g. 500"
+                    onChange={(e) => updateRow(row.id, { manualQuantity: e.target.value })}
+                    className="w-full h-10 px-2.5 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                  />
+                </div>
+                ) : (
                 <div className="space-y-1">
                   <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
                     {row.product?.qtyMethod === 'SECTION_WEIGHT' ? 'No. of lengths' : 'Pieces (Nos)'} <span className="text-danger">*</span>
@@ -1468,6 +1565,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     className="w-full h-10 px-2.5 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
                   />
                 </div>
+                )}
 
                 <div className="space-y-1">
                   <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
@@ -1517,7 +1615,16 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   </div>
                   {(() => {
                     const wp = weightPreview(row, widthFactor, feetToMetre);
-                    if (!wp || row.isManualQuantity) return null;
+                    if (!wp) return null;
+                    if (row.isManualQuantity) {
+                      if (!isPipe) return null;
+                      const n = approxLengths(wp.quantity, wp.perPiece);
+                      return n === null ? null : (
+                        <span className="block text-[11px] text-muted font-mono tabular-nums mt-0.5">
+                          ≈ {n} lengths ({wp.perPiece} kg each)
+                        </span>
+                      );
+                    }
                     return (
                       <span className="block text-[11px] text-muted font-mono tabular-nums mt-0.5">
                         {wp.perPiece} kg per length × {row.nos || 1}

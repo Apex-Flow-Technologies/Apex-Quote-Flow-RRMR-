@@ -37,3 +37,33 @@ describe('weightPreview (steel before a rate is entered)', () => {
     expect(weightPreview({ ...createInitialRow('r3') })).toBeNull();
   });
 });
+
+import { describeSteelLine, approxLengths, isSteelByKg } from '../utils/steelLine';
+
+describe('steel sold by kg', () => {
+  it('prices the typed kg and keeps the bar length for reference', () => {
+    const row: EditableRowState = { ...createInitialRow('k1', steel), isManualQuantity: true, manualQuantity: '500', nos: '1', rate: '62' };
+    const { calculatedLine, validationError } = computeRowCalculation(row, 'intra');
+    expect(validationError).toBeNull();
+    expect(calculatedLine!.quantity).toBe(500);
+    expect(calculatedLine!.taxableAmount).toBe(31000);
+    expect(isSteelByKg(calculatedLine!)).toBe(true);
+    expect(describeSteelLine(calculatedLine!)).toBe('By weight · ≈ 7.1 lengths of 6m · 11.672 kg/m');
+  });
+
+  it('asks for the kg when the box is empty', () => {
+    const row: EditableRowState = { ...createInitialRow('k2', steel), isManualQuantity: true, manualQuantity: '', rate: '62' };
+    expect(computeRowCalculation(row, 'intra').validationError).toBe('Enter the weight in kg.');
+  });
+
+  it('describes a normal lengths line as before', () => {
+    const row: EditableRowState = { ...createInitialRow('k3', steel), nos: '3', rate: '62' };
+    const line = computeRowCalculation(row, 'intra').calculatedLine!;
+    expect(describeSteelLine(line)).toBe('6m × 3 nos · 11.672 kg/m');
+  });
+
+  it('approxLengths rounds to one decimal and guards zero', () => {
+    expect(approxLengths(140.06, 70.03)).toBe(2);
+    expect(approxLengths(100, 0)).toBeNull();
+  });
+});
