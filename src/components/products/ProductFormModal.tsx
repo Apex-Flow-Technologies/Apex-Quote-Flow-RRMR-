@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useId } from 'react';
 import { Decimal } from 'decimal.js';
 import { AlertCircle, X } from 'lucide-react';
-import type { Product, QuantityMethod, CreateProductInput } from '../../types/product';
+import type { Product, ProductUnit, QuantityMethod, CreateProductInput } from '../../types/product';
 import {
   type SteelShape,
   STEEL_SHAPE_LABELS,
@@ -160,11 +160,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <option value="CUSTOM">Custom line / Service charge</option>
                     <option value="SHEET_WEIGHT">Sheet · by weight (Thickness × Coil Width)</option>
                     <option value="SECTION_WEIGHT">Steel / Pipe · by weight (kg per metre)</option>
-                    <option value="AREA">By area (Sq.Mtr)</option>
-                    <option value="RUNNING_LENGTH">By running metre (R.Mtr)</option>
-                    <option value="LENGTH_FT">By feet (Ft)</option>
-                    <option value="MANUAL">Manual</option>
+                    {/* No length box on a quote line for these, so they are master-only */}
+                    {!isQuote && (
+                      <>
+                        <option value="AREA">By area (Sq.Mtr)</option>
+                        <option value="RUNNING_LENGTH">By running metre (R.Mtr)</option>
+                        <option value="LENGTH_FT">By feet (Ft)</option>
+                        <option value="MANUAL">Manual</option>
+                      </>
+                    )}
                   </select>
+                  {isQuote && formData.qtyMethod === 'CUSTOM' && (
+                    <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-faint uppercase tracking-wider">
+                      Unit
+                      <select
+                        value={formData.unit}
+                        onChange={(e) => setFormData({ ...formData, unit: e.target.value as ProductUnit })}
+                        className="py-1 px-2 rounded-control border border-line-strong bg-white font-medium text-ink normal-case tracking-normal focus:outline-none focus:border-brand"
+                      >
+                        {(['Nos', 'Kgs', 'Sq.Mtr', 'R.Mtr', 'Ft'] as ProductUnit[]).map((u) => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   {editingProduct && (
                     <span className="text-[10px] text-muted mt-0.5 block">
                       Note: Changing calculation method affects how quantities are calculated for new quotation lines.

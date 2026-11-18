@@ -56,6 +56,32 @@ describe('custom item uses the product form (every calculation method)', () => {
     });
   }
 
+  it('adds each quote method exactly as the Custom Item button does, with the right quantity', () => {
+    const expected: Partial<Record<QuantityMethod, [number, string]>> = {
+      SQM: [5.73, 'Sq.Mtr'], // 17.4 ft × 0.305 × 1.08
+      WEIGHT_PER_PIECE: [40, 'Kgs'],
+      PIECE: [1, 'Nos'],
+      CUSTOM: [1, 'Nos'],
+      SHEET_WEIGHT: [9.69, 'Kgs'], // 8 ft sheet, 0.47 mm × 1.06 m
+      SECTION_WEIGHT: [27, 'Kgs'], // 6 m × 4.5 kg/m
+    };
+    for (const [method, [qty, unit]] of Object.entries(expected) as [QuantityMethod, [number, string]][]) {
+      const product = oneOffProduct(buildProductPayload(formFor(method)));
+      const { calculatedLine, validationError } = computeRowCalculation(createInitialRow(undefined, product), 'intra', 1.08, 0.305);
+      expect(validationError, method).toBeNull();
+      expect(calculatedLine!.quantity, method).toBeCloseTo(qty, 2);
+      expect(calculatedLine!.snapshot.unit, method).toBe(unit);
+    }
+  });
+
+  it('a custom line keeps the unit picked in the form', () => {
+    const form = { ...customItemFormState('Labour'), unit: 'Sq.Mtr' as const, ratePerUnit: '40' };
+    const line = computeRowCalculation({ ...createInitialRow('r', oneOffProduct(buildProductPayload(form))), nos: '50' }, 'intra').calculatedLine!;
+    expect(line.quantity).toBe(50);
+    expect(line.snapshot.unit).toBe('Sq.Mtr');
+    expect(rowFromSavedLine(line).product!.unit).toBe('Sq.Mtr');
+  });
+
   it('a plain custom line needs only a name and a rate', () => {
     const form = { ...customItemFormState('Labour charge'), ratePerUnit: '1500' };
     expect(validateProductForm(form)).toEqual({});
