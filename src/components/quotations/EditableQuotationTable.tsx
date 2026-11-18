@@ -1,6 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { Product, ProductUnit } from '../../types/product';
+import type { Product, ProductUnit, CreateProductInput } from '../../types/product';
+import { ProductFormModal } from '../products/ProductFormModal';
+import { oneOffProduct } from '../products/productForm';
+import { createProduct } from '../../services/productService';
+import { useAuth } from '../../hooks/useAuth';
 import { formatQtyMethodLabel, type TaxMode, type LengthUnit } from '../../engine';
 import { Decimal } from 'decimal.js';
 import {
@@ -29,7 +33,7 @@ import { searchProducts } from './productSearch';
 import {
   type RowLengthUnit,
   type EditableRowState,
-  createCustomRow,
+  createInitialRow,
   computeRowCalculation,
   isRateHint,
   productDefaultLengthM,
@@ -66,7 +70,6 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
   feetToMetre,
   onRowsChange,
   onAddRow,
-  onAddCustomRow,
   onRemoveRow,
   onDuplicateRow,
 }) => {
@@ -78,6 +81,28 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
   const [activeManualRowId, setActiveManualRowId] = useState<string | null>(null);
   const [tempManualQty, setTempManualQty] = useState<string>('');
   const [manualModalError, setManualModalError] = useState<string | null>(null);
+
+  // Custom Item: the same form as adding a product
+  const { isAdmin } = useAuth();
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState<boolean>(false);
+
+  const handleAddCustomItem = async (payload: CreateProductInput, opts: { saveToMaster: boolean }) => {
+    let product: Product;
+    if (opts.saveToMaster) {
+      const id = await createProduct(payload);
+      product = { ...payload, id } as Product;
+    } else {
+      product = oneOffProduct(payload);
+    }
+    const base = createInitialRow(undefined, product);
+    const { calculatedLine, validationError } = computeRowCalculation(base, taxMode, widthFactor, feetToMetre);
+    const newRow: EditableRowState = { ...base, calculatedLine, validationError };
+    // Fill the empty last row if there is one, otherwise add a new line
+    const last = rows[rows.length - 1];
+    const lastIsBlank = last && !last.product && !last.isCustomItem && !last.productSearch.trim();
+    onRowsChange(lastIsBlank ? [...rows.slice(0, -1), newRow] : [...rows, newRow]);
+    setIsCustomModalOpen(false);
+  };
 
   // Product Autocomplete Dropdown Portal Positioning State
   const [dropdownPos, setDropdownPos] = useState<DropdownPosition | null>(null);
@@ -490,7 +515,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
-            onClick={onAddCustomRow ? onAddCustomRow : () => onRowsChange([...rows, createCustomRow()])}
+            onClick={() => setIsCustomModalOpen(true)}
             className="flex-1 sm:flex-initial min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
           >
             <Plus className="w-3.5 h-3.5 text-brand" />
@@ -1662,7 +1687,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           </button>
           <button
             type="button"
-            onClick={onAddCustomRow ? onAddCustomRow : () => onRowsChange([...rows, createCustomRow()])}
+            onClick={() => setIsCustomModalOpen(true)}
             className="w-full sm:w-auto min-h-[44px] sm:min-h-[36px] inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
           >
             <Plus className="w-4 h-4 text-brand" />
@@ -1902,6 +1927,15 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           )}
         </div>,
         document.body
+      )}
+
+      {isCustomModalOpen && (
+        <ProductFormModal
+          mode="quote"
+          canSaveToMaster={isAdmin}
+          onClose={() => setIsCustomModalOpen(false)}
+          onSubmit={handleAddCustomItem}
+        />
       )}
     </div>
   );

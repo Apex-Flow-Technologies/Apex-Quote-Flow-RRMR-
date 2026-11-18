@@ -24,7 +24,6 @@ import type {
 import {
   EditableQuotationTable,
   createInitialRow,
-  createCustomRow,
   computeRowCalculation,
   rowFromSavedLine,
   type EditableRowState,
@@ -225,10 +224,6 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   // Row Management
   const handleAddRow = () => {
     setRows((prev) => [...prev, createInitialRow()]);
-  };
-
-  const handleAddCustomRow = () => {
-    setRows((prev) => [...prev, createCustomRow()]);
   };
 
   const handleRemoveRow = (id: string) => {
@@ -600,7 +595,6 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         feetToMetre={feetToMetreNum}
         onRowsChange={setRows}
         onAddRow={handleAddRow}
-        onAddCustomRow={handleAddCustomRow}
         onRemoveRow={handleRemoveRow}
         onDuplicateRow={handleDuplicateRow}
       />
