@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { LogOut, Menu, X, ChevronDown } from 'lucide-react';
 import { prefetchMasterData, getCompanySettingsCached } from '../../services/masterDataCache';
@@ -39,6 +39,7 @@ const CompanySetupWarning: React.FC = () => {
 
 export const AppLayout: React.FC = () => {
   const { profile, user, isAdmin, logout } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -268,7 +269,9 @@ export const AppLayout: React.FC = () => {
       {/* Main Content Workspace */}
       <main className="flex-1 w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-5">
         {isAdmin && <CompanySetupWarning />}
-        <Outlet />
+        <div key={location.pathname} className="anim-page">
+          <Outlet />
+        </div>
       </main>
 
       {/* Application Footer */}

@@ -167,3 +167,96 @@
     background-color: rgba(16, 24, 40, 0.94) !important;
   }
 }
+
+/* ── Motion & type polish ───────────────────────────────────────────────
+   One easing curve and short durations everywhere; all of it switches off
+   for people who ask their device to reduce motion. */
+:root {
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes rr-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes rr-rise-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rr-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes rr-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Modals: dimmed backdrop fades, the panel rises in */
+.fixed.inset-0.z-50 {
+  animation: rr-fade-in 160ms ease-out both;
+}
+.animate-in {
+  animation: rr-rise-in 220ms var(--ease-out-soft) both;
+}
+
+/* Page change, notices, dropdowns, new quotation lines */
+.anim-page { animation: rr-fade-up 260ms var(--ease-out-soft) both; }
+.anim-fade-up { animation: rr-fade-up 240ms var(--ease-out-soft) both; }
+.anim-pop { animation: rr-pop 160ms var(--ease-out-soft) both; transform-origin: top center; }
+.anim-row { animation: rr-fade-up 220ms var(--ease-out-soft) both; }
+
+@layer base {
+  /* Inter's clearer digits and letter shapes; balanced headings */
+  html {
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3 {
+    letter-spacing: -0.012em;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Smooth hover and focus changes on every control */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 150ms;
+    transition-timing-function: var(--ease-out-soft);
+  }
+
+  /* A small press-down on buttons */
+  button:not(:disabled):active,
+  .press:active {
+    transform: scale(0.97);
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

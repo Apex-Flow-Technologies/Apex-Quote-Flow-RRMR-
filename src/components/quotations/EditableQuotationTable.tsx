@@ -565,7 +565,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               return (
                 <tr
                   key={row.id}
-                  className={`hover:bg-brand-tint/20 transition ${
+                  className={`anim-row hover:bg-brand-tint/20 transition ${
                     hasError ? 'bg-rose-50/20' : ''
                   }`}
                 >
@@ -1164,7 +1164,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           return (
             <div
               key={`mobile_${row.id}`}
-              className={`p-3.5 space-y-3 transition ${
+              className={`anim-row p-3.5 space-y-3 transition ${
                 hasError ? 'bg-rose-50/20' : 'bg-white'
               }`}
             >
