@@ -617,7 +617,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                 <Text style={[styles.colSNo, { color: '#94a3b8' }]}>{index + 1}</Text>
 
                 <View style={styles.colDesc}>
-                  <Text style={styles.productName}>{line.productName}</Text>
+                  <Text style={styles.productName}>{line.productName}{line.colour ? ` • Colour: ${line.colour}` : ''}</Text>
                   <Text style={styles.productSpecs}>
                     {isSqm && (
                       `${line.lengthValue !== undefined ? line.lengthValue : (line.lengthFeet || 0)} ${line.lengthUnit || 'ft'} × ${line.nos} nos • Width: ${line.widthFactor || snap.widthFactor || quotation.widthFactor || 1.08}`
@@ -633,6 +633,9 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                     )}
                     {isPipe && describeSteelLine(line, '•')}
                     {isPiece && `${line.nos} nos • Per piece`}
+                    {(snap.qtyMethod === 'AREA' || snap.qtyMethod === 'RUNNING_LENGTH' || snap.qtyMethod === 'LENGTH_FT') && (
+                      `${line.lengthFeet || 0}'${line.lengthInches || 0}" × ${line.nos} nos`
+                    )}
                   </Text>
                 </View>
 

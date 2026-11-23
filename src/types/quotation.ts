@@ -55,6 +55,8 @@ export interface QuotationLine {
   unit: ProductUnit;
   rate: number;
   gstRate: number;
+  /** Sheet colour typed on the quote line (free text). */
+  colour?: string;
 }
 
 export interface QuotationCustomerSnapshot {

@@ -45,8 +45,11 @@ describe('ProductFormModal renders in every mode', () => {
     expect(html).toContain('value="Gutter"');
     expect(html).toContain('Add to Quotation');
     expect(html).toContain('Also save to Products');
-    expect(html).not.toContain('By running metre');
-    expect(html).not.toContain('Base Rate');
+    // Same options as Add Product
+    expect(html).toContain('By running metre');
+    expect(html).toContain('Sheet · by weight');
+    expect(html).toContain('Base Rate');
+    expect(html).not.toContain('Active Product');
   });
 
   it('quotation: sales staff do not get "save to Products"', () => {

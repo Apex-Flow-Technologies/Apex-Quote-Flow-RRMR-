@@ -97,3 +97,36 @@ describe('custom item uses the product form (every calculation method)', () => {
     expect(errors.ratePerUnit).toBeTruthy();
   });
 });
+
+describe('lengths and sheet colour survive save and revise', () => {
+  it('feet + inches methods keep a non-default length through revise', () => {
+    for (const method of ['SHEET_WEIGHT', 'AREA', 'RUNNING_LENGTH', 'LENGTH_FT'] as QuantityMethod[]) {
+      const product = oneOffProduct(buildProductPayload(formFor(method)));
+      const row = { ...createInitialRow('r', product), lengthFeet: '12', lengthInches: '6', nos: '3' };
+      const line = computeRowCalculation(row, 'intra', 1.08, 0.305).calculatedLine!;
+      expect(line, method).not.toBeNull();
+      expect(line.lengthFeet, method).toBe(12);
+      expect(line.lengthInches, method).toBe(6);
+      const revised = rowFromSavedLine(line);
+      expect(revised.lengthFeet, method).toBe('12');
+      expect(revised.lengthInches, method).toBe('6');
+      const again = computeRowCalculation(revised, 'intra', 1.08, 0.305).calculatedLine!;
+      expect(again.quantity, method).toBe(line.quantity);
+    }
+    const ft = oneOffProduct(buildProductPayload(formFor('LENGTH_FT')));
+    const q = computeRowCalculation({ ...createInitialRow('r', ft), lengthFeet: '12', lengthInches: '6', nos: '3' }, 'intra').calculatedLine!;
+    expect(q.quantity).toBe(37.5); // 12.5 ft × 3
+  });
+
+  it('a sheet line keeps its colour; a non-sheet line ignores it', () => {
+    const sheet = oneOffProduct(buildProductPayload(formFor('SHEET_WEIGHT')));
+    const line = computeRowCalculation({ ...createInitialRow('r', sheet), colour: ' Brick Red ' }, 'intra').calculatedLine!;
+    expect(line.colour).toBe('Brick Red');
+    const revised = rowFromSavedLine(line);
+    expect(revised.colour).toBe('Brick Red');
+    expect(computeRowCalculation(revised, 'intra').calculatedLine!.colour).toBe('Brick Red');
+
+    const piece = oneOffProduct(buildProductPayload(formFor('PIECE')));
+    expect(computeRowCalculation({ ...createInitialRow('r', piece), colour: 'Blue' }, 'intra').calculatedLine!.colour).toBeUndefined();
+  });
+});

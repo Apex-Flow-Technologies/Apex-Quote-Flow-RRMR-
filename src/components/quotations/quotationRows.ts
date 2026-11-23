@@ -33,6 +33,19 @@ export interface EditableRowState {
   manualQuantity: string;
   calculatedLine: QuotationLine | null;
   validationError: string | null;
+  /** Sheet colour typed on the quote line (free text). */
+  colour?: string;
+}
+
+/** Methods whose quantity comes from a feet + inches length on the line. */
+export function isLengthMethod(method?: QuantityMethod | string): boolean {
+  return method === 'AREA' || method === 'RUNNING_LENGTH' || method === 'LENGTH_FT';
+}
+
+/** Roofing sheets get a colour box on the quote line. */
+export function isSheetLike(product?: Product | null): boolean {
+  if (!product) return false;
+  return product.qtyMethod === 'SHEET_WEIGHT' || product.qtyMethod === 'SQM' || /sheet/i.test(product.category || '');
 }
 
 /** Steel products carry their own default length (6 m, chequered plate 2.5 m). */
@@ -143,6 +156,7 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
 
   return {
     ...base,
+    colour: line.colour ?? '',
     rate: str(line.rate),
     nos: str(line.nos, '1'),
     lengthUnit,
@@ -186,6 +200,20 @@ export function createCustomRow(description = '', rate = '', nos = '1', unit: Pr
 }
 
 export function computeRowCalculation(
+  row: EditableRowState,
+  taxMode: TaxMode,
+  widthFactor?: number,
+  feetToMetre?: number
+): { calculatedLine: QuotationLine | null; validationError: string | null } {
+  const result = computeRowCalculationInner(row, taxMode, widthFactor, feetToMetre);
+  const colour = row.colour?.trim();
+  if (result.calculatedLine && colour && isSheetLike(row.product)) {
+    return { ...result, calculatedLine: { ...result.calculatedLine, colour } };
+  }
+  return result;
+}
+
+function computeRowCalculationInner(
   row: EditableRowState,
   taxMode: TaxMode,
   widthFactor?: number,

@@ -13,7 +13,6 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 import {
   type ProductFormData,
   INITIAL_FORM_STATE,
-  customItemFormState,
   formDataFromProduct,
   unitForMethod,
   computeFormSteelKgPerMetre,
@@ -45,13 +44,13 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 }) => {
   const isQuote = mode === 'quote';
   const [formData, setFormData] = useState<ProductFormData>(() =>
-    editingProduct ? formDataFromProduct(editingProduct) : isQuote ? customItemFormState(initialName) : INITIAL_FORM_STATE
+    editingProduct ? formDataFromProduct(editingProduct) : { ...INITIAL_FORM_STATE, name: initialName }
   );
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [saveToMaster, setSaveToMaster] = useState<boolean>(false);
-  /** Base / min rate and Active only matter for the Products list. */
-  const showMasterFields = !isQuote || saveToMaster;
+  /** "Active" only matters for the Products list. */
+  const showActiveToggle = !isQuote || saveToMaster;
 
   const fieldIdCategory = useId();
   const fieldIdQtyMethod = useId();
@@ -160,17 +159,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <option value="CUSTOM">Custom line / Service charge</option>
                     <option value="SHEET_WEIGHT">Sheet · by weight (Thickness × Coil Width)</option>
                     <option value="SECTION_WEIGHT">Steel / Pipe · by weight (kg per metre)</option>
-                    {/* No length box on a quote line for these, so they are master-only */}
-                    {!isQuote && (
-                      <>
-                        <option value="AREA">By area (Sq.Mtr)</option>
-                        <option value="RUNNING_LENGTH">By running metre (R.Mtr)</option>
-                        <option value="LENGTH_FT">By feet (Ft)</option>
-                        <option value="MANUAL">Manual</option>
-                      </>
-                    )}
+                    <option value="AREA">By area (Sq.Mtr)</option>
+                    <option value="RUNNING_LENGTH">By running metre (R.Mtr)</option>
+                    <option value="LENGTH_FT">By feet (Ft)</option>
+                    <option value="MANUAL">Manual</option>
                   </select>
-                  {isQuote && formData.qtyMethod === 'CUSTOM' && (
+                  {formData.qtyMethod === 'CUSTOM' && (
                     <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-faint uppercase tracking-wider">
                       Unit
                       <select
@@ -558,7 +552,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               )}
 
               {/* Optional Rate Limits & Active Status */}
-              {showMasterFields && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-line">
                 <div>
                   <label htmlFor={fieldIdBaseRate} className="block text-[11px] font-semibold text-faint uppercase tracking-wider mb-1">Base Rate (₹)</label>
@@ -588,6 +581,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   />
                 </div>
 
+                {showActiveToggle && (
                 <div className="flex items-center pt-4">
                   <label className="flex items-center gap-2 cursor-pointer font-semibold text-ink">
                     <input
@@ -599,8 +593,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <span>Active Product</span>
                   </label>
                 </div>
+                )}
               </div>
-              )}
 
               {/* Modal Actions */}
               <div className="pt-3 border-t border-line flex items-center justify-end gap-2.5">

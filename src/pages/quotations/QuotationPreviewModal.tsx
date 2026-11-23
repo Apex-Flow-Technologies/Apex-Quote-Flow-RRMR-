@@ -34,6 +34,8 @@ function describeLine(line: QuotationLine, quotation: Quotation): string {
     return describeSteelLine(line);
   } else if (m === 'PIECE') {
     s = `${line.nos} nos`;
+  } else if (m === 'AREA' || m === 'RUNNING_LENGTH' || m === 'LENGTH_FT') {
+    s = `${line.lengthFeet || 0}'${line.lengthInches || 0}" × ${line.nos} nos`;
   }
   return line.isManualQuantity ? `${s} · Manual qty` : s;
 }
@@ -246,6 +248,7 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                     </span>
                     <div className="min-w-0">
                       <div className="font-semibold text-ink text-[13px] leading-snug break-words">{line.productName}</div>
+                      {line.colour && <div className="text-[11px] text-ink mt-0.5">Colour: <span className="font-semibold">{line.colour}</span></div>}
                       <div className="text-[11px] text-muted mt-0.5">{describeLine(line, quotation)}</div>
                       <div className="text-[10.5px] text-faint font-mono mt-0.5">HSN {line.hsn}</div>
                     </div>
@@ -298,6 +301,7 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                       <td className="py-2.5 px-3 text-center font-mono text-muted">{idx + 1}</td>
                       <td className="py-2.5 px-3">
                         <div className="font-semibold text-ink">{line.productName}</div>
+                        {line.colour && <div className="text-[11px] text-ink">Colour: <span className="font-semibold">{line.colour}</span></div>}
                         <div className="text-[11px] text-muted">
                           {line.snapshot.qtyMethod === 'SQM' && (
                             <span>

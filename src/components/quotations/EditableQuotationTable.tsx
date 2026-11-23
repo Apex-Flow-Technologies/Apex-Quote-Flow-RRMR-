@@ -38,6 +38,8 @@ import {
   isRateHint,
   productDefaultLengthM,
   weightPreview,
+  isLengthMethod,
+  isSheetLike,
 } from './quotationRows';
 import { approxLengths } from '../../utils/steelLine';
 
@@ -556,6 +558,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               const isSheet = row.product?.qtyMethod === 'SHEET_WEIGHT';
               const isPipe = row.product?.qtyMethod === 'SECTION_WEIGHT';
               const isPiece = row.product?.qtyMethod === 'PIECE';
+              const isFeetInches = isSheet || isLengthMethod(row.product?.qtyMethod);
+              const takesColour = isSheetLike(row.product);
               const hasError = Boolean(row.validationError);
 
               return (
@@ -703,6 +707,17 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                                 Weight: {row.product.kgPerPiece} kg/pc
                               </div>
                             )}
+                            {takesColour && (
+                              <input
+                                type="text"
+                                value={row.colour ?? ''}
+                                onChange={(e) => updateRow(row.id, { colour: e.target.value })}
+                                placeholder="Colour (e.g. Blue, Brick Red)"
+                                aria-label="Sheet colour"
+                                maxLength={60}
+                                className="mt-1 w-full max-w-[220px] py-1 px-2 text-xs rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
+                              />
+                            )}
                           </div>
                         )}
 
@@ -792,7 +807,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                         />
                         <span className="font-semibold text-muted text-xs">kg/pc</span>
                       </div>
-                    ) : isSheet ? (
+                    ) : isFeetInches ? (
                       <div className="space-y-1">
                         <div className="flex items-center gap-1.5">
                           <div className="flex items-center gap-1">
@@ -1142,6 +1157,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           const isWeightPerPiece = row.product?.qtyMethod === 'WEIGHT_PER_PIECE';
           const isSheet = row.product?.qtyMethod === 'SHEET_WEIGHT';
           const isPipe = row.product?.qtyMethod === 'SECTION_WEIGHT';
+          const isFeetInches = isSheet || isLengthMethod(row.product?.qtyMethod);
+          const takesColour = isSheetLike(row.product);
           const hasError = Boolean(row.validationError);
 
           return (
@@ -1412,10 +1429,10 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     <span className="font-semibold text-muted text-xs">kg/pc</span>
                   </div>
                 </div>
-              ) : isSheet ? (
+              ) : isFeetInches ? (
                 <div className="space-y-1.5 pt-1">
                   <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
-                    Sheet Length
+                    {isSheet ? 'Sheet Length' : 'Length'}
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center gap-1.5">
@@ -1552,6 +1569,23 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   )}
                 </div>
               ) : null}
+
+              {takesColour && (
+                <div className="space-y-1">
+                  <label htmlFor={`${row.id}_colour_mobile`} className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                    Sheet Colour
+                  </label>
+                  <input
+                    id={`${row.id}_colour_mobile`}
+                    type="text"
+                    value={row.colour ?? ''}
+                    onChange={(e) => updateRow(row.id, { colour: e.target.value })}
+                    placeholder="e.g. Blue, Brick Red"
+                    maxLength={60}
+                    className="w-full h-10 px-3 text-sm rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
+                  />
+                </div>
+              )}
 
               {/* Pieces (Nos) and Rate Grid */}
               <div className="grid grid-cols-2 gap-3 pt-1">
