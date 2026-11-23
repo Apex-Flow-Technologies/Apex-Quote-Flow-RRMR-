@@ -2,7 +2,14 @@
 
 @theme {
   --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  /* Figures use Inter's tabular digits, not a code font: aligned columns, product look */
+  --font-mono: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Manrope', 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px -2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 2px 4px rgba(16, 24, 40, 0.04), 0 8px 24px -6px rgba(16, 24, 40, 0.10);
+  --shadow-lg: 0 4px 8px rgba(16, 24, 40, 0.04), 0 16px 40px -8px rgba(16, 24, 40, 0.16);
 
   --color-brand: #2563eb;
   --color-brand-dark: #1d4ed8;
@@ -13,16 +20,16 @@
   --color-ink: #101828;
   --color-muted: #667085;
   --color-faint: #98a2b3;
-  --color-line: #edf0f5;
-  --color-line-strong: #dfe4ed;
-  --color-surface-2: #fbfcfe;
+  --color-line: #eceef3;
+  --color-line-strong: #e1e5ec;
+  --color-surface-2: #f8f9fb;
 
   --color-warn: #b45309;
   --color-danger: #dc2626;
   --color-ok: #15803d;
 
-  --radius-card: 12px;
-  --radius-control: 8px;
+  --radius-card: 14px;
+  --radius-control: 9px;
 }
 
 :root {
@@ -35,16 +42,16 @@
   --color-ink: #101828;
   --color-muted: #667085;
   --color-faint: #98a2b3;
-  --color-line: #edf0f5;
-  --color-line-strong: #dfe4ed;
-  --color-surface-2: #fbfcfe;
+  --color-line: #eceef3;
+  --color-line-strong: #e1e5ec;
+  --color-surface-2: #f8f9fb;
 
   --color-warn: #b45309;
   --color-danger: #dc2626;
   --color-ok: #15803d;
 
-  --radius-card: 12px;
-  --radius-control: 8px;
+  --radius-card: 14px;
+  --radius-control: 9px;
 }
 
 @layer base {
@@ -261,4 +268,128 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* ── Product look: canvas, cards, brand, nav, type ──────────────────────
+   Labels and table heads are sentence case (no shouting uppercase eyebrows);
+   headings and big figures use Manrope; everything numeric is tabular Inter. */
+:root {
+  --canvas: #f5f6f9;
+}
+
+.app-canvas {
+  background:
+    radial-gradient(1200px 420px at 100% -10%, rgba(37, 99, 235, 0.06), transparent 60%),
+    var(--canvas);
+}
+
+.font-display,
+h1,
+h2 {
+  font-family: var(--font-display);
+}
+h1 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.font-mono,
+.tabular-nums {
+  font-feature-settings: 'tnum', 'cv11', 'ss01';
+  letter-spacing: -0.005em;
+}
+
+/* Quiet, readable labels instead of tiny tracked capitals */
+.uppercase.tracking-wider,
+.uppercase.tracking-wide,
+.uppercase.tracking-widest,
+.uppercase.font-mono {
+  text-transform: none;
+  letter-spacing: 0;
+}
+label.uppercase.tracking-wider,
+.uppercase.tracking-wider.text-faint {
+  font-size: 12px;
+  font-weight: 500;
+  color: #5b6474;
+}
+th.uppercase,
+thead .uppercase,
+thead th {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7383;
+}
+
+/* RR's mark, with depth */
+.brand-mark {
+  background: linear-gradient(145deg, #3b82f6 0%, #1d4ed8 100%);
+  box-shadow: 0 1px 2px rgba(29, 78, 216, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Primary action: brand blue with a soft lift */
+.btn-primary {
+  background: linear-gradient(180deg, #2f6df0 0%, #2563eb 100%);
+  box-shadow: 0 1px 2px rgba(29, 78, 216, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.btn-primary:hover {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* Sidebar navigation */
+.nav-item .nav-icon {
+  color: #8a93a3;
+}
+.nav-item:hover .nav-icon {
+  color: var(--color-ink);
+}
+.nav-item-active {
+  background: var(--color-brand-soft);
+  color: var(--color-brand-dark);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.10);
+}
+.nav-item-active .nav-icon {
+  color: var(--color-brand);
+}
+
+/* Cards and panels: white on the canvas, hairline border, soft depth */
+.card {
+  background: #ffffff;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+}
+.card-hover {
+  transition: box-shadow 180ms var(--ease-out-soft), border-color 180ms var(--ease-out-soft), transform 180ms var(--ease-out-soft);
+}
+@media (hover: hover) and (pointer: fine) {
+  .card-hover:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-line-strong);
+    transform: translateY(-1px);
+  }
+}
+
+/* Coloured icon chip used on stat cards */
+.icon-chip {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Dashboard lead card: RR blue, deep and calm (white text stays above 5:1 on every stop) */
+.hero-card {
+  background:
+    radial-gradient(420px 220px at 110% -20%, rgba(255, 255, 255, 0.18), transparent 60%),
+    linear-gradient(150deg, #1e40af 0%, #1d4ed8 55%, #2563eb 100%);
+  box-shadow: 0 10px 30px -12px rgba(29, 78, 216, 0.55);
 }

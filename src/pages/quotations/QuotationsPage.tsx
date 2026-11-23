@@ -8,15 +8,25 @@ import { QuotationPreviewModal, StatusPill } from './QuotationPreviewModal';
 import { QuotationPdfActions } from './QuotationPdfActions';
 import { draftKey, loadDraft, clearDraft, countDraftLines, type QuoteDraft } from '../../utils/quoteDraft';
 import {
-  FileText,
   Plus,
   RefreshCw,
   Search,
   Eye,
-  Calendar,
   AlertCircle,
   Clock,
 } from 'lucide-react';
+
+/** "2026-11-21" → "21 Nov 2026" */
+function formatQuoteDate(iso?: string): string {
+  if (!iso) return '—';
+  const d = new Date(`${iso}T00:00:00`);
+  return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function taxLabel(q: Quotation): string {
+  if (q.isGstEnabled === false) return 'No GST';
+  return q.taxMode === 'intra' ? 'CGST + SGST' : 'IGST';
+}
 
 export const QuotationsPage: React.FC = () => {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
@@ -168,225 +178,164 @@ export const QuotationsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-line pb-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-ink flex items-center gap-2">
-            <FileText className="w-5 h-5 text-brand" />
-            <span>Quotations</span>
-          </h1>
-          <p className="text-xs text-muted mt-0.5">
-            Quotation register, tax breakdown, and customer history
+          <h1 className="text-[26px] sm:text-[30px] leading-tight text-ink">Quotations</h1>
+          <p className="text-[13.5px] text-muted mt-1">
+            {loading && quotations.length === 0
+              ? 'Loading your register…'
+              : `${quotations.length} quotation${quotations.length === 1 ? '' : 's'} issued, newest first`}
           </p>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
-            onClick={() => openBuilder()}
-            className="flex-1 sm:flex-initial min-h-[44px] inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-brand hover:bg-brand-dark active:scale-[0.99] text-white rounded-control text-xs font-semibold shadow-xs transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Quotation</span>
-          </button>
-
-          <button
             onClick={fetchQuotations}
             disabled={loading}
-            className="w-11 h-11 shrink-0 flex items-center justify-center text-muted hover:text-ink hover:bg-surface-2 rounded-control border border-line-strong transition active:scale-95"
-            title="Refresh quotations list"
+            className="w-11 h-11 shrink-0 flex items-center justify-center text-muted hover:text-ink bg-white hover:bg-surface-2 rounded-[10px] border border-line-strong"
+            title="Refresh"
             aria-label="Refresh quotations list"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+          <button
+            onClick={() => openBuilder()}
+            className="btn-primary flex-1 sm:flex-initial min-h-[44px] inline-flex items-center justify-center gap-2 px-5 text-white rounded-[10px] text-sm font-semibold"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New quotation</span>
+          </button>
         </div>
       </div>
 
-      {/* Search / Filter Bar */}
-      <div className="bg-white p-3 sm:p-3.5 rounded-card border border-line-strong shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="relative flex-1 w-full sm:max-w-lg">
-          <Search className="w-4 h-4 text-faint absolute left-3.5 top-1/2 -translate-y-1/2" />
+      {/* Toolbar: search + status filter */}
+      <div className="card p-2 flex flex-col lg:flex-row lg:items-center gap-2">
+        <div className="relative flex-1 min-w-0">
+          <Search className="w-4 h-4 text-faint absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
-            type="text"
-            placeholder="Search by quote number, customer name, or GSTIN..."
+            type="search"
+            placeholder="Search quotes, customers, GSTIN"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-3.5 h-11 text-sm rounded-control border border-line-strong focus:border-brand focus:ring-3 focus:ring-brand/15 text-ink bg-white"
+            aria-label="Search quotations"
+            className="w-full pl-10 pr-3.5 h-10 text-sm rounded-[10px] border border-transparent bg-surface-2 hover:bg-slate-100/70 focus:bg-white text-ink"
           />
         </div>
-
-        <div className="text-xs text-muted font-medium flex items-center justify-between sm:justify-end gap-2">
-          <span>Total Quotations:</span>
-          <span className="font-mono tabular-nums font-bold text-ink bg-surface-2 px-2 py-0.5 rounded border border-line">
-            {loading && quotations.length === 0 ? '…' : quotations.length}
-          </span>
+        <div
+          className="flex gap-1 overflow-x-auto no-scrollbar p-1 bg-surface-2 rounded-[10px] shrink-0"
+          role="tablist"
+          aria-label="Filter by status"
+        >
+          {(['all', ...Object.keys(QUOTATION_STATUS_LABELS)] as (QuotationStatus | 'all')[]).map((st) => {
+            const count = st === 'all' ? quotations.length : quotations.filter((q) => (q.status || 'draft') === st).length;
+            const active = statusFilter === st;
+            return (
+              <button
+                key={st}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setStatusFilter(st)}
+                className={`shrink-0 h-8 px-3 rounded-[8px] text-[13px] font-medium inline-flex items-center gap-1.5 ${
+                  active ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'
+                }`}
+              >
+                {st === 'all' ? 'All' : QUOTATION_STATUS_LABELS[st]}
+                <span className={`tabular-nums text-[12px] ${active ? 'text-brand font-semibold' : 'text-faint'}`}>{count}</span>
+              </button>
+            );
+          })}
         </div>
-      </div>
-
-      {/* Status filter */}
-      <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-1 no-scrollbar" role="tablist" aria-label="Filter by status">
-        {(['all', ...Object.keys(QUOTATION_STATUS_LABELS)] as (QuotationStatus | 'all')[]).map((st) => {
-          const count = st === 'all' ? quotations.length : quotations.filter((q) => (q.status || 'draft') === st).length;
-          const active = statusFilter === st;
-          return (
-            <button
-              key={st}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setStatusFilter(st)}
-              className={`shrink-0 min-h-[36px] px-3 rounded-full text-xs font-semibold border transition ${
-                active ? 'bg-ink text-white border-ink' : 'bg-white text-muted border-line-strong hover:bg-surface-2'
-              }`}
-            >
-              {st === 'all' ? 'All' : QUOTATION_STATUS_LABELS[st]}
-              <span className={`ml-1.5 font-mono ${active ? 'text-white/70' : 'text-faint'}`}>{count}</span>
-            </button>
-          );
-        })}
       </div>
 
       {/* Content Area */}
       {loading ? (
-        <div className="space-y-3" aria-busy="true" aria-label="Loading quotations">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-card border border-line-strong p-4 animate-pulse space-y-3">
-              <div className="flex justify-between">
-                <div className="h-5 w-40 bg-surface-2 rounded-control border border-line" />
-                <div className="h-4 w-20 bg-surface-2 rounded" />
+        <div className="card divide-y divide-line overflow-hidden" aria-busy="true" aria-label="Loading quotations">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="px-5 py-4 flex items-center gap-4 animate-pulse">
+              <div className="space-y-2 flex-1">
+                <div className="h-4 w-44 bg-surface-2 rounded" />
+                <div className="h-3 w-28 bg-surface-2 rounded" />
               </div>
-              <div className="h-4 w-52 bg-surface-2 rounded" />
-              <div className="flex justify-between pt-2 border-t border-line">
-                <div className="h-4 w-24 bg-surface-2 rounded" />
-                <div className="h-6 w-28 bg-surface-2 rounded" />
-              </div>
+              <div className="h-5 w-24 bg-surface-2 rounded" />
             </div>
           ))}
         </div>
       ) : error ? (
-        <div className="bg-white rounded-card border border-rose-200 p-8 text-center shadow-xs">
-          <AlertCircle className="w-10 h-10 text-danger mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-ink mb-1">Failed to Load Quotations</h3>
-          <p className="text-xs text-muted max-w-md mx-auto mb-4">{error}</p>
+        <div className="card p-10 text-center">
+          <span className="icon-chip bg-rose-50 text-rose-600 mx-auto"><AlertCircle className="w-[18px] h-[18px]" /></span>
+          <h3 className="text-[15px] font-semibold text-ink mt-3">Couldn&rsquo;t load quotations</h3>
+          <p className="text-[13px] text-muted max-w-md mx-auto mt-1 mb-4">{error}</p>
           <button
             onClick={fetchQuotations}
-            className="min-h-[44px] inline-flex items-center gap-1.5 px-4 py-2 bg-brand text-white rounded-control text-xs font-semibold hover:bg-brand-dark transition shadow-xs"
+            className="btn-primary min-h-[44px] inline-flex items-center gap-1.5 px-4 text-white rounded-[10px] text-sm font-semibold"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Retry
+            <RefreshCw className="w-4 h-4" /> Try again
           </button>
         </div>
       ) : filteredQuotations.length === 0 ? (
-        <div className="bg-white rounded-card border border-dashed border-line-strong p-10 sm:p-12 text-center">
-          <Clock className="w-10 h-10 text-faint mx-auto mb-2" />
-          <h3 className="text-sm font-bold text-ink mb-1">
-            {quotations.length === 0 ? 'No Quotations Issued Yet' : 'No Matching Quotations'}
+        <div className="card p-12 text-center">
+          <span className="icon-chip bg-blue-50 text-blue-600 mx-auto"><Clock className="w-[18px] h-[18px]" /></span>
+          <h3 className="text-[15px] font-semibold text-ink mt-3">
+            {quotations.length === 0 ? 'No quotations yet' : 'Nothing matches that search'}
           </h3>
-          <p className="text-xs text-muted max-w-md mx-auto mb-4">
+          <p className="text-[13px] text-muted max-w-md mx-auto mt-1 mb-4">
             {quotations.length === 0
-              ? 'Click "+ New Quotation" to create your first quotation with live calculations.'
-              : 'Try clearing your search query to view all records in the register.'}
+              ? 'Create your first quotation. Prices and GST are worked out as you type.'
+              : 'Try a different quote number or customer, or switch the filter back to All.'}
           </p>
           {quotations.length === 0 && (
             <button
               onClick={() => openBuilder()}
-              className="min-h-[44px] inline-flex items-center gap-1.5 px-4 py-2 bg-brand text-white rounded-control text-xs font-semibold hover:bg-brand-dark shadow-xs transition"
+              className="btn-primary min-h-[44px] inline-flex items-center gap-1.5 px-4 text-white rounded-[10px] text-sm font-semibold"
             >
-              <Plus className="w-4 h-4" /> Create First Quotation
+              <Plus className="w-4 h-4" /> Create quotation
             </button>
           )}
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Mobile Card Presentation (< 768px) */}
+          {/* Phone: cards */}
           <div className="block md:hidden space-y-3">
-            {filteredQuotations.map((quotation) => (
-              <div
-                key={quotation.id}
-                className="bg-white rounded-card border border-line-strong p-3.5 shadow-xs space-y-3 transition hover:border-brand/40"
-              >
-                {/* Card Top Header: Quotation Number Badge & Date */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                    <span className="font-mono tabular-nums font-bold text-xs text-brand bg-brand-soft px-2.5 py-1 rounded-control border border-brand/20 select-all shrink-0">
+            {filteredQuotations.map((quotation, i) => (
+              <div key={quotation.id} className="card p-4 space-y-3 anim-row" style={{ animationDelay: `${Math.min(i, 8) * 25}ms` }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[15px] text-ink leading-snug truncate">{quotation.customer.name}</div>
+                    <div className="text-[12.5px] text-muted tabular-nums mt-0.5">
                       {quotation.quotationNumber}
-                      {(quotation.revision || 1) > 1 ? ` · R${quotation.revision}` : ''}
-                    </span>
-                    <StatusPill status={quotation.status} />
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-muted font-medium font-mono tabular-nums shrink-0">
-                    <Calendar className="w-3.5 h-3.5 text-faint" />
-                    <span>{quotation.quotationDate || '—'}</span>
-                  </div>
-                </div>
-
-                {/* Customer Info & Details */}
-                <div>
-                  <div className="font-bold text-sm text-ink leading-snug">
-                    {quotation.customer.name}
-                  </div>
-                  <div className="text-xs text-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                    {quotation.customer.gstin ? (
-                      <span className="font-mono text-[11px] bg-surface-2 px-1.5 py-0.5 rounded border border-line break-all">
-                        GSTIN: <strong className="text-ink font-semibold">{quotation.customer.gstin}</strong>
-                      </span>
-                    ) : (
-                      <span className="text-faint text-[11px] italic">Unregistered Buyer</span>
-                    )}
-                    <span className="text-line-strong">&bull;</span>
-                    <span className="text-[11px] text-muted">
-                      {quotation.lines.length} {quotation.lines.length === 1 ? 'item' : 'items'}
-                    </span>
-                    <span className="text-line-strong">&bull;</span>
-                    <span className="text-[11px] font-mono text-muted">
-                      {Number(quotation.totalKgs).toFixed(2)} Kgs
-                    </span>
-                  </div>
-                </div>
-
-                {/* Status & Total Amount Box */}
-                <div className="pt-2.5 border-t border-line flex items-center justify-between gap-2">
-                  <div>
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-control text-[10px] font-mono font-bold uppercase tracking-wide border ${
-                        quotation.isGstEnabled === false
-                          ? 'bg-surface-2 text-muted border-line'
-                          : quotation.taxMode === 'intra'
-                            ? 'bg-brand-soft text-brand border-brand/20'
-                            : 'bg-purple-50 text-purple-700 border-purple-200'
-                      }`}
-                    >
-                      {quotation.isGstEnabled === false
-                        ? 'NO GST'
-                        : quotation.taxMode === 'intra'
-                          ? 'INTRA (CGST+SGST)'
-                          : 'INTER (IGST)'}
-                    </span>
-                    <div className="text-[10px] text-faint mt-0.5 truncate max-w-[140px]">
-                      By {quotation.createdByName}
+                      {(quotation.revision || 1) > 1 ? ` · Rev ${quotation.revision}` : ''}
                     </div>
                   </div>
+                  <StatusPill status={quotation.status} />
+                </div>
 
+                <div className="flex items-end justify-between gap-3">
+                  <div className="text-[12.5px] text-muted space-y-0.5">
+                    <div>{formatQuoteDate(quotation.quotationDate)}</div>
+                    <div>
+                      {quotation.lines.length} {quotation.lines.length === 1 ? 'item' : 'items'}
+                      {Number(quotation.totalKgs) > 0 ? ` · ${Number(quotation.totalKgs).toLocaleString('en-IN', { maximumFractionDigits: 2 })} kg` : ''}
+                    </div>
+                  </div>
                   <div className="text-right">
-                    <span className="text-[10px] uppercase font-bold text-faint block">
-                      Total Payable
-                    </span>
-                    <span className="text-lg font-mono tabular-nums font-bold text-brand">
+                    <div className="font-display tabular-nums text-[20px] font-bold text-ink leading-none">
                       ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
+                    </div>
+                    <div className="text-[12px] text-faint mt-1">{taxLabel(quotation)}</div>
                   </div>
                 </div>
 
-                {/* Card Action Buttons (Min 44px touch targets) */}
-                <div className="pt-2.5 border-t border-line flex items-center gap-2">
+                <div className="pt-3 border-t border-line flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setPreviewQuotation(quotation)}
-                    className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-ink bg-white hover:bg-surface-2 active:bg-surface-2 border border-line-strong rounded-control shadow-xs transition"
-                    title="View quotation review and calculation details"
+                    className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 text-[13px] font-semibold text-ink bg-white hover:bg-surface-2 border border-line-strong rounded-[10px]"
                   >
                     <Eye className="w-4 h-4 text-brand" />
-                    <span>View Details</span>
+                    <span>Open</span>
                   </button>
-
                   <div className="shrink-0">
                     <QuotationPdfActions quotation={quotation} variant="card" />
                   </div>
@@ -394,117 +343,84 @@ export const QuotationsPage: React.FC = () => {
               </div>
             ))}
 
-            <div className="p-3 bg-surface-2 rounded-control border border-line text-xs text-muted font-medium text-center">
-              Showing {filteredQuotations.length} of {quotations.length} saved records
-            </div>
+            <p className="text-[12.5px] text-muted text-center pt-1">
+              Showing {filteredQuotations.length} of {quotations.length}
+            </p>
           </div>
 
-          {/* Desktop Table Presentation (>= 768px) */}
-          <div className="hidden md:block bg-white rounded-card border border-line-strong shadow-xs overflow-hidden">
+          {/* Tablet and desktop: table */}
+          <div className="hidden md:block card overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-[13.5px]">
                 <thead>
-                  <tr className="bg-surface-2 border-b border-line text-faint font-semibold uppercase tracking-wider text-[10.5px]">
-                    <th className="py-3 px-3.5 font-semibold">Quotation No</th>
-                    <th className="py-3 px-3.5 font-semibold">Status</th>
-                    <th className="py-3 px-3.5 font-semibold">Date</th>
-                    <th className="py-3 px-3.5 font-semibold">Customer Name</th>
-                    <th className="py-3 px-3.5 font-semibold">GSTIN</th>
-                    <th className="py-3 px-3.5 text-center font-semibold">Tax Mode</th>
-                    <th className="py-3 px-3.5 text-center font-semibold">Items</th>
-                    <th className="py-3 px-3.5 text-right font-semibold">Total Weight</th>
-                    <th className="py-3 px-3.5 text-right font-semibold">Total Payable</th>
-                    <th className="py-3 px-3.5 text-center font-semibold">Issued By</th>
-                    <th className="py-3 px-3.5 text-right font-semibold">Actions</th>
+                  <tr className="border-b border-line bg-surface-2/70">
+                    <th className="py-3 pl-5 pr-3 font-medium">Quotation</th>
+                    <th className="py-3 px-3 font-medium">Customer</th>
+                    <th className="py-3 px-3 font-medium">Status</th>
+                    <th className="py-3 px-3 font-medium hidden xl:table-cell">Items</th>
+                    <th className="py-3 px-3 font-medium text-right">Amount</th>
+                    <th className="py-3 pl-3 pr-5 font-medium text-right"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {filteredQuotations.map((quotation) => (
-                    <tr key={quotation.id} className="hover:bg-surface-2/60 transition">
-                      {/* Quotation Number */}
-                      <td className="py-3 px-3.5">
-                        <span className="font-mono tabular-nums font-bold text-brand bg-brand-soft px-2 py-0.5 rounded-control border border-brand/20">
+                  {filteredQuotations.map((quotation, i) => (
+                    <tr
+                      key={quotation.id}
+                      onClick={() => setPreviewQuotation(quotation)}
+                      className="group cursor-pointer hover:bg-brand-tint anim-row"
+                      style={{ animationDelay: `${Math.min(i, 10) * 20}ms` }}
+                    >
+                      <td className="py-3.5 pl-5 pr-3 align-middle">
+                        <div className="font-semibold text-ink tabular-nums whitespace-nowrap">
                           {quotation.quotationNumber}
-                          {(quotation.revision || 1) > 1 ? ` · R${quotation.revision}` : ''}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-3.5">
-                        <StatusPill status={quotation.status} />
-                      </td>
-
-                      {/* Date */}
-                      <td className="py-3 px-3.5 text-muted font-medium font-mono tabular-nums">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-faint" />
-                          <span>{quotation.quotationDate || '—'}</span>
+                          {(quotation.revision || 1) > 1 && (
+                            <span className="ml-1.5 text-[11.5px] font-medium text-muted bg-slate-100 rounded px-1.5 py-0.5">
+                              Rev {quotation.revision}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[12.5px] text-muted mt-0.5 whitespace-nowrap">
+                          {formatQuoteDate(quotation.quotationDate)} · by {quotation.createdByName}
                         </div>
                       </td>
 
-                      {/* Customer */}
-                      <td className="py-3 px-3.5 font-semibold text-ink">
-                        {quotation.customer.name}
+                      <td className="py-3.5 px-3 align-middle min-w-[160px]">
+                        <div className="font-medium text-ink truncate max-w-[260px]">{quotation.customer.name}</div>
+                        <div className="text-[12.5px] text-muted mt-0.5 tabular-nums">
+                          {quotation.customer.gstin || 'Unregistered'}
+                        </div>
                       </td>
 
-                      {/* GSTIN */}
-                      <td className="py-3 px-3.5 font-mono text-muted font-medium">
-                        {quotation.customer.gstin ? (
-                          quotation.customer.gstin
-                        ) : (
-                          <span className="text-faint italic text-[11px]">Unregistered</span>
+                      <td className="py-3.5 px-3 align-middle">
+                        <StatusPill status={quotation.status} />
+                      </td>
+
+                      <td className="py-3.5 px-3 align-middle hidden xl:table-cell text-muted whitespace-nowrap">
+                        {quotation.lines.length} {quotation.lines.length === 1 ? 'item' : 'items'}
+                        {Number(quotation.totalKgs) > 0 && (
+                          <div className="text-[12.5px] text-faint tabular-nums">
+                            {Number(quotation.totalKgs).toLocaleString('en-IN', { maximumFractionDigits: 2 })} kg
+                          </div>
                         )}
                       </td>
 
-                      {/* Tax Mode */}
-                      <td className="py-3 px-3.5 text-center">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-control text-[10px] font-mono font-bold uppercase tracking-wide border ${
-                            quotation.isGstEnabled === false
-                              ? 'bg-surface-2 text-muted border-line'
-                              : quotation.taxMode === 'intra'
-                                ? 'bg-brand-soft text-brand border-brand/20'
-                                : 'bg-purple-50 text-purple-700 border-purple-200'
-                          }`}
-                        >
-                          {quotation.isGstEnabled === false
-                            ? 'NO GST'
-                            : quotation.taxMode === 'intra'
-                              ? 'INTRA (CGST+SGST)'
-                              : 'INTER (IGST)'}
-                        </span>
+                      <td className="py-3.5 px-3 align-middle text-right whitespace-nowrap">
+                        <div className="font-semibold text-ink tabular-nums">
+                          ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-[12px] text-faint mt-0.5">{taxLabel(quotation)}</div>
                       </td>
 
-                      {/* Items */}
-                      <td className="py-3 px-3.5 text-center font-semibold text-ink">
-                        {quotation.lines.length}
-                      </td>
-
-                      {/* Total Weight */}
-                      <td className="py-3 px-3.5 text-right font-mono tabular-nums font-medium text-muted">
-                        {Number(quotation.totalKgs).toFixed(2)} Kgs
-                      </td>
-
-                      {/* Total Payable */}
-                      <td className="py-3 px-3.5 text-right font-mono tabular-nums font-bold text-ink">
-                        ₹{Number(quotation.payableAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </td>
-
-                      {/* Created By */}
-                      <td className="py-3 px-3.5 text-center text-muted text-[11px]">
-                        {quotation.createdByName}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-3 px-3.5 text-right">
+                      <td className="py-3.5 pl-3 pr-5 align-middle text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           <QuotationPdfActions quotation={quotation} variant="table" />
                           <button
                             onClick={() => setPreviewQuotation(quotation)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-muted hover:text-ink hover:bg-surface-2 rounded-control transition text-xs font-semibold border border-line-strong"
-                            title="View Quotation Review & Calculation Details"
+                            className="inline-flex items-center gap-1.5 h-8 px-3 text-muted hover:text-ink bg-white hover:bg-surface-2 rounded-[8px] text-[13px] font-medium border border-line-strong"
+                            title="Open quotation"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            <span>View</span>
+                            <span>Open</span>
                           </button>
                         </div>
                       </td>
@@ -514,8 +430,8 @@ export const QuotationsPage: React.FC = () => {
               </table>
             </div>
 
-            <div className="bg-surface-2 px-4 py-2.5 border-t border-line text-xs text-muted font-medium flex justify-between">
-              <span>Showing {filteredQuotations.length} of {quotations.length} saved records</span>
+            <div className="px-5 py-3 border-t border-line text-[12.5px] text-muted">
+              Showing {filteredQuotations.length} of {quotations.length}
             </div>
           </div>
         </div>

@@ -87,7 +87,7 @@ export const QuotationPdfActions: React.FC<QuotationPdfActionsProps> = ({
       <button
         onClick={handleDownload}
         disabled={generating}
-        className="inline-flex items-center gap-1 px-2.5 py-1 text-muted hover:text-ink hover:bg-surface-2 rounded-control transition text-xs font-semibold border border-line-strong disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 h-8 px-3 text-muted hover:text-ink bg-white hover:bg-surface-2 rounded-[8px] text-[13px] font-medium border border-line-strong disabled:opacity-50"
         title={`Download ${quotation.quotationNumber} PDF`}
       >
         {generating ? (

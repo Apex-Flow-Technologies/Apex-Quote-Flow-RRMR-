@@ -49,15 +49,23 @@ interface QuotationPreviewModalProps {
 }
 
 const STATUS_STYLES: Record<QuotationStatus, string> = {
-  draft: 'bg-surface-2 text-muted border-line-strong',
-  sent: 'bg-brand-soft text-brand border-brand/25',
-  won: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  lost: 'bg-rose-50 text-rose-700 border-rose-200',
-  cancelled: 'bg-zinc-100 text-zinc-500 border-zinc-200 line-through',
+  draft: 'bg-slate-100 text-slate-600',
+  sent: 'bg-blue-50 text-blue-700',
+  won: 'bg-emerald-50 text-emerald-700',
+  lost: 'bg-rose-50 text-rose-700',
+  cancelled: 'bg-zinc-100 text-zinc-500 line-through',
+};
+const STATUS_DOTS: Record<QuotationStatus, string> = {
+  draft: 'bg-slate-400',
+  sent: 'bg-blue-500',
+  won: 'bg-emerald-500',
+  lost: 'bg-rose-500',
+  cancelled: 'bg-zinc-400',
 };
 
 export const StatusPill: React.FC<{ status?: QuotationStatus; className?: string }> = ({ status = 'draft', className = '' }) => (
-  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-wide border ${STATUS_STYLES[status]} ${className}`}>
+  <span className={`inline-flex items-center gap-1.5 pl-2 pr-2.5 py-0.5 rounded-full text-[12px] font-medium whitespace-nowrap ${STATUS_STYLES[status]} ${className}`}>
+    <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOTS[status]}`} aria-hidden="true" />
     {QUOTATION_STATUS_LABELS[status]}
   </span>
 );

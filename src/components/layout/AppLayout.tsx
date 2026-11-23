@@ -1,7 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink, Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { LogOut, Menu, X, ChevronDown } from 'lucide-react';
+import {
+  LogOut,
+  Menu,
+  X,
+  LayoutDashboard,
+  FileText,
+  Package,
+  Users,
+  Building2,
+  UserCog,
+  Plus,
+} from 'lucide-react';
 import { prefetchMasterData, getCompanySettingsCached } from '../../services/masterDataCache';
 import { validateGstin } from '../../engine/gstin';
 
@@ -22,9 +33,10 @@ const CompanySetupWarning: React.FC = () => {
   }, []);
   if (issues.length === 0) return null;
   return (
-    <div className="mb-4 p-3 rounded-card border border-amber-200 bg-amber-50 text-amber-900 text-sm flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+    <div className="mb-5 p-3.5 rounded-card border border-amber-200 bg-amber-50 text-amber-900 text-sm flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
       <span className="flex-1">
-        <strong>Company details incomplete:</strong> the {issues.join(', ')} printed on quotation PDFs {issues.length > 1 ? 'are' : 'is'} still a placeholder.
+        <strong className="font-semibold">Company details incomplete:</strong> the {issues.join(', ')} printed on quotation PDFs{' '}
+        {issues.length > 1 ? 'are' : 'is'} still a placeholder.
       </span>
       <button
         type="button"
@@ -37,14 +49,21 @@ const CompanySetupWarning: React.FC = () => {
   );
 };
 
+/** RR's existing mark (the "RR" tile), kept and given depth rather than replaced. */
+const BrandMark: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'md' }) => (
+  <span
+    className={`brand-mark ${size === 'sm' ? 'w-8 h-8 text-[12px]' : 'w-9 h-9 text-[13px]'} shrink-0 rounded-[10px] flex items-center justify-center text-white font-display font-extrabold select-none`}
+    aria-hidden="true"
+  >
+    RR
+  </span>
+);
+
 export const AppLayout: React.FC = () => {
   const { profile, user, isAdmin, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
     await logout();
@@ -56,230 +75,135 @@ export const AppLayout: React.FC = () => {
     if (profile?.active) prefetchMasterData();
   }, [profile?.active]);
 
-  // Close dropdown on outside click
+  // Close the phone menu whenever the page changes
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setUserDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const navItems = [
-    { to: '/app', label: 'Dashboard', end: true },
-    { to: '/app/quotations', label: 'Quotations' },
-    { to: '/app/products', label: 'Products', adminOnly: true },
-    { to: '/app/customers', label: 'Customers' },
-    { to: '/app/settings', label: 'Company Settings', adminOnly: true },
-    { to: '/app/users', label: 'Users', adminOnly: true },
-  ];
+    { to: '/app', label: 'Dashboard', end: true, icon: LayoutDashboard },
+    { to: '/app/quotations', label: 'Quotations', icon: FileText },
+    { to: '/app/customers', label: 'Customers', icon: Users },
+    { to: '/app/products', label: 'Products', adminOnly: true, icon: Package },
+    { to: '/app/settings', label: 'Company settings', adminOnly: true, icon: Building2 },
+    { to: '/app/users', label: 'Users', adminOnly: true, icon: UserCog },
+  ].filter((item) => !item.adminOnly || isAdmin);
 
   const userName = profile?.name || user?.email?.split('@')[0] || 'User';
-  const roleLabel = isAdmin ? 'Administrator' : 'Sales Staff';
+  const roleLabel = isAdmin ? 'Administrator' : 'Sales staff';
+  const initial = userName.charAt(0).toUpperCase();
+
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `nav-item group flex items-center gap-3 h-10 px-3 rounded-[10px] text-[13.5px] font-medium ${
+      isActive ? 'nav-item-active' : 'text-muted hover:text-ink hover:bg-ink/[0.04]'
+    }`;
+
+  const newQuote = (
+    <Link
+      to="/app/quotations"
+      state={{ newQuote: true }}
+      className="btn-primary w-full h-10 inline-flex items-center justify-center gap-2 rounded-[10px] text-[13.5px] font-semibold text-white"
+    >
+      <Plus className="w-4 h-4" />
+      New quotation
+    </Link>
+  );
+
+  const userCard = (
+    <div className="flex items-center gap-3 p-2 rounded-[12px]">
+      <span className="w-9 h-9 rounded-full bg-brand-soft text-brand font-display font-bold text-sm flex items-center justify-center shrink-0">
+        {initial}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-semibold text-ink truncate">{userName}</div>
+        <div className="text-[11.5px] text-muted truncate" title={user?.email || ''}>
+          {roleLabel}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="w-9 h-9 rounded-[10px] flex items-center justify-center text-faint hover:text-danger hover:bg-rose-50 shrink-0"
+        title="Sign out"
+        aria-label="Sign out"
+      >
+        <LogOut className="w-4 h-4" />
+      </button>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen flex flex-col bg-white text-ink font-sans">
-      {/* Application Header (White, sticky, thin bottom border, subtle blur) */}
-      <header className="w-full sticky top-0 z-30 no-print bg-white/95 backdrop-blur-xs border-b border-line">
-        <div className="w-full max-w-[1680px] mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 sm:h-13">
-            {/* Left: Blue square logo & brand text */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-              <div className="w-7 h-7 sm:w-6 sm:h-6 bg-brand rounded-control flex items-center justify-center text-white font-bold text-xs select-none shadow-xs shrink-0">
-                RR
-              </div>
-              <div className="flex items-center gap-2 truncate">
-                <span className="font-bold text-xs sm:text-sm tracking-tight text-ink truncate">
-                  RR Metal Roofing
-                </span>
-                <span className="hidden sm:inline-block text-faint text-xs font-normal border-l border-line-strong pl-2.5 shrink-0">
-                  Quotations
-                </span>
-              </div>
-            </div>
-
-            {/* Right: Outlined user profile button & quiet logout */}
-            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-              <div className="relative" ref={userMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="flex items-center gap-1.5 text-xs text-muted hover:text-ink h-10 sm:h-auto py-1 px-2 sm:px-2.5 rounded-control border border-line-strong bg-white hover:bg-surface-2 transition-colors focus:outline-none"
-                  title="Account details"
-                  aria-expanded={userDropdownOpen}
-                >
-                  {/* Desktop Full Label */}
-                  <span className="hidden sm:inline font-medium max-w-[120px] truncate">{userName}</span>
-                  <span className="hidden sm:inline text-line-strong">·</span>
-                  <span className="hidden sm:inline text-muted text-[11px]">{roleLabel}</span>
-
-                  {/* Mobile Compact Pill */}
-                  <span className="sm:hidden flex items-center gap-1">
-                    <span className="w-5 h-5 rounded-full bg-brand-soft text-brand font-bold text-[10px] flex items-center justify-center">
-                      {userName.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="text-[11px] font-semibold text-ink">
-                      {isAdmin ? 'Admin' : 'Sales'}
-                    </span>
-                  </span>
-
-                  <ChevronDown className="w-3.5 h-3.5 text-faint ml-0.5 shrink-0" />
-                </button>
-
-                {/* Dropdown Menu for Email & Account Details */}
-                {userDropdownOpen && (
-                  <div
-                    onMouseLeave={() => setUserDropdownOpen(false)}
-                    className="absolute right-0 top-full mt-1.5 w-60 bg-white text-ink border border-line-strong rounded-control shadow-lg p-3.5 z-50 text-xs animate-in fade-in duration-100"
-                  >
-                    <div className="text-[10px] font-bold text-faint uppercase tracking-wider mb-1">
-                      Signed In User
-                    </div>
-                    <div className="font-semibold text-ink text-xs mb-0.5">{userName}</div>
-                    <div className="font-mono text-[11px] text-muted break-all mb-2.5">
-                      {user?.email}
-                    </div>
-                    <div className="pt-2 border-t border-line flex items-center justify-between text-[11px] text-muted">
-                      <span>System Role:</span>
-                      <span className="font-semibold text-brand">{roleLabel}</span>
-                    </div>
-                    <div className="pt-3 mt-3 border-t border-line sm:hidden">
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        className="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-danger hover:bg-rose-50 rounded-control border border-rose-200 transition"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        <span>Sign Out</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Quiet Outlined Logout Button (Desktop only, mobile has it in drawer & user dropdown) */}
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="hidden sm:flex px-2.5 py-1 text-xs text-muted hover:text-ink border border-line-strong rounded-control bg-white hover:bg-surface-2 transition-colors items-center gap-1"
-                title="Sign out of the system"
-              >
-                <LogOut className="w-3.5 h-3.5 text-faint" />
-                <span>Logout</span>
-              </button>
-
-              {/* Mobile Menu Toggle Button (Min 44x44 touch area) */}
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="sm:hidden w-10 h-10 flex items-center justify-center text-muted hover:text-ink border border-line-strong rounded-control bg-white hover:bg-surface-2 transition active:scale-95"
-                aria-label="Toggle navigation menu"
-                aria-expanded={mobileMenuOpen}
-              >
-                {mobileMenuOpen ? <X className="w-5 h-5 text-ink" /> : <Menu className="w-5 h-5 text-ink" />}
-              </button>
-            </div>
+    <div className="app-canvas min-h-dvh text-ink font-sans lg:flex">
+      {/* ── Desktop sidebar ─────────────────────────────────────────── */}
+      <aside className="hidden lg:flex no-print w-[248px] shrink-0 h-dvh sticky top-0 flex-col bg-white border-r border-line">
+        <div className="h-16 px-5 flex items-center gap-3">
+          <BrandMark />
+          <div className="min-w-0">
+            <div className="font-display font-bold text-[15px] text-ink leading-tight truncate">RR Metal Roofing</div>
+            <div className="text-[11.5px] text-muted leading-tight">Quotations &amp; billing</div>
           </div>
         </div>
 
-        {/* Tier 2: Tabs beneath Header */}
-        <div className="w-full bg-white border-t border-line">
-          <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
-            <nav className="hidden sm:flex items-stretch gap-1">
-              {navItems.map((item) => {
-                const isRestrictedForSales = item.adminOnly && !isAdmin;
+        <div className="px-4 pt-2 pb-4">{newQuote}</div>
 
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    className={({ isActive }) =>
-                      `inline-flex items-center px-4 py-2.5 text-xs font-semibold tracking-wide transition-colors border-b-2 -mb-[1px] ${
-                        isActive
-                          ? 'text-brand border-brand'
-                          : 'text-muted hover:text-ink border-transparent hover:border-line-strong'
-                      } ${isRestrictedForSales ? 'opacity-35 pointer-events-none' : ''}`
-                    }
-                  >
-                    <span>{item.label}</span>
-                  </NavLink>
-                );
-              })}
+        <nav className="px-3 flex-1 space-y-0.5 overflow-y-auto" aria-label="Main">
+          {navItems.map(({ to, label, end, icon: Icon }) => (
+            <NavLink key={to} to={to} end={end} className={navLinkClass}>
+              <Icon className="nav-icon w-[18px] h-[18px] shrink-0" strokeWidth={1.9} />
+              <span className="truncate">{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="p-3 border-t border-line">{userCard}</div>
+      </aside>
+
+      {/* ── Phone / tablet top bar ──────────────────────────────────── */}
+      <header className="lg:hidden no-print sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-line">
+        <div className="h-14 px-4 sm:px-6 flex items-center justify-between gap-3">
+          <Link to="/app" className="flex items-center gap-2.5 min-w-0">
+            <BrandMark size="sm" />
+            <span className="font-display font-bold text-[15px] text-ink truncate">RR Metal Roofing</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            className="w-11 h-11 -mr-1.5 flex items-center justify-center rounded-[10px] text-ink hover:bg-ink/[0.05]"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+
+        {mobileMenuOpen && (
+          <div className="anim-pop border-t border-line bg-white shadow-lg">
+            <nav className="p-3 space-y-0.5" aria-label="Main">
+              <div className="pb-2">{newQuote}</div>
+              {navItems.map(({ to, label, end, icon: Icon }) => (
+                <NavLink key={to} to={to} end={end} className={(s) => `${navLinkClass(s)} h-11`}>
+                  <Icon className="nav-icon w-[18px] h-[18px] shrink-0" strokeWidth={1.9} />
+                  <span>{label}</span>
+                </NavLink>
+              ))}
             </nav>
-
-            {/* Mobile Navigation Dropdown */}
-            {mobileMenuOpen && (
-              <div className="sm:hidden border-t border-line bg-white shadow-lg animate-in slide-in-from-top-2 duration-150">
-                <nav className="py-2 px-3 space-y-1">
-                  {navItems.map((item) => {
-                    const isRestrictedForSales = item.adminOnly && !isAdmin;
-
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        end={item.end}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={({ isActive }) =>
-                          `flex items-center min-h-[44px] px-3.5 py-2.5 text-xs font-semibold rounded-control transition ${
-                            isActive
-                              ? 'text-brand bg-brand-soft border-l-3 border-brand'
-                              : 'text-muted hover:text-ink hover:bg-surface-2'
-                          } ${isRestrictedForSales ? 'opacity-35 pointer-events-none' : ''}`
-                        }
-                      >
-                        <span>{item.label}</span>
-                        {item.adminOnly && !isAdmin && (
-                          <span className="ml-auto text-[10px] text-faint">Admin Only</span>
-                        )}
-                      </NavLink>
-                    );
-                  })}
-
-                  {/* Drawer Footer with User Info & Logout */}
-                  <div className="pt-3 mt-2 border-t border-line px-1 space-y-2">
-                    <div className="text-[11px] text-muted flex items-center justify-between">
-                      <span className="truncate">{userName}</span>
-                      <span className="font-semibold text-brand text-[10px] bg-brand-soft px-1.5 py-0.5 rounded border border-brand/20">
-                        {roleLabel}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        handleLogout();
-                      }}
-                      className="w-full min-h-[44px] flex items-center justify-center gap-2 text-xs font-semibold text-danger bg-rose-50/60 hover:bg-rose-50 border border-rose-200 rounded-control transition"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      <span>Sign Out</span>
-                    </button>
-                  </div>
-                </nav>
-              </div>
-            )}
+            <div className="px-3 pb-3 pt-1 border-t border-line">{userCard}</div>
           </div>
-        </div>
+        )}
       </header>
 
-      {/* Main Content Workspace */}
-      <main className="flex-1 w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 py-5">
-        {isAdmin && <CompanySetupWarning />}
-        <div key={location.pathname} className="anim-page">
-          <Outlet />
-        </div>
-      </main>
-
-      {/* Application Footer */}
-      <footer className="w-full bg-white border-t border-line py-3.5 text-center text-xs text-muted no-print">
-        <div className="w-full max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8">
-          RR Metal Roofing · Quotation &amp; Billing System · ApexFlow Technologies
-        </div>
-      </footer>
+      {/* ── Content ─────────────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-7 lg:py-9">
+          {isAdmin && <CompanySetupWarning />}
+          <div key={location.pathname} className="anim-page">
+            <Outlet />
+          </div>
+        </main>
+        <footer className="no-print w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-10 py-5 text-[12px] text-faint">
+          RR Metal Roofing · Built by ApexFlow Technologies
+        </footer>
+      </div>
     </div>
   );
 };
