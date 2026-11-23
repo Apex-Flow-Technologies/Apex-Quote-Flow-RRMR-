@@ -13,7 +13,9 @@ import {
   ENGINE_VERSION,
   type TaxMode,
 } from '../../engine';
-import type { Customer } from '../../types/customer';
+import type { Customer, CreateCustomerInput } from '../../types/customer';
+import { createCustomer } from '../../services/customerService';
+import { CustomerFormModal } from '../../components/customers/CustomerFormModal';
 import type { Product } from '../../types/product';
 import type { CompanySettings } from '../../types/settings';
 import type {
@@ -37,6 +39,7 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
+  UserPlus,
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import {
@@ -114,6 +117,18 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   const [customerSearch, setCustomerSearch] = useState<string>('');
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState<boolean>(false);
   const customerSearchRef = useRef<HTMLDivElement>(null);
+  const [isNewCustomerOpen, setIsNewCustomerOpen] = useState<boolean>(false);
+
+  // New customer straight from the quotation: saved to Customers, then picked
+  const handleCreateCustomer = async (payload: CreateCustomerInput) => {
+    const id = await createCustomer(payload);
+    const created = { ...payload, id } as Customer;
+    setCustomers((prev) => [...prev.filter((c) => c.id !== id), created].sort((a, b) => a.name.localeCompare(b.name)));
+    setSelectedCustomer(created);
+    setCustomerSearch('');
+    setIsCustomerDropdownOpen(false);
+    setIsNewCustomerOpen(false);
+  };
 
   // Close customer dropdown on click outside
   useEffect(() => {
@@ -540,9 +555,19 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Customer Selection */}
           <div className="md:col-span-2 space-y-1.5">
-            <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
-              Customer / Client <span className="text-danger">*</span>
-            </label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                Customer / Client <span className="text-danger">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsNewCustomerOpen(true)}
+                className="press inline-flex items-center gap-1 text-[11px] font-semibold text-brand hover:text-brand-dark px-2 py-1 rounded-control hover:bg-brand-soft transition"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                New customer
+              </button>
+            </div>
 
             {selectedCustomer ? (
               <div className="p-3 sm:p-3.5 rounded-control border border-line-strong bg-surface-2 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -596,7 +621,18 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
                 />
 
                 {isCustomerDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-line-strong rounded-control shadow-lg z-50 max-h-56 overflow-y-auto">
+                  <div className="anim-pop absolute left-0 right-0 top-full mt-1.5 bg-white border border-line-strong rounded-control shadow-lg z-50 max-h-64 overflow-y-auto">
+                    {!loadingMasters && (
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setIsNewCustomerOpen(true)}
+                        className="sticky top-0 z-10 w-full text-left px-3 py-2.5 bg-brand-tint hover:bg-brand-soft border-b border-line flex items-center gap-2 text-xs font-semibold text-brand transition min-h-[44px]"
+                      >
+                        <UserPlus className="w-4 h-4 shrink-0" />
+                        {customerSearch.trim() ? <span>Add &quot;{customerSearch.trim()}&quot; as a new customer</span> : <span>Add a new customer</span>}
+                      </button>
+                    )}
                     {loadingMasters ? (
                       <div className="p-3 text-xs text-muted text-center">
                         Loading customers...
@@ -906,6 +942,15 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           {isSaving ? 'Saving…' : !selectedCustomer ? 'Pick customer' : isRevise ? 'Save revision' : 'Save'}
         </button>
       </div>
+
+      {isNewCustomerOpen && (
+        <CustomerFormModal
+          initialName={customerSearch.trim()}
+          subtitle="Saved to Customers and picked for this quotation."
+          onClose={() => setIsNewCustomerOpen(false)}
+          onSubmit={handleCreateCustomer}
+        />
+      )}
     </div>
   );
 };
