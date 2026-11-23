@@ -359,7 +359,10 @@ thead th {
 
 /* Cards and panels: white on the canvas, hairline border, soft depth */
 .card {
-  background: #ffffff;
+  /* Frosted: the frame drawing behind shows through faintly */
+  background: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  backdrop-filter: blur(10px) saturate(1.15);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   box-shadow: 0 1px 0 rgba(16, 24, 40, 0.03);
@@ -396,7 +399,7 @@ thead th {
   animation: rr-bar-grow 520ms var(--ease-out-soft) backwards;
 }
 
-/* ── Roof backdrop (RR's corrugated sheet behind the top of every page) ── */
+/* ── Frame backdrop (steel shed frame line drawing behind the top of every page) ── */
 /* The page colour lives on <html> so the backdrop (z-index -1) can show above it */
 html {
   background-color: var(--canvas) !important;
@@ -407,40 +410,38 @@ body {
 .app-canvas {
   background: transparent !important;
 }
-.roof-backdrop {
+.frame-backdrop {
   position: fixed;
-  inset: 0 0 auto 0;
-  height: 460px;
+  inset: 0;
   z-index: -1;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.75) 45%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.75) 45%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.35) 30%, #000 65%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.35) 30%, #000 65%);
 }
-.roof-layer {
+.frame-layer {
   position: absolute;
   inset: 0;
   opacity: 0;
   transition: opacity 1400ms var(--ease-out-soft);
 }
-.roof-layer.roof-ready {
-  opacity: 0.62;
+.frame-layer.frame-ready {
+  opacity: 1;
 }
-/* Keep page headings readable: the sheet is calm on the left and comes through on the right */
-.roof-backdrop::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgba(245, 246, 249, 0.92) 0%, rgba(245, 246, 249, 0.72) 30%, rgba(245, 246, 249, 0.15) 62%, rgba(245, 246, 249, 0) 80%);
-}
-/* Phones / no WebGL: the same sheet, drawn with gradients */
-.roof-layer.roof-static {
-  opacity: 0.55;
-  background:
-    linear-gradient(100deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.55) 48%, rgba(255, 255, 255, 0) 62%),
-    repeating-linear-gradient(105deg, #cfd9e8 0 10px, #e6ecf5 10px 14px, #f3f6fb 14px 38px, #dbe3ef 38px 42px);
+/* Phones / no WebGL: a faint drafting grid */
+.frame-layer.frame-static {
+  opacity: 1;
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 @media print {
-  .roof-backdrop {
+  .frame-backdrop {
     display: none !important;
   }
+}
+
+.sidebar {
+  transition: width 220ms var(--ease-out-soft);
+  overflow: hidden;
 }

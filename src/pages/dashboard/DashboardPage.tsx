@@ -92,107 +92,86 @@ export const DashboardPage: React.FC = () => {
   const peak = Math.max(1, ...monthly.map((m) => m.value));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
           <p className="text-[13px] text-muted">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
-          <h1 className="text-[28px] sm:text-[32px] leading-tight text-ink mt-1">{monthName} so far</h1>
+          <h1 className="text-[24px] sm:text-[26px] leading-tight text-ink mt-0.5">{monthName} so far</h1>
         </div>
-        <Link
-          to="/app/quotations"
-          state={{ newQuote: true }}
-          className="btn-primary min-h-[44px] inline-flex items-center justify-center gap-2 px-5 text-white text-sm font-semibold rounded-[10px]"
-        >
-          <Plus className="w-4 h-4" />
-          New quotation
-        </Link>
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3 text-[13px] text-muted">
+            <Link to="/app/customers" className="hover:text-ink">
+              <span className="tabular-nums font-semibold text-ink">{customerCount ?? '…'}</span> customers
+            </Link>
+            <span className="text-line-strong">·</span>
+            <Link to="/app/products" className="hover:text-ink">
+              <span className="tabular-nums font-semibold text-ink">{activeProductCount ?? '…'}</span> products
+            </Link>
+          </div>
+          <Link
+            to="/app/quotations"
+            state={{ newQuote: true }}
+            className="btn-primary min-h-[42px] flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 text-white text-sm font-semibold rounded-[10px]"
+          >
+            <Plus className="w-4 h-4" />
+            New quotation
+          </Link>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Quoted value: the figure, and the last six months as a chart */}
-        <section className="card xl:col-span-2 p-6 min-w-0" aria-label="Quoted value by month">
-          <div className="flex flex-col md:flex-row md:items-end gap-6">
-            <div className="shrink-0">
-              <div className="text-[13px] font-medium text-muted">Quoted in {monthName}</div>
-              {loading ? (
-                <div className="h-14 w-56 mt-3 bg-surface-2 rounded-md animate-pulse" />
-              ) : (
-                <div className="font-display tabular-nums text-[44px] sm:text-[56px] leading-[1] font-extrabold text-ink mt-2 tracking-tight">
-                  {inr(stats.monthValue)}
-                </div>
-              )}
-              <div className="text-[13px] text-muted mt-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* Quoted this month, with the last six months as small bars */}
+        <section className="card p-5 min-w-0 flex flex-col" aria-label="Quoted value">
+          <div className="text-[13px] font-medium text-muted">Quoted in {monthName}</div>
+          <div className="flex items-end justify-between gap-4 mt-2">
+            <div className="min-w-0">
+              <div className="font-display tabular-nums text-[24px] font-bold text-ink leading-tight truncate">
+                {loading ? '…' : inr(stats.monthValue)}
+              </div>
+              <div className="text-[12.5px] text-muted mt-1">
                 {stats.monthCount} quotation{stats.monthCount === 1 ? '' : 's'}
-                {monthly.length > 1 && monthly[monthly.length - 2].value > 0 && !loading && (
-                  <> · {trendText(stats.monthValue, monthly[monthly.length - 2].value)} on last month</>
+                {!loading && monthly[monthly.length - 2]?.value > 0 && (
+                  <>, {trendText(stats.monthValue, monthly[monthly.length - 2].value)} on last month</>
                 )}
               </div>
             </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-end gap-2 sm:gap-3 h-36" role="img" aria-label="Quoted value for the last six months">
-                {monthly.map((m, i) => {
-                  const current = i === monthly.length - 1;
-                  const h = loading ? 8 : Math.max(4, Math.round((m.value / peak) * 100));
-                  return (
-                    <div key={m.key} className="flex-1 min-w-0 h-full flex flex-col justify-end items-center gap-2">
-                      <div
-                        className={`bar w-full max-w-[44px] rounded-t-[6px] ${current ? 'bg-brand' : 'bg-slate-200 hover:bg-slate-300'}`}
-                        style={{ height: `${h}%`, animationDelay: `${i * 50}ms` }}
-                        title={`${m.label}: ${inr(m.value)}`}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex gap-2 sm:gap-3 mt-2">
-                {monthly.map((m, i) => (
-                  <div
-                    key={m.key}
-                    className={`flex-1 text-center text-[12px] ${i === monthly.length - 1 ? 'text-ink font-semibold' : 'text-faint'}`}
-                  >
-                    {m.label}
-                  </div>
-                ))}
-              </div>
+            <div className="flex items-end gap-1 h-10 shrink-0" role="img" aria-label="Quoted value, last six months">
+              {monthly.map((m, i) => (
+                <div
+                  key={m.key}
+                  className={`bar w-2.5 rounded-sm ${i === monthly.length - 1 ? 'bg-brand' : 'bg-slate-200'}`}
+                  style={{ height: `${loading ? 10 : Math.max(8, Math.round((m.value / peak) * 100))}%`, animationDelay: `${i * 40}ms` }}
+                  title={`${m.label}: ${inr(m.value)}`}
+                />
+              ))}
             </div>
           </div>
         </section>
 
-        {/* Pipeline: what is still open, what was won */}
-        <section className="card p-0 min-w-0 divide-y divide-line" aria-label="Pipeline">
-          <div className="p-5">
-            <div className="text-[13px] font-medium text-muted">Waiting on customers</div>
-            <div className="font-display tabular-nums text-[26px] font-bold text-ink mt-1.5 leading-none">
-              {loading ? '…' : inr(stats.openValue)}
-            </div>
-            <div className="text-[12.5px] text-muted mt-2">{stats.openCount} draft or sent</div>
+        <section className="card p-5 min-w-0" aria-label="Waiting on customers">
+          <div className="text-[13px] font-medium text-muted">Waiting on customers</div>
+          <div className="font-display tabular-nums text-[24px] font-bold text-ink leading-tight mt-2 truncate">
+            {loading ? '…' : inr(stats.openValue)}
           </div>
-          <div className="p-5">
-            <div className="text-[13px] font-medium text-muted">Won in {monthName}</div>
-            <div className="font-display tabular-nums text-[26px] font-bold text-ink mt-1.5 leading-none">
-              {loading ? '…' : inr(stats.wonMonthValue)}
-            </div>
-            <div className="text-[12.5px] text-muted mt-2">
-              {stats.winRate === null ? 'Mark quotes Won or Lost to track this' : `${stats.winRate}% win rate, ${stats.decided} decided`}
-            </div>
+          <div className="text-[12.5px] text-muted mt-1">{stats.openCount} draft or sent</div>
+        </section>
+
+        <section className="card p-5 min-w-0" aria-label="Won this month">
+          <div className="text-[13px] font-medium text-muted">Won in {monthName}</div>
+          <div className="font-display tabular-nums text-[24px] font-bold text-ink leading-tight mt-2 truncate">
+            {loading ? '…' : inr(stats.wonMonthValue)}
           </div>
-          <div className="px-5 py-3.5 flex items-center justify-between text-[13px]">
-            <Link to="/app/customers" className="text-muted hover:text-ink">
-              <span className="tabular-nums font-semibold text-ink">{customerCount ?? '…'}</span> customers
-            </Link>
-            <Link to="/app/products" className="text-muted hover:text-ink">
-              <span className="tabular-nums font-semibold text-ink">{activeProductCount ?? '…'}</span> products
-            </Link>
+          <div className="text-[12.5px] text-muted mt-1">
+            {stats.winRate === null ? 'Mark quotes Won or Lost to track this' : `${stats.winRate}% win rate, ${stats.decided} decided`}
           </div>
         </section>
       </div>
 
       <section className="card overflow-hidden" aria-label="Recent quotations">
         <div className="px-5 py-4 flex items-center justify-between">
-          <h2 className="text-[16px] font-bold text-ink">Recent quotations</h2>
+          <h2 className="text-[15px] font-bold text-ink">Recent quotations</h2>
           <Link to="/app/quotations" className="text-[13px] font-semibold text-brand hover:text-brand-dark flex items-center gap-1">
             All quotations <ArrowRight className="w-4 h-4" />
           </Link>
@@ -225,7 +204,7 @@ export const DashboardPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setPreviewQuotation(q)}
-                  className="w-full text-left px-5 py-3.5 hover:bg-surface-2 active:bg-surface-2 flex items-center gap-4"
+                  className="w-full text-left px-5 py-3 hover:bg-surface-2 active:bg-surface-2 flex items-center gap-4"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">

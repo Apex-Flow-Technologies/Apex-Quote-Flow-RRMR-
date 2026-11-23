@@ -12,10 +12,12 @@ import {
   Building2,
   UserCog,
   Plus,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { prefetchMasterData, getCompanySettingsCached } from '../../services/masterDataCache';
 import { validateGstin } from '../../engine/gstin';
-import { RoofBackdrop } from './RoofBackdrop';
+import { FrameBackdrop } from './FrameBackdrop';
 
 /** Admin-only reminder while Company Settings still hold placeholder details (they print on every PDF). */
 const CompanySetupWarning: React.FC = () => {
@@ -65,6 +67,24 @@ export const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Desktop sidebar can fold down to an icon strip; remembered on this device
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('rrmr.sidebarCollapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem('rrmr.sidebarCollapsed', c ? '0' : '1');
+      } catch {
+        /* ignore */
+      }
+      return !c;
+    });
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -135,29 +155,101 @@ export const AppLayout: React.FC = () => {
 
   return (
     <div className="app-canvas min-h-dvh text-ink font-sans lg:flex">
-      <RoofBackdrop />
-      {/* ── Desktop sidebar ─────────────────────────────────────────── */}
-      <aside className="hidden lg:flex no-print w-[248px] shrink-0 h-dvh sticky top-0 flex-col bg-white border-r border-line">
-        <div className="h-16 px-5 flex items-center gap-3">
-          <BrandMark />
-          <div className="min-w-0">
-            <div className="font-display font-bold text-[15px] text-ink leading-tight truncate">RR Metal Roofing</div>
-            <div className="text-[11.5px] text-muted leading-tight">Quotations &amp; billing</div>
-          </div>
+      <FrameBackdrop />
+      {/* ── Desktop sidebar (collapsible) ───────────────────────────── */}
+      <aside
+        className={`sidebar hidden lg:flex no-print shrink-0 h-dvh sticky top-0 flex-col bg-white border-r border-line ${
+          collapsed ? 'w-[72px]' : 'w-[248px]'
+        }`}
+        aria-label="Sidebar"
+      >
+        <div className={`h-16 flex items-center ${collapsed ? 'justify-center px-0' : 'px-4 gap-3'}`}>
+          <Link to="/app" className="flex items-center gap-3 min-w-0" title="RR Metal Roofing">
+            <BrandMark />
+            {!collapsed && (
+              <div className="min-w-0">
+                <div className="font-display font-bold text-[15px] text-ink leading-tight truncate">RR Metal Roofing</div>
+                <div className="text-[11.5px] text-muted leading-tight">Quotations &amp; billing</div>
+              </div>
+            )}
+          </Link>
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="ml-auto w-8 h-8 rounded-[8px] flex items-center justify-center text-faint hover:text-ink hover:bg-ink/[0.05]"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftClose className="w-[18px] h-[18px]" />
+            </button>
+          )}
         </div>
 
-        <div className="px-4 pt-2 pb-4">{newQuote}</div>
+        <div className={collapsed ? 'px-3 pt-1 pb-3' : 'px-4 pt-1 pb-4'}>
+          {collapsed ? (
+            <Link
+              to="/app/quotations"
+              state={{ newQuote: true }}
+              className="btn-primary w-12 h-10 mx-auto flex items-center justify-center rounded-[10px] text-white"
+              title="New quotation"
+              aria-label="New quotation"
+            >
+              <Plus className="w-[18px] h-[18px]" />
+            </Link>
+          ) : (
+            newQuote
+          )}
+        </div>
 
         <nav className="px-3 flex-1 space-y-0.5 overflow-y-auto" aria-label="Main">
           {navItems.map(({ to, label, end, icon: Icon }) => (
-            <NavLink key={to} to={to} end={end} className={navLinkClass}>
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              title={collapsed ? label : undefined}
+              aria-label={collapsed ? label : undefined}
+              className={(st) => `${navLinkClass(st)} ${collapsed ? 'justify-center px-0' : ''}`}
+            >
               <Icon className="nav-icon w-[18px] h-[18px] shrink-0" strokeWidth={1.9} />
-              <span className="truncate">{label}</span>
+              {!collapsed && <span className="truncate">{label}</span>}
             </NavLink>
           ))}
         </nav>
 
-        <div className="p-3 border-t border-line">{userCard}</div>
+        <div className="p-3 border-t border-line">
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                className="w-10 h-10 rounded-[10px] flex items-center justify-center text-faint hover:text-ink hover:bg-ink/[0.05]"
+                title="Expand sidebar"
+                aria-label="Expand sidebar"
+              >
+                <PanelLeftOpen className="w-[18px] h-[18px]" />
+              </button>
+              <span
+                className="w-9 h-9 rounded-full bg-brand-soft text-brand font-display font-bold text-sm flex items-center justify-center"
+                title={`${userName} · ${roleLabel}`}
+              >
+                {initial}
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-10 h-10 rounded-[10px] flex items-center justify-center text-faint hover:text-danger hover:bg-rose-50"
+                title="Sign out"
+                aria-label="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            userCard
+          )}
+        </div>
       </aside>
 
       {/* ── Phone / tablet top bar ──────────────────────────────────── */}
