@@ -6,6 +6,7 @@ import { QUOTATION_STATUS_LABELS, type Quotation, type QuotationStatus } from '.
 import { QuotationBuilder, type QuotationBuilderSource } from './QuotationBuilder';
 import { QuotationPreviewModal, StatusPill } from './QuotationPreviewModal';
 import { QuotationPdfActions } from './QuotationPdfActions';
+import { draftKey, loadDraft, clearDraft, countDraftLines, type QuoteDraft } from '../../utils/quoteDraft';
 import {
   FileText,
   Plus,
@@ -45,6 +46,26 @@ export const QuotationsPage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
+
+  // An unsaved new quotation kept on this device: reopen it if the user just
+  // navigated away, or offer it if they left with the Back button.
+  const newDraftKey = draftKey(user?.uid || 'anon');
+  const [pendingDraft, setPendingDraft] = useState<QuoteDraft | null>(null);
+  useEffect(() => {
+    if (viewMode !== 'list' || !user) return;
+    const d = loadDraft(newDraftKey);
+    if (d && !d.parked && !(location.state as { newQuote?: boolean } | null)?.newQuote) {
+      openBuilder();
+      return;
+    }
+    setPendingDraft(d);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, user?.uid]);
+
+  const discardPendingDraft = () => {
+    clearDraft(newDraftKey);
+    setPendingDraft(null);
+  };
 
   const canRevise = (q: Quotation) => isAdmin || q.createdByUid === user?.uid;
 
@@ -115,6 +136,38 @@ export const QuotationsPage: React.FC = () => {
 
   return (
     <div className="space-y-5">
+      {pendingDraft && (
+        <div className="anim-fade-up p-3.5 bg-amber-50 border border-amber-200 rounded-card text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+          <div className="flex items-start gap-2">
+            <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-700" />
+            <span>
+              <strong className="font-semibold">Unsaved quotation</strong>
+              {pendingDraft.customer ? ` for ${pendingDraft.customer.name}` : ''}
+              {' · '}
+              {countDraftLines(pendingDraft)} item{countDraftLines(pendingDraft) === 1 ? '' : 's'}
+              {' · '}
+              {new Date(pendingDraft.savedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={discardPendingDraft}
+              className="px-3 py-1.5 rounded-control border border-amber-300 bg-white text-amber-900 font-semibold hover:bg-amber-100 transition"
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              onClick={() => openBuilder()}
+              className="px-3 py-1.5 rounded-control bg-brand hover:bg-brand-dark text-white font-semibold transition"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-line pb-4">
         <div>

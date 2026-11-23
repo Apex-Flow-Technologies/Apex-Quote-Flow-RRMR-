@@ -1,3 +1,4 @@
+import { clearAllDrafts } from '../utils/quoteDraft';
 import React, {
   createContext,
   useContext,
@@ -142,6 +143,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     setLoading(true);
+    // Unsaved quotation drafts hold customer details: do not leave them on a shared PC
+    clearAllDrafts();
     try {
       await logoutUser();
       setUser(null);

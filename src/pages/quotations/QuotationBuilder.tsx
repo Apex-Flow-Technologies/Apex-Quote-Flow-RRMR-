@@ -39,6 +39,15 @@ import {
   X,
 } from 'lucide-react';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import {
+  type QuoteDraft,
+  draftKey,
+  loadDraft,
+  saveDraft,
+  clearDraft,
+  parkDraft,
+  rowsSignature,
+} from '../../utils/quoteDraft';
 
 export interface QuotationBuilderSource {
   quotation: Quotation;
@@ -60,6 +69,21 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   const isRevise = source?.mode === 'revise';
   const { user, profile } = useAuth();
 
+  // Unsaved draft kept on this device, so leaving the page does not lose the quote
+  const draftSource = source
+    ? { mode: source.mode, quotationId: source.quotation.id, revision: source.quotation.revision || 1 }
+    : undefined;
+  const dKey = draftKey(user?.uid || 'anon', draftSource);
+  const [restoredDraft] = useState<QuoteDraft | null>(() => loadDraft(dKey));
+  const [showRestoredNotice, setShowRestoredNotice] = useState<boolean>(Boolean(restoredDraft));
+  const isSavedRef = useRef<boolean>(false);
+  // True while the restored draft is in use (then every change is kept)
+  const fromDraftRef = useRef<boolean>(Boolean(restoredDraft));
+  const initialRows = (): EditableRowState[] =>
+    source && source.quotation.lines.length > 0
+      ? source.quotation.lines.map((l) => rowFromSavedLine(l))
+      : [createInitialRow()];
+
   // Master Data
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -68,24 +92,23 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   const [masterError, setMasterError] = useState<string | null>(null);
 
   // Quotation Document Metadata
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [quotationDate, setQuotationDate] = useState<string>(
-    isRevise && source?.quotation.quotationDate ? source.quotation.quotationDate : new Date().toISOString().split('T')[0]
+  const freshDate = isRevise && source?.quotation.quotationDate ? source.quotation.quotationDate : new Date().toISOString().split('T')[0];
+  const freshWidthFactor = source?.quotation.widthFactor ? String(source.quotation.widthFactor) : '1.08';
+  const freshAdvance = isRevise && source?.quotation.advanceAmount ? String(source.quotation.advanceAmount) : '';
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(restoredDraft?.customer ?? null);
+  const [quotationDate, setQuotationDate] = useState<string>(restoredDraft?.quotationDate ?? freshDate);
+  const [widthFactor, setWidthFactor] = useState<string>(restoredDraft?.widthFactor ?? freshWidthFactor);
+  const [isGstEnabled, setIsGstEnabled] = useState<boolean>(
+    restoredDraft?.isGstEnabled ?? source?.quotation.isGstEnabled ?? true
   );
-  const [widthFactor, setWidthFactor] = useState<string>(
-    source?.quotation.widthFactor ? String(source.quotation.widthFactor) : '1.08'
-  );
-  const [isGstEnabled, setIsGstEnabled] = useState<boolean>(source?.quotation.isGstEnabled ?? true);
-  const [advanceAmount, setAdvanceAmount] = useState<string>(
-    isRevise && source?.quotation.advanceAmount ? String(source.quotation.advanceAmount) : ''
-  );
+  const [advanceAmount, setAdvanceAmount] = useState<string>(restoredDraft?.advanceAmount ?? freshAdvance);
 
-  // Editable Table Rows (pre-filled from the source quotation when revising / duplicating)
+  // Editable Table Rows (restored draft, else pre-filled from the source quotation when revising / duplicating)
   const [rows, setRows] = useState<EditableRowState[]>(() =>
-    source && source.quotation.lines.length > 0
-      ? source.quotation.lines.map((l) => rowFromSavedLine(l))
-      : [createInitialRow()]
+    restoredDraft && restoredDraft.rows.length > 0 ? restoredDraft.rows : initialRows()
   );
+  // A revise / duplicate is only worth keeping as a draft once something was changed
+  const [sourceBaseline] = useState<string>(() => rowsSignature(initialRows()));
 
   // Customer Search & Selector
   const [customerSearch, setCustomerSearch] = useState<string>('');
@@ -130,7 +153,11 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           getCompanySettingsCached((fresh) => setCompanySettings(fresh)),
         ]);
         setCustomers(loadedCustomers);
-        if (source) {
+        if (restoredDraft?.customer) {
+          // Use the latest copy of the customer the draft was for
+          const fresh = loadedCustomers.find((x) => x.id && x.id === restoredDraft.customer?.id);
+          if (fresh) setSelectedCustomer(fresh);
+        } else if (source) {
           const c = source.quotation.customer;
           const match = loadedCustomers.find((x) => x.id && x.id === c.id);
           setSelectedCustomer(match || ({ id: c.id || '', name: c.name, gstin: c.gstin, phone: c.phone, address: c.address } as Customer));
@@ -138,7 +165,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
         // Only active products can be added to new quotes
         setProducts(loadedProducts.filter((p) => p.active));
         setCompanySettings(loadedCompany);
-        if (loadedCompany?.defaultWidthFactor && !source?.quotation.widthFactor) {
+        if (loadedCompany?.defaultWidthFactor && !source?.quotation.widthFactor && !restoredDraft) {
           setWidthFactor(String(loadedCompany.defaultWidthFactor));
         }
       } catch (err: unknown) {
@@ -166,6 +193,59 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   const feetToMetreNum = useMemo(() => {
     return companySettings?.feetToMetre ?? 0.305;
   }, [companySettings?.feetToMetre]);
+
+  // Keep the unsaved quote on this device as it is typed
+  useEffect(() => {
+    if (isSavedRef.current) return;
+    if (source && !fromDraftRef.current) {
+      const unchanged =
+        rowsSignature(rows) === sourceBaseline &&
+        (selectedCustomer?.id || '') === (source.quotation.customer.id || '') &&
+        quotationDate === freshDate &&
+        advanceAmount === freshAdvance &&
+        isGstEnabled === (source.quotation.isGstEnabled ?? true);
+      if (unchanged) return;
+    }
+    saveDraft(dKey, {
+      source: draftSource,
+      customer: selectedCustomer,
+      quotationDate,
+      widthFactor,
+      isGstEnabled,
+      advanceAmount,
+      rows,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, selectedCustomer, quotationDate, widthFactor, isGstEnabled, advanceAmount]);
+
+  const handleBack = () => {
+    parkDraft(dKey);
+    onCancel();
+  };
+
+  const handleDiscardDraft = () => {
+    clearDraft(dKey);
+    fromDraftRef.current = false;
+    setShowRestoredNotice(false);
+    setRows(initialRows());
+    setQuotationDate(freshDate);
+    setAdvanceAmount(freshAdvance);
+    setIsGstEnabled(source?.quotation.isGstEnabled ?? true);
+    setWidthFactor(
+      source?.quotation.widthFactor
+        ? String(source.quotation.widthFactor)
+        : companySettings?.defaultWidthFactor
+          ? String(companySettings.defaultWidthFactor)
+          : '1.08'
+    );
+    if (source) {
+      const c = source.quotation.customer;
+      const match = customers.find((x) => x.id && x.id === c.id);
+      setSelectedCustomer(match || ({ id: c.id || '', name: c.name, gstin: c.gstin, phone: c.phone, address: c.address } as Customer));
+    } else {
+      setSelectedCustomer(null);
+    }
+  };
 
   // Valid lines derived from editable table rows
   const validLines = useMemo(() => {
@@ -327,6 +407,9 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
           ? await reviseQuotation(source.quotation, quotationPayload, profile?.name || user?.email || 'Sales Team')
           : await createQuotation(quotationPayload);
       if (isRevise && source) quotationPayload.revision = (source.quotation.revision || 1) + 1;
+      // Saved: the device draft is no longer needed
+      isSavedRef.current = true;
+      clearDraft(dKey);
 
       setSaveSuccessMessage(
         isRevise
@@ -369,7 +452,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
       <div className="border-b border-line pb-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={onCancel}
+            onClick={handleBack}
             className="w-10 h-10 flex items-center justify-center text-muted hover:text-ink hover:bg-surface-2 rounded-control border border-line-strong transition shrink-0"
             title="Return to Quotation Register"
             aria-label="Return to Quotation Register"
@@ -394,6 +477,38 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
       </div>
 
       {/* Notifications */}
+      {showRestoredNotice && restoredDraft && (
+        <div className="anim-fade-up p-3 bg-brand-soft border border-brand/20 rounded-control text-brand-deep text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-brand" />
+            <span>
+              Restored your unsaved quotation from{' '}
+              <strong className="font-semibold">
+                {new Date(restoredDraft.savedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+              </strong>
+              .
+            </span>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={handleDiscardDraft}
+              className="px-3 py-1.5 rounded-control border border-brand/30 bg-white text-brand-deep font-semibold hover:bg-brand-tint transition"
+            >
+              Discard draft
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowRestoredNotice(false)}
+              aria-label="Hide message"
+              className="p-1 text-brand-deep/60 hover:text-brand-deep"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {masterError && (
         <div className="p-3 bg-rose-50 border border-rose-200 rounded-control text-danger text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-danger" />
@@ -742,7 +857,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
             <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-2.5 w-full sm:w-auto">
               <button
                 type="button"
-                onClick={onCancel}
+                onClick={handleBack}
                 className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 text-xs font-semibold text-muted hover:text-ink bg-white hover:bg-surface-2 border border-line-strong rounded-control shadow-xs transition flex items-center justify-center"
               >
                 Cancel Draft
