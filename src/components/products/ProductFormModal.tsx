@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useMemo, useId } from 'react';
 import { Decimal } from 'decimal.js';
 import { AlertCircle, X } from 'lucide-react';
@@ -105,7 +106,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
   };
 
-  return (
+  const modal = (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-ink/40 backdrop-blur-xs">
           <div className="bg-white rounded-card shadow-xl border border-line max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
             {/* Modal Header */}
@@ -624,4 +625,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </div>
         </div>
   );
+  // On top of everything (the page header too); plain render where there is no DOM (tests)
+  return typeof document === 'undefined' ? modal : createPortal(modal, document.body);
 };

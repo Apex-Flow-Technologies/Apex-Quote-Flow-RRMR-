@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useId } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import { validateGstin } from '../../engine/gstin';
@@ -106,7 +107,7 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     }
   };
 
-  return (
+  const modal = (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-ink/40 backdrop-blur-xs">
           <div className="bg-white rounded-card border border-line shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100">
             {/* Modal Header */}
@@ -293,4 +294,6 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           </div>
         </div>
   );
+  // On top of everything (the page header too); plain render where there is no DOM (tests)
+  return typeof document === 'undefined' ? modal : createPortal(modal, document.body);
 };

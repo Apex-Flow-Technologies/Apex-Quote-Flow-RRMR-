@@ -242,6 +242,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
     clearDraft(dKey);
     fromDraftRef.current = false;
     setShowRestoredNotice(false);
+    setCustomerSearch('');
     setRows(initialRows());
     setQuotationDate(freshDate);
     setAdvanceAmount(freshAdvance);

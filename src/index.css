@@ -170,7 +170,9 @@
 
 /* ── Motion & type polish ───────────────────────────────────────────────
    One easing curve and short durations everywhere; all of it switches off
-   for people who ask their device to reduce motion. */
+   for people who ask their device to reduce motion.
+   Fill mode is "backwards" on purpose: a finished animation must leave no
+   transform behind, or fixed popups inside the page get trapped under the header. */
 :root {
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -194,17 +196,17 @@
 
 /* Modals: dimmed backdrop fades, the panel rises in */
 .fixed.inset-0.z-50 {
-  animation: rr-fade-in 160ms ease-out both;
+  animation: rr-fade-in 160ms ease-out backwards;
 }
 .animate-in {
-  animation: rr-rise-in 220ms var(--ease-out-soft) both;
+  animation: rr-rise-in 220ms var(--ease-out-soft) backwards;
 }
 
 /* Page change, notices, dropdowns, new quotation lines */
-.anim-page { animation: rr-fade-up 260ms var(--ease-out-soft) both; }
-.anim-fade-up { animation: rr-fade-up 240ms var(--ease-out-soft) both; }
-.anim-pop { animation: rr-pop 160ms var(--ease-out-soft) both; transform-origin: top center; }
-.anim-row { animation: rr-fade-up 220ms var(--ease-out-soft) both; }
+.anim-page { animation: rr-fade-up 260ms var(--ease-out-soft) backwards; }
+.anim-fade-up { animation: rr-fade-up 240ms var(--ease-out-soft) backwards; }
+.anim-pop { animation: rr-pop 160ms var(--ease-out-soft) backwards; transform-origin: top center; }
+.anim-row { animation: rr-fade-up 220ms var(--ease-out-soft) backwards; }
 
 @layer base {
   /* Inter's clearer digits and letter shapes; balanced headings */
