@@ -362,7 +362,7 @@ thead th {
   background: #ffffff;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 0 rgba(16, 24, 40, 0.03);
 }
 .card-hover {
   transition: box-shadow 180ms var(--ease-out-soft), border-color 180ms var(--ease-out-soft), transform 180ms var(--ease-out-soft);
@@ -386,10 +386,61 @@ thead th {
   flex-shrink: 0;
 }
 
-/* Dashboard lead card: RR blue, deep and calm (white text stays above 5:1 on every stop) */
-.hero-card {
+/* Chart bars grow from the baseline once, on load */
+@keyframes rr-bar-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.bar {
+  transform-origin: bottom;
+  animation: rr-bar-grow 520ms var(--ease-out-soft) backwards;
+}
+
+/* ── Roof backdrop (RR's corrugated sheet behind the top of every page) ── */
+/* The page colour lives on <html> so the backdrop (z-index -1) can show above it */
+html {
+  background-color: var(--canvas) !important;
+}
+body {
+  background-color: transparent !important;
+}
+.app-canvas {
+  background: transparent !important;
+}
+.roof-backdrop {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 460px;
+  z-index: -1;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.75) 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.75) 45%, transparent 100%);
+}
+.roof-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1400ms var(--ease-out-soft);
+}
+.roof-layer.roof-ready {
+  opacity: 0.62;
+}
+/* Keep page headings readable: the sheet is calm on the left and comes through on the right */
+.roof-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(245, 246, 249, 0.92) 0%, rgba(245, 246, 249, 0.72) 30%, rgba(245, 246, 249, 0.15) 62%, rgba(245, 246, 249, 0) 80%);
+}
+/* Phones / no WebGL: the same sheet, drawn with gradients */
+.roof-layer.roof-static {
+  opacity: 0.55;
   background:
-    radial-gradient(420px 220px at 110% -20%, rgba(255, 255, 255, 0.18), transparent 60%),
-    linear-gradient(150deg, #1e40af 0%, #1d4ed8 55%, #2563eb 100%);
-  box-shadow: 0 10px 30px -12px rgba(29, 78, 216, 0.55);
+    linear-gradient(100deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.55) 48%, rgba(255, 255, 255, 0) 62%),
+    repeating-linear-gradient(105deg, #cfd9e8 0 10px, #e6ecf5 10px 14px, #f3f6fb 14px 38px, #dbe3ef 38px 42px);
+}
+@media print {
+  .roof-backdrop {
+    display: none !important;
+  }
 }

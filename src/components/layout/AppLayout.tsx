@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { prefetchMasterData, getCompanySettingsCached } from '../../services/masterDataCache';
 import { validateGstin } from '../../engine/gstin';
+import { RoofBackdrop } from './RoofBackdrop';
 
 /** Admin-only reminder while Company Settings still hold placeholder details (they print on every PDF). */
 const CompanySetupWarning: React.FC = () => {
@@ -134,6 +135,7 @@ export const AppLayout: React.FC = () => {
 
   return (
     <div className="app-canvas min-h-dvh text-ink font-sans lg:flex">
+      <RoofBackdrop />
       {/* ── Desktop sidebar ─────────────────────────────────────────── */}
       <aside className="hidden lg:flex no-print w-[248px] shrink-0 h-dvh sticky top-0 flex-col bg-white border-r border-line">
         <div className="h-16 px-5 flex items-center gap-3">
