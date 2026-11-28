@@ -6,7 +6,7 @@
  */
 import type { Customer } from '../types/customer';
 import { legacyLengthToFeetInches, type EditableRowState } from '../components/quotations/quotationRows';
-import { legacySteelSizeDims } from '../components/quotations/steelSize';
+import { legacySteelSizeDims, migrateSheetCutDims } from '../components/quotations/steelSize';
 
 /**
  * Drafts written by older versions of the app: Sq.Mtr lines kept one length value
@@ -22,6 +22,10 @@ export function migrateDraftRow(row: EditableRowState): EditableRowState {
   const steel = r.steelSize as (EditableRowState['steelSize'] & { text?: string }) | undefined;
   if (steel && !steel.dims) {
     r = { ...r, steelSize: { shape: steel.shape, dims: legacySteelSizeDims(steel.shape, steel.text || '') } };
+  }
+  if (r.steelSize?.dims) {
+    const dims = migrateSheetCutDims(r.steelSize.shape, r.steelSize.dims);
+    if (dims !== r.steelSize.dims) r = { ...r, steelSize: { ...r.steelSize, dims } };
   }
   return r;
 }

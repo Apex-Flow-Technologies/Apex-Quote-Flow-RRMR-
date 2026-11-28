@@ -6,7 +6,7 @@ import type { Product, QuantityMethod, ProductUnit } from '../../types/product';
 import type { QuotationLine, QuotationLineSnapshot } from '../../types/quotation';
 import { calculateQuotationLine, validateLineDraft, type TaxMode, type LengthUnit } from '../../engine';
 import { Decimal } from 'decimal.js';
-import { steelSizeProduct, parseSteelSize, flashingPerSheet, isSheetCut, legacySteelSizeDims, defaultDims, kindHasColour, STEEL_SIZE_KINDS, type SteelSizeInput, type SteelSizeKind } from './steelSize';
+import { steelSizeProduct, parseSteelSize, sheetCutPerSheet, isSheetCut, migrateSheetCutDims, legacySteelSizeDims, defaultDims, kindHasColour, STEEL_SIZE_KINDS, type SteelSizeInput, type SteelSizeKind } from './steelSize';
 
 export type RowLengthUnit = 'ft_in' | 'metres' | 'ft' | 'in' | 'mm' | 'm';
 
@@ -138,7 +138,7 @@ export function flashingSheets(
 ): { pieces: number; perSheet: number; girth: number; sheets: number; widthFactor: number } | null {
   const size = row.steelSize;
   if (!size || !isSheetCut(size.shape)) return null;
-  const cut = flashingPerSheet(size.dims.size ?? '', Number(size.dims.sheet || 48));
+  const cut = sheetCutPerSheet(migrateSheetCutDims(size.shape, size.dims));
   const pieces = Number(row.nos);
   if ('error' in cut || !(pieces > 0)) return null;
   const wf = Number(size.dims.wf || 1.08);
@@ -326,7 +326,7 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
       ? {
           steelSize: {
             shape: snap.steelShape as SteelSizeKind,
-            dims: snap.steelSizeDims ? { ...snap.steelSizeDims } : legacySteelSizeDims(snap.steelShape, snap.steelSizeText || ''),
+            dims: snap.steelSizeDims ? migrateSheetCutDims(snap.steelShape, { ...snap.steelSizeDims }) : legacySteelSizeDims(snap.steelShape, snap.steelSizeText || ''),
             hsn: snap.hsn,
           },
         }
@@ -583,7 +583,8 @@ export function weightPreview(
   widthFactor?: number,
   feetToMetre?: number
 ): { quantity: number; unit: string; perPiece: number } | null {
-  if (row.isCustomItem || !row.product || row.product.qtyMethod !== 'SECTION_WEIGHT') return null;
+  // Any measured line (steel kg, sheet Sq.Mtr, flashing sheets…) shows its quantity before a rate is typed
+  if (row.isCustomItem || !row.product) return null;
   if (row.calculatedLine) {
     return { quantity: row.calculatedLine.quantity, unit: row.calculatedLine.unit, perPiece: row.calculatedLine.perPieceQuantity };
   }
@@ -597,8 +598,9 @@ export function weightPreview(
  * The line's working in plain words, e.g.
  * "12 pcs ÷ 4 a sheet = 3 sheets · 8 ft = 2.44 m × 1.08 = 2.63 Sq.Mtr a sheet × 3 = 7.89 Sq.Mtr".
  */
-export function workingText(row: EditableRowState): string | null {
-  const l = row.calculatedLine;
+export function workingText(row: EditableRowState, widthFactor?: number, feetToMetre?: number): string | null {
+  // Before a rate is typed, work it out with a placeholder rate so the sizes can be checked
+  const l = row.calculatedLine ?? computeRowCalculation({ ...row, rate: '1' }, 'intra', widthFactor, feetToMetre).calculatedLine;
   if (!l || !row.steelSize || l.isManualQuantity) return null;
   const cfg = STEEL_SIZE_KINDS[row.steelSize.shape];
   const num = (v: number | undefined, dp = 4) => String(Number(Number(v || 0).toFixed(dp)));

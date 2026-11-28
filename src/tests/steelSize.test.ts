@@ -61,10 +61,17 @@ describe('Steel by type: weight per metre (maiak-m.bg formulas)', () => {
     });
   }
 
+  it('steel types have a Brand box, shown in front of the name', () => {
+    expect(STEEL_SIZE_KINDS.SQUARE_PIPE.fields.map((f) => f.key)).toEqual(['a', 't', 'brand']);
+    expect(kg('SQUARE_PIPE', { a: '40', t: '1.3', brand: 'Apollo' }).name).toBe('Apollo MS Square Tube 40 × 40 × 1.3 mm');
+    expect(kg('SQUARE_PIPE', { a: '40', t: '1.3' }).name).toBe('MS Square Tube 40 × 40 × 1.3 mm');
+  });
+
   it('every type in the picker has boxes', () => {
     expect(STEEL_SIZE_KIND_ORDER).not.toContain('UNEQUAL_ANGLE');
     expect(STEEL_SIZE_KIND_ORDER).not.toContain('SHEET_WEIGHT'); // replaced by the kg/ft sheet
     expect(STEEL_SIZE_KIND_ORDER).not.toContain('RIDGE_GUTTER'); // split into Ridge and Gutter
+    expect(STEEL_SIZE_KIND_ORDER).toContain('PROFILE_RIDGE');
     expect(STEEL_SIZE_KIND_ORDER).toHaveLength(Object.keys(STEEL_SIZE_KINDS).length - 3);
     for (const k of STEEL_SIZE_KIND_ORDER) expect(STEEL_SIZE_KINDS[k].fields.length).toBeGreaterThan(0);
   });
@@ -126,27 +133,75 @@ describe('Sheets and accessories by type', () => {
     expect(l.taxableAmount).toBe(3450);
   });
 
-  it('ridge and gutter are cut from the sheet too', () => {
-    const r = calc(line('RIDGE', { item: 'Profile ridge', size: '1x1 ft' }, { nos: '4', rate: '1' })).calculatedLine!;
-    expect(r.productName).toBe('Profile ridge 1 × 1 ft');
+  it('ridge and gutter are cut from the sheet; sizes in separate boxes', () => {
+    const r = calc(line('RIDGE', { a: '1', b: '1' }, { nos: '4', rate: '1' })).calculatedLine!; // ridge starts in ft
+    expect(r.productName).toBe('Ridge 1 × 1 ft');
     expect(r.nos).toBe(2); // 24 in → 2 a sheet; 4 pcs → 2 sheets
     expect(r.unit).toBe('Sq.Mtr');
     expect(r.quantity).toBe(5.26); // 2 × 2.63
     // non-standard 1.5 × 1.5 ft ridge: 36 in → only 1 a sheet
-    expect(calc(line('RIDGE', { size: '1.5x1.5 ft' }, { nos: '3', rate: '1' })).calculatedLine!.nos).toBe(3);
-    // gutter: 24 in girth → 2 a sheet; anything over 24 in → 1
-    expect(calc(line('GUTTER', { item: 'Barge gutter', size: '24' }, { nos: '4', rate: '1' })).calculatedLine!.nos).toBe(2);
-    expect(calc(line('GUTTER', { size: '30' }, { nos: '4', rate: '1' })).calculatedLine!.nos).toBe(4);
+    expect(calc(line('RIDGE', { a: '1.5', b: '1.5' }, { nos: '3', rate: '1' })).calculatedLine!.nos).toBe(3);
+    // gutter: Side A × Side B like ridge; 8 × 8 in → 16 in → 3 a sheet
+    const g8 = calc(line('GUTTER', { a: '8', b: '8' }, { nos: '4', rate: '1' })).calculatedLine!;
+    expect(g8.nos).toBe(2); // 4 pcs ÷ 3 a sheet → 2 sheets
+    expect(g8.productName).toBe('Gutter 8 × 8 in');
+    expect(STEEL_SIZE_KINDS.GUTTER.fields.map((f) => f.key).slice(0, 3)).toEqual(['a', 'b', 'su']);
+    // only the girth known: Side B left empty; 24 in → 2 a sheet; over 24 in → 1
+    const g = calc(line('GUTTER', { item: 'Barge gutter', a: '24' }, { nos: '4', rate: '1' })).calculatedLine!;
+    expect(g.nos).toBe(2);
+    expect(g.productName).toBe('Barge gutter 24 in');
+    expect(calc(line('GUTTER', { a: '30' }, { nos: '4', rate: '1' })).calculatedLine!.nos).toBe(4);
     const back = rowFromSavedLine(r);
     expect(back.nos).toBe('4');
-    expect(back.steelSize!.dims.item).toBe('Profile ridge');
-    expect(ITEM_PRESETS.RIDGE).toEqual(['Ridge', 'Profile ridge']);
+    expect(back.steelSize!.dims).toMatchObject({ a: '1', b: '1', su: 'ft' });
+    expect(ITEM_PRESETS.RIDGE).toEqual(['Ridge']);
     expect(ITEM_PRESETS.GUTTER).toEqual(['Gutter', 'Barge gutter']);
     expect(ITEM_PRESETS.FLASHING).toEqual(['L flashing', 'Ridge', 'Barge L flashing']);
-    // picked in the main dropdown, so no separate item box
     expect(STEEL_SIZE_KINDS.FLASHING.fields.some((f) => f.key === 'item')).toBe(false);
     expect(createSteelSizeRow('GUTTER', 'Barge gutter').steelSize!.dims.item).toBe('Barge gutter');
-    expect(createSteelSizeRow('FLASHING').steelSize!.dims.item).toBe('L flashing');
+    expect(createSteelSizeRow('FLASHING').steelSize!.dims).toMatchObject({ item: 'L flashing', su: 'in' });
+  });
+
+  it('UPVC and tile sheet (Sq.Mtr) use the sheet formula; tile sheet by weight uses kg/ft', () => {
+    const base = { lengthUnit: 'in' as const, lengthValue: '126', nos: '5', rate: '1' };
+    const u = calc(line('UPVC_SHEET', { t: '2', wf: '1.08' }, base)).calculatedLine!;
+    expect(u.productName).toBe('UPVC sheet 2 mm');
+    expect(u.quantity).toBe(17.29);
+    expect(calc(line('TILE_SQM', { wf: '1.08' }, base)).calculatedLine!.quantity).toBe(17.29);
+    const tw = calc(line('TILE_KGFT', {}, base)).calculatedLine!;
+    expect(tw.unit).toBe('Kgs');
+    expect(tw.quantity).toBe(65.1); // 10.5 ft × 1.24 × 5
+  });
+
+  it('air vent: per piece, base always one of the two', () => {
+    const row = createSteelSizeRow('AIR_VENT');
+    expect(row.steelSize!.dims.base).toBe('Polycarbonate base');
+    const l = calc(line('AIR_VENT', { base: 'Aluminium base' }, { nos: '3', rate: '1500' })).calculatedLine!;
+    expect(l.productName).toBe('Air vent – aluminium base');
+    expect(l.unit).toBe('Nos');
+    expect(l.taxableAmount).toBe(4500);
+    expect(parseSteelSize({ shape: 'AIR_VENT', dims: { base: '' } }).ok).toBe(false);
+    expect(parseSteelSize({ shape: 'AIR_VENT', dims: { base: 'Steel base' } }).ok).toBe(false);
+  });
+
+  it('plain sheet uses the Sq.Mtr sheet formula', () => {
+    const p = calc(line('PLAIN_SHEET', { brand: 'JSW', t: '0.47', wf: '1.08', colour: 'Blue' }, { lengthUnit: 'in', lengthValue: '126', nos: '5', rate: '1' })).calculatedLine!;
+    expect(p.productName).toBe('JSW Plain sheet 0.47 mm');
+    expect(p.unit).toBe('Sq.Mtr');
+    expect(p.quantity).toBe(17.29); // 126 ÷ 12 × 0.305 × 1.08 × 5
+    expect(p.colour).toBe('Blue');
+    expect(createSteelSizeRow('PLAIN_SHEET').lengthUnit).toBe('ft_in');
+  });
+
+  it('profile ridge is priced on the sheet length only', () => {
+    const p = calc(line('PROFILE_RIDGE', { wf: '1.08' }, { lengthFeet: '10', lengthInches: '0', nos: '3', rate: '1' })).calculatedLine!;
+    expect(p.productName).toBe('Profile ridge');
+    expect(p.quantity).toBe(9.88); // 10 × 0.305 × 1.08 × 3 = 9.882
+    expect(STEEL_SIZE_KINDS.PROFILE_RIDGE.fields.some((f) => f.key === 'a')).toBe(false);
+  });
+
+  it('older lines with one size text box still work', () => {
+    expect(calc(line('FLASHING', { size: '6x6' }, { nos: '12', rate: '1' })).calculatedLine!.nos).toBe(3);
   });
 
   it('ridge / gutter needs the item', () => {
@@ -205,9 +260,16 @@ describe('Roofing sheet by weight (kg per foot)', () => {
   });
 });
 
+/** "6x6" → { a: '6', b: '6' }; "1x1 ft" → feet; "24" → one girth box */
+const sides = (size: string): Record<string, string> => {
+  const ft = /ft/.test(size);
+  const [a, b] = size.replace(/ft/, '').split('x').map((x) => x.trim());
+  return { a, ...(b ? { b } : {}), su: ft ? 'ft' : 'in' };
+};
+
 describe('Flashing cut from 8 ft × 4 ft sheets', () => {
   const cut = (size: string, pcs: string, extra: Record<string, string> = {}) =>
-    calc(line('FLASHING', { size, ...extra }, { nos: pcs, rate: '1500' })).calculatedLine!;
+    calc(line('FLASHING', { ...sides(size), ...extra }, { nos: pcs, rate: '1500' })).calculatedLine!;
 
   it('pieces per 48 in sheet: 6x6 → 4, 8x8 → 3, 1x1 ft → 2, 18x18 → 1', () => {
     expect(flashingPerSheet('6x6', 48)).toMatchObject({ girth: 12, perSheet: 4 });
@@ -229,7 +291,7 @@ describe('Flashing cut from 8 ft × 4 ft sheets', () => {
     expect(l.taxableAmount).toBe(11835); // 7.89 × 1500
     const ten = cut('6x6', '10');
     expect(ten.snapshot.steelSizeDims?.pcs).toBe('10');
-    expect(describeFlashingLine(ten)).toBe('10 pcs · 4 per 48 in sheet → 3 sheets');
+    expect(describeFlashingLine(ten)).toBe('10 pcs · 4 per 48 in sheet = 3 sheets');
   });
 
   it('8x8 × 3 pcs → 1 sheet; 1x1 ft × 2 pcs → 1 sheet; 12 pcs of 6x6 → 3 sheets', () => {
@@ -239,12 +301,12 @@ describe('Flashing cut from 8 ft × 4 ft sheets', () => {
   });
 
   it('the width factor and sheet length can be changed', () => {
-    const l = calc(line('FLASHING', { size: '6x6', wf: '1.22' }, { nos: '4', rate: '1', lengthFeet: '10', lengthInches: '0' })).calculatedLine!;
+    const l = calc(line('FLASHING', { a: '6', b: '6', wf: '1.22' }, { nos: '4', rate: '1', lengthFeet: '10', lengthInches: '0' })).calculatedLine!;
     expect(l.quantity).toBe(3.72); // 10 × 0.305 × 1.22 = 3.721 → 3.72
   });
 
   it('a piece wider than the sheet is explained', () => {
-    const r = parseSteelSize({ shape: 'FLASHING', dims: { item: 'L flashing', size: '30x30', sheet: '48', wf: '1.28' } });
+    const r = parseSteelSize({ shape: 'FLASHING', dims: { item: 'L flashing', a: '30', b: '30', su: 'in', sheet: '48', wf: '1.28' } });
     expect(!r.ok && r.error).toMatch(/wider than the 48 in sheet/);
   });
 
@@ -271,7 +333,7 @@ describe('Width factor on the line and the working shown', () => {
 
   it('working text for each kind of line', () => {
     const show = (r: EditableRowState) => workingText({ ...r, ...calc(r) });
-    expect(show(line('FLASHING', { size: '6x6' }, { nos: '12', rate: '1' }))).toBe(
+    expect(show(line('FLASHING', { a: '6', b: '6' }, { nos: '12', rate: '1' }))).toBe(
       '12 pcs ÷ 4 a sheet = 3 sheets · 8 ft = 2.44 m × 1.08 = 2.63 Sq.Mtr a sheet × 3 = 7.89 Sq.Mtr'
     );
     expect(show(line('RECT_PIPE', { a: '80', b: '40', t: '2' }, { nos: '1', rate: '1' }))).toBe(
@@ -378,7 +440,7 @@ describe('Steel by type: on a quote line', () => {
     ['SHEET_SQM', { brand: 'JSW Pragathi+', t: '0.47', colour: 'Blue' }, { nos: '6', rate: '400', lengthFeet: '10' }],
     ['SHEET_WEIGHT', { t: '0.5' }, { nos: '3', rate: '118' }],
     ['RIDGE_GUTTER', { item: 'Valley gutter', size: '24 inch' }, { nos: '2', rate: '980' }],
-    ['FLASHING', { size: '6x6' }, { nos: '10', rate: '1500' }],
+    ['FLASHING', { a: '6', b: '6' }, { nos: '10', rate: '1500' }],
     ['FIXING', { item: 'EPDM washer' }, { nos: '200', rate: '2' }],
   ] as [SteelSizeKind, Record<string, string>, Partial<EditableRowState>][]) {
     it(`revise brings back a ${shape} line with the same amount`, () => {

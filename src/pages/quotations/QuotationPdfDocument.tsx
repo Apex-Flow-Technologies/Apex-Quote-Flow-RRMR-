@@ -198,17 +198,15 @@ const styles = StyleSheet.create({
 
   // Table
   tableContainer: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 5,
-    overflow: 'hidden',
+    // Borders live on the header and rows (not one box), so a page break leaves no empty bordered space
     marginBottom: 12,
   },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
     borderBottomWidth: 1.25,
-    borderBottomColor: '#cbd5e1',
     paddingVertical: 6.5,
     paddingHorizontal: 5,
     alignItems: 'center',
@@ -223,6 +221,10 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: 'row',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderLeftColor: '#cbd5e1',
+    borderRightColor: '#cbd5e1',
     borderBottomWidth: 0.75,
     borderBottomColor: '#e2e8f0',
     paddingVertical: 6.5,
@@ -231,6 +233,10 @@ const styles = StyleSheet.create({
   },
   tableRowEven: {
     backgroundColor: '#fafafa',
+  },
+  tableRowLast: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#cbd5e1',
   },
   colSNo: { width: '5%', textAlign: 'center' },
   colDesc: { width: '37%', paddingRight: 5 },
@@ -613,7 +619,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
               <View
                 key={line.id || index}
                 wrap={false}
-                style={[styles.tableRow, index % 2 === 1 ? styles.tableRowEven : {}]}
+                style={[styles.tableRow, index % 2 === 1 ? styles.tableRowEven : {}, index === quotation.lines.length - 1 ? styles.tableRowLast : {}]}
               >
                 <Text style={[styles.colSNo, { color: '#94a3b8' }]}>{index + 1}</Text>
 

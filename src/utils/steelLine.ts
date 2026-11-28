@@ -1,5 +1,5 @@
 import type { QuotationLine } from '../types/quotation';
-import { weightRateText, flashingPerSheet, isSheetCut } from '../components/quotations/steelSize';
+import { weightRateText, sheetCutPerSheet, isSheetCut } from '../components/quotations/steelSize';
 
 /** A steel (by-weight) line where the salesperson typed the kg instead of a number of lengths. */
 export function isSteelByKg(line: Pick<QuotationLine, 'isManualQuantity' | 'snapshot'>): boolean {
@@ -28,13 +28,13 @@ export function describeSteelLine(line: QuotationLine, sep = '·'): string {
   return `${len} × ${line.nos} nos ${sep} ${kgm}`;
 }
 
-/** Flashing cut from sheets, e.g. "10 pcs · 4 per 48 in sheet → 3 sheets" (null for other lines). */
+/** Flashing cut from sheets, e.g. "10 pcs · 4 per 48 in sheet = 3 sheets" (null for other lines). Plain characters only: the PDF font has no arrows. */
 export function describeFlashingLine(line: QuotationLine, sep = '·'): string | null {
   const dims = line.snapshot.steelSizeDims;
   if (!isSheetCut(line.snapshot.steelShape) || !dims?.pcs) return null;
   const width = Number(dims.sheet || 48);
-  const cut = flashingPerSheet(dims.size ?? '', width);
+  const cut = sheetCutPerSheet({ ...dims, sheet: String(width) });
   if ('error' in cut) return null;
   const sheets = Number(line.nos);
-  return `${dims.pcs} pcs ${sep} ${cut.perSheet} per ${width} in sheet → ${sheets} sheet${sheets === 1 ? '' : 's'}`;
+  return `${dims.pcs} pcs ${sep} ${cut.perSheet} per ${width} in sheet = ${sheets} sheet${sheets === 1 ? '' : 's'}`;
 }

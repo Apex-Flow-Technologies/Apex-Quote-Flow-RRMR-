@@ -522,7 +522,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                 </span>
                 {kind === 'select' ? (
                   <select value={size.dims[fd.key] ?? ''} onChange={(e) => setDim(fd.key, e.target.value)} className={boxClass} aria-label={fd.label}>
-                    <option value="">Pick…</option>
+                    {(fd.optional || !fd.default) && <option value="">Pick…</option>}
                     {(fd.options || []).map((o) => (
                       <option key={o} value={o}>
                         {o.replace(/x/g, ' × ')}
@@ -568,7 +568,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               <span className="text-ink font-medium">{row.product.name}</span>
               {kgm !== undefined && <span className="tabular-nums"> · {weightRateText(size.shape, kgm, size.dims)}</span>}
               {(() => {
-                const working = workingText(row);
+                const working = workingText(row, widthFactor, feetToMetre);
                 return working ? <span className="block tabular-nums text-ink mt-0.5">{working}</span> : null;
               })()}
             </>
@@ -1222,7 +1222,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           <div className="font-mono tabular-nums font-bold text-ink text-xs">
                             {wp.quantity.toFixed(2)} <span className="font-medium text-muted text-[11px]">{wp.unit}</span>
                           </div>
-                          <div className="text-[10px] text-faint font-mono tabular-nums">{wp.perPiece} {wp.unit}/pc</div>
+                          {!flashingSheets(row) && <div className="text-[10px] text-faint font-mono tabular-nums">{wp.perPiece} {wp.unit}/pc</div>}
                         </div>
                       ) : (
                         <span className="text-faint text-xs">—</span>
@@ -1800,9 +1800,10 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                         </span>
                       );
                     }
+                    if (flashingSheets(row)) return null; // the working line under the item says it
                     return (
                       <span className="block text-[11px] text-muted font-mono tabular-nums mt-0.5">
-                        {wp.perPiece} kg per length × {row.nos || 1}
+                        {wp.perPiece} {wp.unit === 'Kgs' ? 'kg per length' : `${wp.unit} each`} × {row.nos || 1}
                       </span>
                     );
                   })()}

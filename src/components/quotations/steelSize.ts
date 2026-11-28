@@ -30,7 +30,7 @@ export function chequeredKgPerSqm(t: number): Decimal {
 }
 import { Decimal } from 'decimal.js';
 
-export type SheetItemKind = 'SHEET_SQM' | 'SHEET_KGFT' | 'SHEET_WEIGHT' | 'POLYCARBONATE' | 'FLASHING' | 'RIDGE' | 'GUTTER' | 'RIDGE_GUTTER' | 'FIXING';
+export type SheetItemKind = 'SHEET_SQM' | 'PLAIN_SHEET' | 'UPVC_SHEET' | 'TILE_SQM' | 'TILE_KGFT' | 'AIR_VENT' | 'SHEET_KGFT' | 'SHEET_WEIGHT' | 'POLYCARBONATE' | 'FLASHING' | 'RIDGE' | 'PROFILE_RIDGE' | 'GUTTER' | 'RIDGE_GUTTER' | 'FIXING';
 export type SteelItemKind =
   | 'PLATE'
   | 'CHEQUERED_PLATE'
@@ -97,7 +97,8 @@ export const POLY_THICKNESSES = ['1.5', '2', '3', '4', '6', '8', '10'];
 export const POLY_COLOURS = ['Clear', 'Bronze', 'Opal', 'Blue', 'Green', 'Grey'];
 export const FLASHING_ITEMS = ['L flashing', 'Ridge', 'Barge L flashing'];
 export const RIDGE_GUTTER_ITEMS = ['Ridge', 'Valley gutter', 'Gutter', 'End cap'];
-export const RIDGE_ITEMS = ['Ridge', 'Profile ridge'];
+export const RIDGE_ITEMS = ['Ridge'];
+export const AIR_VENT_BASES = ['Polycarbonate base', 'Aluminium base'];
 export const GUTTER_ITEMS = ['Gutter', 'Barge gutter'];
 export const RIDGE_GUTTER_SIZES = ['12x12', '18x18', '24 inch'];
 export const FLASHING_SIZES = ['6x6', '8x8', '1x1 ft', '18x18', '24'];
@@ -128,22 +129,90 @@ const SHEET_T = combo('t', 'Thickness', SHEET_THICKNESSES, { unit: 'mm' });
 const SHEET_WF = combo('wf', 'Width factor', ['1.06', '1.08'], { numeric: true });
 const mm = (t: number | string) => (f(t) ? `${f(t)} mm` : '');
 
+export const STEEL_BRANDS = ['Tata', 'JSW', 'SAIL', 'Jindal', 'Apollo', 'Madhav'];
+const STEEL_BRAND = combo('brand', 'Brand', STEEL_BRANDS);
+
+/** Steel types: sizes, then an optional Brand (put in front of the item name, e.g. "Tata MS Square Tube …"). */
 const steel = (label: string, category: string, fields: SteelSizeField[], compute: SteelSizeKindConfig['compute'], defaultLengthM = 6): SteelSizeKindConfig => ({
-  label, group: 'Steel', method: 'SECTION_WEIGHT', unit: 'Kgs', fields, defaultLengthM, category, compute,
+  label,
+  group: 'Steel',
+  method: 'SECTION_WEIGHT',
+  unit: 'Kgs',
+  fields: [...fields, STEEL_BRAND],
+  defaultLengthM,
+  category,
+  compute: (v) => {
+    const r = compute(v);
+    return 'error' in r ? r : { ...r, name: join(v.brand, r.name) };
+  },
 });
 
 export const RIDGE_SIZES = ['1x1 ft', '1.5x1.5 ft', '12x12', '18x18'];
 export const GUTTER_SIZES = ['18', '24', '30', '36'];
 
 /** A sheet-cut item (ridge, gutter): same boxes and pricing as flashing; the item is picked in the main dropdown. */
-function sheetCut(label: string, sizeLabel: string, sizes: string[]): SteelSizeKindConfig {
+/**
+ * Width a sheet-cut piece uses across the sheet, in inches, from the line's boxes:
+ * Side A + Side B (or one Girth box) in inches or feet. Older lines kept one "6x6" text box.
+ */
+export function sheetCutGirthInches(dims: Record<string, string>): number | null {
+  const a = Number(dims.a);
+  if (dims.a !== undefined && String(dims.a).trim() !== '') {
+    const b = dims.b !== undefined && String(dims.b).trim() !== '' ? Number(dims.b) : 0;
+    if (!(a > 0) || !(b >= 0)) return null;
+    return (a + b) * (dims.su === 'ft' ? 12 : 1);
+  }
+  return dims.size ? flashingGirthInches(dims.size) : null;
+}
+
+/** Older sheet-cut lines kept one size text ("6x6", "1x1 ft", "24"); split it into Side A / Side B / unit. */
+export function migrateSheetCutDims(shape: string, dims: Record<string, string>): Record<string, string> {
+  if (!isSheetCut(shape) || !dims.size || (dims.a !== undefined && String(dims.a).trim() !== '')) return dims;
+  const text = dims.size.toLowerCase();
+  const nums = (text.match(/\d+(\.\d+)?/g) || []).slice(0, 2);
+  if (!nums.length) return dims;
+  const inFeet = /ft|feet|'/.test(text) || nums.every((v) => Number(v) <= 3);
+  const { size: _old, ...rest } = dims; // eslint-disable-line @typescript-eslint/no-unused-vars
+  return { ...rest, a: nums[0], ...(nums[1] ? { b: nums[1] } : {}), su: inFeet ? 'ft' : 'in' };
+}
+
+/** "6 × 6 in", "1.5 × 1.5 ft", "24 in" for the item name. */
+function sheetCutSizeText(dims: Record<string, string>): string {
+  const unit = dims.su === 'ft' ? 'ft' : 'in';
+  if (dims.a !== undefined && String(dims.a).trim() !== '') {
+    return dims.b !== undefined && String(dims.b).trim() !== '' ? `${f(dims.a)} × ${f(dims.b)} ${unit}` : `${f(dims.a)} ${unit}`;
+  }
+  return f(dims.size ?? '').replace(/\s*x\s*/gi, ' × ');
+}
+
+/** Pieces per sheet from the line's boxes (see sheetCutGirthInches). */
+export function sheetCutPerSheet(dims: Record<string, string>): { girth: number; perSheet: number } | { error: string } {
+  const girth = sheetCutGirthInches(dims);
+  if (!girth) return { error: 'Enter the size.' };
+  const width = Number(dims.sheet || 48);
+  if (!(width > 0)) return { error: 'Enter the sheet width in inches, e.g. 48.' };
+  const perSheet = Math.floor(width / girth + 1e-9);
+  if (perSheet < 1) return { error: `A ${Number(girth.toFixed(2))} in piece is wider than the ${width} in sheet.` };
+  return { girth, perSheet };
+}
+
+const SIDE_UNIT = (def: 'in' | 'ft'): SteelSizeField => ({ key: 'su', label: 'Size in', short: 'Unit', kind: 'select', unit: '', options: ['in', 'ft'], default: def });
+
+/** A sheet-cut item (flashing, ridge, gutter): sizes, then the sheet; the item is picked in the main dropdown. */
+function sheetCut(label: string, sides: 'AB' | 'AB_optionalB', unitDefault: 'in' | 'ft'): SteelSizeKindConfig {
+  // Gutter: Side B can be left empty when only the girth is known
+  const sizeFields: SteelSizeField[] = [
+    { key: 'a', label: 'Side A', short: 'A', unit: '' },
+    { key: 'b', label: 'Side B', short: 'B', unit: '', optional: sides === 'AB_optionalB' },
+    SIDE_UNIT(unitDefault),
+  ];
   return {
     label,
     group: 'Accessories',
     method: 'SQM',
     unit: 'Sq.Mtr',
     fields: [
-      combo('size', sizeLabel, sizes, { optional: false }),
+      ...sizeFields,
       combo('sheet', 'Sheet width', ['48'], { unit: 'in', optional: false, numeric: true, default: '48' }),
       combo('wf', 'Width factor', ['1.08', '1.28'], { optional: false, numeric: true, default: '1.08' }),
       BRAND,
@@ -154,10 +223,11 @@ function sheetCut(label: string, sizeLabel: string, sizes: string[]): SteelSizeK
     lengthInFeet: true,
     sheetCut: true,
     category: 'Flashing',
-    compute: ({ item, size, sheet, brand, t }) => {
-      const cut = flashingPerSheet(String(size), Number(sheet));
+    compute: (v) => {
+      const dims = Object.fromEntries(Object.entries(v).map(([k, x]) => [k, String(x)]));
+      const cut = sheetCutPerSheet(dims);
       if ('error' in cut) return { error: cut.error };
-      return { name: join(brand, item, f(size).replace(/\s*x\s*/gi, ' × '), mm(t)), hsn: '72109090' };
+      return { name: join(v.brand, v.item, sheetCutSizeText(dims), mm(v.t)), hsn: '72109090' };
     },
   };
 }
@@ -176,6 +246,17 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
   },
   // RR's way: weight per sheet = length in feet × kg per foot (e.g. 126 in ÷ 12 × 1.24 = 13.02 kg).
   // Sold by weight like steel: kg/m = kg/ft ÷ 0.305, so length (m) × kg/m = length (ft) × kg/ft.
+  // Plain (flat) sheet: same Sq.Mtr formula as roofing sheet, no profile
+  PLAIN_SHEET: {
+    label: 'Plain sheet',
+    group: 'Sheets',
+    method: 'SQM',
+    unit: 'Sq.Mtr',
+    fields: [BRAND, SHEET_T, SHEET_WF, COLOUR],
+    defaultLengthM: 0,
+    category: 'Sheet',
+    compute: ({ brand, t }) => ({ name: join(brand, 'Plain sheet', mm(t)), hsn: '72109090' }),
+  },
   SHEET_KGFT: {
     label: 'Roofing sheet (by weight)',
     group: 'Sheets',
@@ -194,6 +275,61 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
     compute: ({ brand, profile, kgft }) => {
       if (n(kgft) >= 50) return { error: 'Weight per ft is in kg, e.g. 1.24.' };
       return { name: join(brand, profile) || 'Roofing sheet', hsn: '72109090', kgPerMetre: new Decimal(n(kgft)).dividedBy(FEET_TO_METRE) };
+    },
+  },
+  // UPVC sheet: same Sq.Mtr formula as roofing sheet
+  UPVC_SHEET: {
+    label: 'UPVC sheet',
+    group: 'Sheets',
+    method: 'SQM',
+    unit: 'Sq.Mtr',
+    fields: [BRAND, combo('t', 'Thickness', ['2', '2.5', '3'], { unit: 'mm' }), SHEET_WF, COLOUR],
+    defaultLengthM: 0,
+    category: 'Sheet',
+    compute: ({ brand, t }) => ({ name: join(brand, 'UPVC sheet', mm(t)), hsn: '39204900' }),
+  },
+  // Tile sheet: by Sq.Mtr (like roofing sheet) or by weight (length in ft × kg per foot)
+  TILE_SQM: {
+    label: 'Tile sheet (Sq.Mtr)',
+    group: 'Sheets',
+    method: 'SQM',
+    unit: 'Sq.Mtr',
+    fields: [BRAND, SHEET_T, SHEET_WF, COLOUR],
+    defaultLengthM: 0,
+    category: 'Sheet',
+    compute: ({ brand, t }) => ({ name: join(brand, 'Tile sheet', mm(t)), hsn: '72109090' }),
+  },
+  TILE_KGFT: {
+    label: 'Tile sheet (by weight)',
+    group: 'Sheets',
+    method: 'SECTION_WEIGHT',
+    unit: 'Kgs',
+    fields: [BRAND, combo('kgft', 'Weight per foot', ['1.24'], { unit: 'kg/ft', optional: false, numeric: true, default: '1.24' }), COLOUR],
+    defaultLengthM: 0,
+    lengthInFeet: true,
+    perFoot: true,
+    category: 'Sheet',
+    compute: ({ brand, kgft }) => {
+      if (n(kgft) >= 50) return { error: 'Weight per ft is in kg, e.g. 1.24.' };
+      return { name: join(brand, 'Tile sheet'), hsn: '72109090', kgPerMetre: new Decimal(n(kgft)).dividedBy(FEET_TO_METRE) };
+    },
+  },
+  // Air vent: priced per piece; the base is always one of the two
+  AIR_VENT: {
+    label: 'Air vent',
+    group: 'Accessories',
+    method: 'PIECE',
+    unit: 'Nos',
+    fields: [
+      { key: 'base', label: 'Base', short: 'Base', kind: 'select', unit: '', options: AIR_VENT_BASES, default: AIR_VENT_BASES[0] },
+      combo('size', 'Size', ['24 inch', '600 mm']),
+      BRAND,
+    ],
+    defaultLengthM: 0,
+    category: 'Air vent',
+    compute: ({ base, size, brand }) => {
+      if (!AIR_VENT_BASES.includes(String(base))) return { error: 'Choose the base: polycarbonate or aluminium.' };
+      return { name: `${join(brand, 'Air vent', size)} – ${String(base).toLowerCase()}`, hsn: '84145990' };
     },
   },
   // Earlier by-weight sheet (thickness × coil width × 7.968); no longer offered, older quotes still open
@@ -232,29 +368,7 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
   // Staff type the pieces in Nos; the sheets used are priced by area:
   // Sq.Mtr per sheet = sheet length (ft) × 0.305 × width factor (1.08), rounded down to 2 decimals, × sheets
   // e.g. 8 × 0.305 × 1.08 = 2.6352 → 2.63 a sheet; 3 sheets = 7.89
-  FLASHING: {
-    label: 'Flashing (cut from sheet)',
-    group: 'Accessories',
-    method: 'SQM',
-    unit: 'Sq.Mtr',
-    fields: [
-      combo('size', 'Size A × B (inches)', FLASHING_SIZES, { optional: false }),
-      combo('sheet', 'Sheet width', ['48'], { unit: 'in', optional: false, numeric: true, default: '48' }),
-      combo('wf', 'Width factor', ['1.08', '1.28'], { optional: false, numeric: true, default: '1.08' }),
-      BRAND,
-      SHEET_T,
-      COLOUR,
-    ],
-    defaultLengthM: 0,
-    lengthInFeet: true,
-    sheetCut: true,
-    category: 'Flashing',
-    compute: ({ item, size, sheet, brand, t }) => {
-      const cut = flashingPerSheet(String(size), Number(sheet));
-      if ('error' in cut) return { error: cut.error };
-      return { name: join(brand, item, f(size).replace(/\s*x\s*/gi, ' × '), mm(t)), hsn: '72109090' };
-    },
-  },
+  FLASHING: sheetCut('Flashing (cut from sheet)', 'AB', 'in'),
   // Earlier combined type; no longer offered, older quotes still open
   RIDGE_GUTTER: {
     label: 'Ridge / gutter',
@@ -278,8 +392,20 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
   },
   // Ridge and gutter are cut from the same 8 ft × 4 ft sheet as flashing:
   // pieces per sheet = 48 in ÷ width used (1 × 1 ft ridge → 2; 1.5 × 1.5 ft → 1; gutter over 24 in → 1)
-  RIDGE: sheetCut('Ridge', 'Size A × B (inches)', RIDGE_SIZES),
-  GUTTER: sheetCut('Gutter', 'Girth (inches)', GUTTER_SIZES),
+  RIDGE: sheetCut('Ridge', 'AB', 'ft'),
+  GUTTER: sheetCut('Gutter', 'AB_optionalB', 'in'),
+  // Profile ridge: priced on the length of the sheet only (no A × B, not cut from the 48 in sheet)
+  PROFILE_RIDGE: {
+    label: 'Profile ridge',
+    group: 'Accessories',
+    method: 'SQM',
+    unit: 'Sq.Mtr',
+    fields: [SHEET_WF, BRAND, SHEET_T, COLOUR],
+    defaultLengthM: 0,
+    lengthInFeet: true,
+    category: 'Flashing',
+    compute: ({ brand, t }) => ({ name: join(brand, 'Profile ridge', mm(t)), hsn: '72109090' }),
+  },
   FIXING: {
     label: 'Screws & fixings',
     group: 'Accessories',
@@ -364,10 +490,11 @@ const presets = (kind: SteelSizeKind): ItemOption[] =>
 
 /** The main dropdown, grouped. */
 export const ITEM_GROUPS: { group: string; options: ItemOption[] }[] = [
-  { group: 'Sheets', options: (['SHEET_SQM', 'SHEET_KGFT', 'POLYCARBONATE'] as SteelSizeKind[]).map(opt) },
+  { group: 'Sheets', options: (['SHEET_SQM', 'PLAIN_SHEET', 'SHEET_KGFT', 'POLYCARBONATE', 'UPVC_SHEET', 'TILE_SQM', 'TILE_KGFT'] as SteelSizeKind[]).map(opt) },
   { group: 'Flashing (cut from sheet)', options: presets('FLASHING') },
-  { group: 'Ridge (cut from sheet)', options: presets('RIDGE') },
+  { group: 'Ridge', options: [...presets('RIDGE'), opt('PROFILE_RIDGE')] },
   { group: 'Gutter (cut from sheet)', options: presets('GUTTER') },
+  { group: 'Air vent', options: [opt('AIR_VENT')] },
   { group: 'Fixings', options: [opt('FIXING')] },
   {
     group: 'Steel',
@@ -459,6 +586,7 @@ export type SteelSizeResult =
   | { ok: false; error: string; missing?: boolean };
 
 export function parseSteelSize(input: SteelSizeInput): SteelSizeResult {
+  input = { ...input, dims: migrateSheetCutDims(input.shape, input.dims || {}) };
   const cfg = STEEL_SIZE_KINDS[input.shape];
   if (!cfg) return { ok: false, error: 'Pick the item type.' };
   const text = (k: string) => String(input.dims?.[k] ?? '').trim();
