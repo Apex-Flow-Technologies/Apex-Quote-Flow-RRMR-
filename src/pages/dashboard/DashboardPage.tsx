@@ -93,7 +93,7 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end lg:items-center sm:justify-between gap-4 lg:min-h-[244px] lg:-mt-1">
         <div>
           <p className="text-[13px] text-muted">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}

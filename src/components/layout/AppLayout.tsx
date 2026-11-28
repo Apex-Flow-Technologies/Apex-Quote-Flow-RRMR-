@@ -154,7 +154,10 @@ export const AppLayout: React.FC = () => {
   );
 
   return (
-    <div className="app-canvas min-h-dvh text-ink font-sans lg:flex">
+    <div
+      className="app-canvas min-h-dvh text-ink font-sans lg:flex"
+      style={{ '--sidebar-w': collapsed ? '72px' : '248px' } as React.CSSProperties}
+    >
       <FrameBackdrop />
       {/* ── Desktop sidebar (collapsible) ───────────────────────────── */}
       <aside

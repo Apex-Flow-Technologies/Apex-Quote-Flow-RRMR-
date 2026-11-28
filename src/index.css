@@ -415,21 +415,37 @@ body {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.35) 30%, #000 65%);
-  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.35) 30%, #000 65%);
+  transition: left 220ms var(--ease-out-soft);
 }
+/* Desktop: start where the content starts, so the building is centred in the content area */
+@media (min-width: 1024px) {
+  .frame-backdrop {
+    left: var(--sidebar-w, 248px);
+  }
+}
+/* The 3D layer is a band at the top of the page (centred on the dashboard's header band),
+   fading out on every side so the ground grid never shows a hard edge */
 .frame-layer {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: calc(var(--frame-cy, 158px) - 200px);
+  height: 400px;
   opacity: 0;
   transition: opacity 1400ms var(--ease-out-soft);
+  -webkit-mask-image: radial-gradient(ellipse 34% 50% at 50% 50%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 34% 50% at 50% 50%, #000 55%, transparent 100%);
 }
 .frame-layer.frame-ready {
   opacity: 1;
 }
 /* Phones / no WebGL: a faint drafting grid */
 .frame-layer.frame-static {
+  inset: 0;
+  height: auto;
   opacity: 1;
+  -webkit-mask-image: linear-gradient(180deg, #000 0, transparent 420px);
+  mask-image: linear-gradient(180deg, #000 0, transparent 420px);
   background-image:
     linear-gradient(rgba(37, 99, 235, 0.06) 1px, transparent 1px),
     linear-gradient(90deg, rgba(37, 99, 235, 0.06) 1px, transparent 1px);

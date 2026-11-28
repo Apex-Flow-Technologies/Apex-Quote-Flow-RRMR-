@@ -15,7 +15,7 @@ export const FrameBackdrop: React.FC = () => {
   const [mode, setMode] = useState<'webgl' | 'static'>('static');
 
   useEffect(() => {
-    const wide = window.matchMedia('(min-width: 768px)').matches;
+    const wide = window.matchMedia('(min-width: 1024px)').matches;
     const test = document.createElement('canvas');
     const hasWebGL = Boolean(test.getContext('webgl2') || test.getContext('webgl'));
     if (wide && hasWebGL) setMode('webgl');
@@ -109,11 +109,11 @@ export const FrameBackdrop: React.FC = () => {
         renderer.domElement.style.width = `${w}px`;
         renderer.domElement.style.height = `${h}px`;
         camera.aspect = w / Math.max(h, 1);
-        // Building sits on the right half of the screen, a little below the page heading
-        const aspect = w / Math.max(h, 1);
-        camera.position.set(0, 9, 30);
+        // The canvas is a fixed-height band over the content area, so the building stays
+        // the same size on any screen and sits centred between the page title and buttons
+        camera.position.set(0, 12, 40);
         camera.lookAt(0, 0, 0);
-        model.position.set(Math.min(7.5, aspect * 3.4), 1.2, 0);
+        model.position.set(0, -1.6, 0);
         camera.updateProjectionMatrix();
       };
       resize();
