@@ -6,7 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
  * turning very slowly like a model on an engineer's screen.
  *
  * - three.js is loaded lazily on idle, as its own chunk, so the app never waits for it.
- * - ~30 fps, capped pixel ratio, paused while the tab is hidden.
+ * - Display frame rate, capped pixel ratio, paused while the tab is hidden.
  * - "Reduce motion": one still frame. Phones / no WebGL: a faint drafting grid instead.
  * - Behind all content (z-index -1), never printed.
  */
@@ -126,11 +126,8 @@ export const FrameBackdrop: React.FC = () => {
       };
 
       let raf = 0;
-      let last = 0;
       const loop = (t: number) => {
         raf = requestAnimationFrame(loop);
-        if (t - last < 33) return;
-        last = t;
         draw(t);
       };
       const onVisibility = () => {

@@ -182,6 +182,9 @@
    transform behind, or fixed popups inside the page get trapped under the header. */
 :root {
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Sidebar fold: one curve and duration shared by the width, labels and backdrop */
+  --sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --sidebar-dur: 300ms;
 }
 
 @keyframes rr-fade-in {
@@ -415,12 +418,12 @@ body {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  transition: left 220ms var(--ease-out-soft);
 }
-/* Desktop: start where the content starts, so the building is centred in the content area */
+/* Desktop: shift the drawing by half the sidebar so it is centred in the content area.
+   A transform (not a resize) so folding the sidebar glides it without re-rendering the canvas. */
 @media (min-width: 1024px) {
-  .frame-backdrop {
-    left: var(--sidebar-w, 248px);
+  .frame-layer:not(.frame-static) {
+    transform: translateX(calc(var(--sidebar-w, 248px) / 2));
   }
 }
 /* The 3D layer is a band at the top of the page (centred on the dashboard's header band),
@@ -432,7 +435,7 @@ body {
   top: calc(var(--frame-cy, 158px) - 200px);
   height: 400px;
   opacity: 0;
-  transition: opacity 1400ms var(--ease-out-soft);
+  transition: opacity 1400ms var(--ease-out-soft), transform var(--sidebar-dur) var(--sidebar-ease);
   -webkit-mask-image: radial-gradient(ellipse 34% 50% at 50% 50%, #000 55%, transparent 100%);
   mask-image: radial-gradient(ellipse 34% 50% at 50% 50%, #000 55%, transparent 100%);
 }
@@ -458,6 +461,48 @@ body {
 }
 
 .sidebar {
-  transition: width 220ms var(--ease-out-soft);
+  transition: width var(--sidebar-dur) var(--sidebar-ease);
   overflow: hidden;
+}
+/* Labels fade (and drift a touch) instead of popping; on expand they wait for some room first */
+.sidebar .side-label {
+  transition: opacity 180ms ease 90ms, transform var(--sidebar-dur) var(--sidebar-ease);
+}
+.sidebar[data-collapsed='true'] .side-label {
+  opacity: 0;
+  transform: translateX(-6px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform var(--sidebar-dur) var(--sidebar-ease);
+}
+/* New quotation: the button narrows to a square and the label folds away, so the + glides to centre */
+.sidebar .side-cta {
+  width: 100%;
+  transition: width var(--sidebar-dur) var(--sidebar-ease);
+}
+.sidebar .side-cta-label {
+  max-width: 140px;
+  margin-left: 8px;
+  transition: max-width var(--sidebar-dur) var(--sidebar-ease), margin-left var(--sidebar-dur) var(--sidebar-ease), opacity 180ms ease 90ms;
+}
+.sidebar[data-collapsed='true'] .side-cta {
+  width: 48px;
+}
+.sidebar[data-collapsed='true'] .side-cta-label {
+  max-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  transition: max-width var(--sidebar-dur) var(--sidebar-ease), margin-left var(--sidebar-dur) var(--sidebar-ease), opacity 120ms ease;
+}
+/* Footer swaps between the user card and the icon stack: a quick fade so it does not blink */
+.sidebar .side-swap {
+  animation: rr-fade-in 200ms ease 80ms backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar .side-label,
+  .sidebar .side-cta,
+  .sidebar .side-cta-label,
+  .frame-layer {
+    transition: none !important;
+  }
 }

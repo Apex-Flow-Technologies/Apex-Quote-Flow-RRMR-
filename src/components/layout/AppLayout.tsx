@@ -115,7 +115,7 @@ export const AppLayout: React.FC = () => {
   const initial = userName.charAt(0).toUpperCase();
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `nav-item group flex items-center gap-3 h-10 px-3 rounded-[10px] text-[13.5px] font-medium ${
+    `nav-item group flex items-center gap-3 h-10 px-[15px] rounded-[10px] text-[13.5px] font-medium ${
       isActive ? 'nav-item-active' : 'text-muted hover:text-ink hover:bg-ink/[0.04]'
     }`;
 
@@ -164,48 +164,45 @@ export const AppLayout: React.FC = () => {
         className={`sidebar hidden lg:flex no-print shrink-0 h-dvh sticky top-0 flex-col bg-white border-r border-line ${
           collapsed ? 'w-[72px]' : 'w-[248px]'
         }`}
+        data-collapsed={collapsed ? 'true' : 'false'}
         aria-label="Sidebar"
       >
-        <div className={`h-16 flex items-center ${collapsed ? 'justify-center px-0' : 'px-4 gap-3'}`}>
+        {/* Everything keeps its left edge while the width animates; only the labels fade */}
+        <div className="h-16 flex items-center px-[18px] gap-3">
           <Link to="/app" className="flex items-center gap-3 min-w-0" title="RR Metal Roofing">
             <BrandMark />
-            {!collapsed && (
-              <div className="min-w-0">
-                <div className="font-display font-bold text-[15px] text-ink leading-tight truncate">RR Metal Roofing</div>
-                <div className="text-[11.5px] text-muted leading-tight">Quotations &amp; billing</div>
-              </div>
-            )}
+            <div className="side-label min-w-0" aria-hidden={collapsed}>
+              <div className="font-display font-bold text-[15px] text-ink leading-tight truncate">RR Metal Roofing</div>
+              <div className="text-[11.5px] text-muted leading-tight whitespace-nowrap">Quotations &amp; billing</div>
+            </div>
           </Link>
-          {!collapsed && (
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              className="ml-auto w-8 h-8 rounded-[8px] flex items-center justify-center text-faint hover:text-ink hover:bg-ink/[0.05]"
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-            >
-              <PanelLeftClose className="w-[18px] h-[18px]" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            tabIndex={collapsed ? -1 : 0}
+            className="side-label ml-auto w-8 h-8 rounded-[8px] flex items-center justify-center text-faint hover:text-ink hover:bg-ink/[0.05] shrink-0"
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+            aria-hidden={collapsed}
+          >
+            <PanelLeftClose className="w-[18px] h-[18px]" />
+          </button>
         </div>
 
-        <div className={collapsed ? 'px-3 pt-1 pb-3' : 'px-4 pt-1 pb-4'}>
-          {collapsed ? (
-            <Link
-              to="/app/quotations"
-              state={{ newQuote: true }}
-              className="btn-primary w-12 h-10 mx-auto flex items-center justify-center rounded-[10px] text-white"
-              title="New quotation"
-              aria-label="New quotation"
-            >
-              <Plus className="w-[18px] h-[18px]" />
-            </Link>
-          ) : (
-            newQuote
-          )}
+        <div className="px-3 pt-1 pb-4">
+          <Link
+            to="/app/quotations"
+            state={{ newQuote: true }}
+            className="side-cta btn-primary h-10 flex items-center justify-center rounded-[10px] text-[13.5px] font-semibold text-white overflow-hidden"
+            title={collapsed ? 'New quotation' : undefined}
+            aria-label="New quotation"
+          >
+            <Plus className="w-[18px] h-[18px] shrink-0" />
+            <span className="side-cta-label whitespace-nowrap">New quotation</span>
+          </Link>
         </div>
 
-        <nav className="px-3 flex-1 space-y-0.5 overflow-y-auto" aria-label="Main">
+        <nav className="px-3 flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden" aria-label="Main">
           {navItems.map(({ to, label, end, icon: Icon }) => (
             <NavLink
               key={to}
@@ -213,17 +210,17 @@ export const AppLayout: React.FC = () => {
               end={end}
               title={collapsed ? label : undefined}
               aria-label={collapsed ? label : undefined}
-              className={(st) => `${navLinkClass(st)} ${collapsed ? 'justify-center px-0' : ''}`}
+              className={(st) => navLinkClass(st)}
             >
               <Icon className="nav-icon w-[18px] h-[18px] shrink-0" strokeWidth={1.9} />
-              {!collapsed && <span className="truncate">{label}</span>}
+              <span className="side-label truncate">{label}</span>
             </NavLink>
           ))}
         </nav>
 
         <div className="p-3 border-t border-line">
           {collapsed ? (
-            <div className="flex flex-col items-center gap-1">
+            <div className="side-swap flex flex-col items-center gap-1">
               <button
                 type="button"
                 onClick={toggleCollapsed}
@@ -250,7 +247,7 @@ export const AppLayout: React.FC = () => {
               </button>
             </div>
           ) : (
-            userCard
+            <div className="side-swap">{userCard}</div>
           )}
         </div>
       </aside>
