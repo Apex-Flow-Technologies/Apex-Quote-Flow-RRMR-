@@ -160,7 +160,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <option value="PIECE">Per piece (Fixed Nos rate)</option>
                     <option value="CUSTOM">Custom line / Service charge</option>
                     <option value="SHEET_WEIGHT">Sheet · by weight (Thickness × Coil Width)</option>
-                    <option value="SECTION_WEIGHT">Steel / Pipe · by weight (kg per metre)</option>
+                    <option value="SECTION_WEIGHT">Steel / Tube · by weight (kg per metre)</option>
                     <option value="AREA">By area (Sq.Mtr)</option>
                     <option value="RUNNING_LENGTH">By running metre (R.Mtr)</option>
                     <option value="LENGTH_FT">By feet (Ft)</option>
@@ -208,7 +208,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     type="text"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="e.g. Crimp, Coloron, Pipe, Fixing"
+                    placeholder="e.g. Crimp, Coloron, Tube, Fixing"
                     className="w-full py-1.5 px-3 rounded-control border border-line-strong focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand text-ink font-medium"
                   />
                 </div>

@@ -200,7 +200,7 @@ export function validateProductForm(formData: ProductFormData): Record<string, s
     checkDefaultLength();
   } else if (formData.qtyMethod === 'SECTION_WEIGHT') {
     checkDefaultLength();
-    positive(formData.kgPerMetre, 'kgPerMetre', 'Weight per metre is required for pipe calculation',
+    positive(formData.kgPerMetre, 'kgPerMetre', 'Weight per metre is required for tube calculation',
       'Weight per metre must be greater than 0 kg/m', 'Invalid weight per metre number');
   }
 

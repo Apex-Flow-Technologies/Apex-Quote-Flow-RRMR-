@@ -4,7 +4,7 @@
  * out kg per metre, builds a one-off steel product for the line, and it is sold by weight:
  * kg = length (m) × kg/m × Nos. Nothing needs to be pre-loaded in Products.
  *
- * Formulas: mild steel 7.85 g/cm³ (0.00785 kg per metre per mm²). Pipes follow IS 4923 /
+ * Formulas: mild steel 7.85 g/cm³ (0.00785 kg per metre per mm²). Tubes follow IS 4923 /
  * IS 1161 (see engine/steel.ts). Angles use RR's weight card when the size is on it,
  * otherwise t × (A + B − t) × 0.00785. Channels and beams are picked from RR's weight card.
  */
@@ -77,35 +77,35 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
     },
   },
   ROUND_PIPE: {
-    label: 'Round pipe',
+    label: 'Round tube',
     fields: [{ key: 'd', label: 'Outside dia (OD)', short: 'OD' }, T],
     defaultLengthM: 6,
-    category: 'Pipe',
+    category: 'Tube',
     compute: ({ d, t }) => {
       if (n(t) * 2 >= n(d)) return { error: 'The thickness is too large for this OD.' };
-      return { kgPerMetre: engine('ROUND_PIPE', { odMm: n(d), thicknessMm: n(t) })!, name: `MS Round Pipe ${f(d)} OD × ${f(t)} mm`, hsn: '73063090' };
+      return { kgPerMetre: engine('ROUND_PIPE', { odMm: n(d), thicknessMm: n(t) })!, name: `MS Round Tube ${f(d)} OD × ${f(t)} mm`, hsn: '73063090' };
     },
   },
   SQUARE_PIPE: {
-    label: 'Square pipe',
+    label: 'Square tube',
     fields: [{ key: 'a', label: 'Side', short: 'A' }, T],
     defaultLengthM: 6,
-    category: 'Pipe',
+    category: 'Tube',
     compute: ({ a, t }) => {
       const kg = engine('SQUARE_PIPE', { sideMm: n(a), thicknessMm: n(t) });
       if (!kg) return { error: 'The thickness is too large for this size.' };
-      return { kgPerMetre: kg, name: `MS Square Pipe ${f(a)} × ${f(a)} × ${f(t)} mm`, hsn: '73066100' };
+      return { kgPerMetre: kg, name: `MS Square Tube ${f(a)} × ${f(a)} × ${f(t)} mm`, hsn: '73066100' };
     },
   },
   RECT_PIPE: {
-    label: 'Rectangular pipe',
+    label: 'Rectangular tube',
     fields: [{ key: 'a', label: 'Width', short: 'A' }, { key: 'b', label: 'Height', short: 'B' }, T],
     defaultLengthM: 6,
-    category: 'Pipe',
+    category: 'Tube',
     compute: ({ a, b, t }) => {
       const kg = engine('RECT_PIPE', { widthMm: n(a), heightMm: n(b), thicknessMm: n(t) });
       if (!kg) return { error: 'The thickness is too large for this size.' };
-      return { kgPerMetre: kg, name: `MS Rectangular Pipe ${f(a)} × ${f(b)} × ${f(t)} mm`, hsn: '73066100' };
+      return { kgPerMetre: kg, name: `MS Rectangular Tube ${f(a)} × ${f(b)} × ${f(t)} mm`, hsn: '73066100' };
     },
   },
   ROUND_BAR: {

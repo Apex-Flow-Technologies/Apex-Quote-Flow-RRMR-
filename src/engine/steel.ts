@@ -37,9 +37,9 @@ export const DEFAULT_STEEL_LENGTH_M = 6;
 export const DEFAULT_CHEQUERED_PLATE_LENGTH_M = 2.5;
 
 export const STEEL_SHAPE_LABELS: Record<SteelShape, string> = {
-  ROUND_PIPE: 'Round pipe (CHS)',
-  SQUARE_PIPE: 'Square pipe (SHS)',
-  RECT_PIPE: 'Rectangular pipe (RHS)',
+  ROUND_PIPE: 'Round tube (CHS)',
+  SQUARE_PIPE: 'Square tube (SHS)',
+  RECT_PIPE: 'Rectangular tube (RHS)',
   PLATE: 'MS plate',
   CHEQUERED_PLATE: 'Chequered plate',
   FLAT: 'MS flat',

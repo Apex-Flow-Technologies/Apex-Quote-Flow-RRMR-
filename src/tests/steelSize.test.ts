@@ -10,10 +10,10 @@ const kg = (shape: SteelSizeKind, dims: Record<string, string>) => {
 
 describe('Steel by size: weight per metre for each type', () => {
   const cases: [SteelSizeKind, Record<string, string>, number, string][] = [
-    ['SQUARE_PIPE', { a: '40', t: '1.3' }, 1.546, 'MS Square Pipe 40 × 40 × 1.3 mm'],
-    ['SQUARE_PIPE', { a: '60', t: '3.2' }, 5.5, 'MS Square Pipe 60 × 60 × 3.2 mm'],
-    ['RECT_PIPE', { a: '80', b: '40', t: '3' }, 5.187, 'MS Rectangular Pipe 80 × 40 × 3 mm'],
-    ['ROUND_PIPE', { d: '21.3', t: '2' }, 0.952, 'MS Round Pipe 21.3 OD × 2 mm'], // Maiak-M shows 0.95
+    ['SQUARE_PIPE', { a: '40', t: '1.3' }, 1.546, 'MS Square Tube 40 × 40 × 1.3 mm'],
+    ['SQUARE_PIPE', { a: '60', t: '3.2' }, 5.5, 'MS Square Tube 60 × 60 × 3.2 mm'],
+    ['RECT_PIPE', { a: '80', b: '40', t: '3' }, 5.187, 'MS Rectangular Tube 80 × 40 × 3 mm'],
+    ['ROUND_PIPE', { d: '21.3', t: '2' }, 0.952, 'MS Round Tube 21.3 OD × 2 mm'], // Maiak-M shows 0.95
     ['PLATE', { t: '5', w: '1250' }, 49.063, 'MS Plate 5 mm (1250 wide)'],
     ['CHEQUERED_PLATE', { t: '6', w: '1250' }, 65.375, 'Chequered Plate 6 mm (1250 wide)'], // RR card 52.3 kg/m²
     ['CHEQUERED_PLATE', { t: '8', w: '1250' }, 78.5, 'Chequered Plate 8 mm (1250 wide)'], // not on the card: formula
