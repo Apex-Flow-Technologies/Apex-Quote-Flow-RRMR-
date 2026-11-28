@@ -25,7 +25,7 @@ import type {
 } from '../../types/quotation';
 import {
   EditableQuotationTable,
-  createInitialRow,
+  createSteelSizeRow,
   computeRowCalculation,
   rowFromSavedLine,
   type EditableRowState,
@@ -85,7 +85,7 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   const initialRows = (): EditableRowState[] =>
     source && source.quotation.lines.length > 0
       ? source.quotation.lines.map((l) => rowFromSavedLine(l))
-      : [createInitialRow()];
+      : [createSteelSizeRow()];
 
   // Master Data
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -318,14 +318,18 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   }, [customers, customerSearch]);
 
   // Row Management
+  // New lines are picked by type; a new line starts as the same type as the line above it
   const handleAddRow = () => {
-    setRows((prev) => [...prev, createInitialRow()]);
+    setRows((prev) => {
+      const lastType = [...prev].reverse().find((r) => r.steelSize)?.steelSize?.shape;
+      return [...prev, createSteelSizeRow(lastType)];
+    });
   };
 
   const handleRemoveRow = (id: string) => {
     setRows((prev) => {
       const next = prev.filter((r) => r.id !== id);
-      return next.length === 0 ? [createInitialRow()] : next;
+      return next.length === 0 ? [createSteelSizeRow()] : next;
     });
   };
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getQuotations, getQuotationsFromDevice } from '../../services/quotationService';
-import { getCustomersCached, getProductsCached } from '../../services/masterDataCache';
+import { getCustomersCached } from '../../services/masterDataCache';
 import type { Quotation } from '../../types/quotation';
 import { QuotationPreviewModal, StatusPill } from '../quotations/QuotationPreviewModal';
 import { Plus, ArrowRight } from 'lucide-react';
@@ -20,7 +20,6 @@ export const DashboardPage: React.FC = () => {
 
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [customerCount, setCustomerCount] = useState<number | null>(null);
-  const [activeProductCount, setActiveProductCount] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [previewQuotation, setPreviewQuotation] = useState<Quotation | null>(null);
 
@@ -43,8 +42,6 @@ export const DashboardPage: React.FC = () => {
       }
     })();
     getCustomersCached((c) => alive && setCustomerCount(c.length)).then((c) => alive && setCustomerCount(c.length)).catch(() => {});
-    const countActive = (p: { active?: boolean }[]) => p.filter((x) => x.active !== false).length;
-    getProductsCached((p) => alive && setActiveProductCount(countActive(p))).then((p) => alive && setActiveProductCount(countActive(p))).catch(() => {});
     return () => {
       alive = false;
     };
@@ -105,10 +102,7 @@ export const DashboardPage: React.FC = () => {
             <Link to="/app/customers" className="hover:text-ink">
               <span className="tabular-nums font-semibold text-ink">{customerCount ?? '…'}</span> customers
             </Link>
-            <span className="text-line-strong">·</span>
-            <Link to="/app/products" className="hover:text-ink">
-              <span className="tabular-nums font-semibold text-ink">{activeProductCount ?? '…'}</span> products
-            </Link>
+            
           </div>
           <Link
             to="/app/quotations"

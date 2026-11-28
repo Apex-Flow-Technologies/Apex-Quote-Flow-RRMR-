@@ -7,7 +7,6 @@ import {
   X,
   LayoutDashboard,
   FileText,
-  Package,
   Users,
   Building2,
   UserCog,
@@ -105,7 +104,7 @@ export const AppLayout: React.FC = () => {
     { to: '/app', label: 'Dashboard', end: true, icon: LayoutDashboard },
     { to: '/app/quotations', label: 'Quotations', icon: FileText },
     { to: '/app/customers', label: 'Customers', icon: Users },
-    { to: '/app/products', label: 'Products', adminOnly: true, icon: Package },
+    // Products is hidden: quotes are built by item type now (the page still opens at /app/products)
     { to: '/app/settings', label: 'Company settings', adminOnly: true, icon: Building2 },
     { to: '/app/users', label: 'Users', adminOnly: true, icon: UserCog },
   ].filter((item) => !item.adminOnly || isAdmin);

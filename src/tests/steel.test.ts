@@ -77,13 +77,13 @@ describe('Steel quotation line — everything billed in Kgs', () => {
     gstRate: 18,
   });
 
-  it('6 m × 10 nos of 60×60×3.2 → 334.1 kg', () => {
+  it('6 m × 10 nos of 60×60×3.2 → 334.14 kg (rounded once)', () => {
     const kgm = calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 60, thicknessMm: 3.2 })!;
     const line = calculateQuotationLine({ snapshot: snapshot(kgm), length: { metres: 6 }, nos: 10 }, 'intra');
     expect(line.unit).toBe('Kgs');
     expect(line.perPieceQuantity).toBe(33.41);
-    expect(line.quantity).toBe(334.1);
-    expect(line.taxableAmount).toBeCloseTo(334.1 * 68, 2);
+    expect(line.quantity).toBe(334.14);
+    expect(line.taxableAmount).toBeCloseTo(334.14 * 68, 2);
   });
 
   it('chequered plate 1250 × 5 at 2.5 m × 4 nos → plate kg = L × W × t × 7.85', () => {
@@ -91,6 +91,6 @@ describe('Steel quotation line — everything billed in Kgs', () => {
     const line = calculateQuotationLine({ snapshot: snapshot(kgm), length: { metres: 2.5 }, nos: 4 }, 'intra');
     // 2.5 × 1.25 × 5 × 7.85 = 122.66 kg per plate
     expect(line.perPieceQuantity).toBeCloseTo(122.66, 2);
-    expect(line.quantity).toBeCloseTo(490.64, 2);
+    expect(line.quantity).toBeCloseTo(490.63, 2);
   });
 });

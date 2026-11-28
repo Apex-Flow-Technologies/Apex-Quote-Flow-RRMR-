@@ -6,7 +6,7 @@ import type { Product, QuantityMethod, ProductUnit } from '../../types/product';
 import type { QuotationLine, QuotationLineSnapshot } from '../../types/quotation';
 import { calculateQuotationLine, validateLineDraft, type TaxMode, type LengthUnit } from '../../engine';
 import { Decimal } from 'decimal.js';
-import { steelSizeProduct, parseSteelSize, legacySteelSizeDims, STEEL_SIZE_KINDS, type SteelSizeInput, type SteelSizeKind } from './steelSize';
+import { steelSizeProduct, parseSteelSize, legacySteelSizeDims, defaultDims, kindHasColour, STEEL_SIZE_KINDS, type SteelSizeInput, type SteelSizeKind } from './steelSize';
 
 export type RowLengthUnit = 'ft_in' | 'metres' | 'ft' | 'in' | 'mm' | 'm';
 
@@ -41,16 +41,103 @@ export interface EditableRowState {
 }
 
 /** A new "Steel by size" line: 6 m lengths, size still to be typed. */
-export function createSteelSizeRow(shape: SteelSizeKind = 'SQUARE_PIPE'): EditableRowState {
-  const base = createInitialRow();
-  return { ...base, steelSize: { shape, dims: {} }, lengthUnit: 'metres', lengthMetres: String(STEEL_SIZE_KINDS[shape].defaultLengthM) };
+/** What a line needs when its item type is picked or changed: default boxes and length entry. */
+export function itemTypeReset(shape: SteelSizeKind): Partial<EditableRowState> {
+  const cfg = STEEL_SIZE_KINDS[shape];
+  const steel = cfg.method === 'SECTION_WEIGHT';
+  return {
+    steelSize: { shape, dims: defaultDims(shape) },
+    lengthUnit: steel ? 'metres' : 'ft_in',
+    lengthMetres: steel ? String(cfg.defaultLengthM) : '6',
+    lengthValue: '',
+    isManualQuantity: false,
+    manualQuantity: '',
+    colour: '',
+  };
 }
 
-/** Rebuilds the line's one-off steel product after the size or shape changes. */
+/** Steel lengths can be typed in m, mm, ft, in or ft + in. */
+export const STEEL_LENGTH_UNITS: { value: RowLengthUnit; label: string }[] = [
+  { value: 'metres', label: 'm' },
+  { value: 'mm', label: 'mm' },
+  { value: 'ft', label: 'ft' },
+  { value: 'in', label: 'in' },
+  { value: 'ft_in', label: 'ft + in' },
+];
+
+/** The steel line's length in metres as typed (null if nothing usable is typed). */
+export function steelLengthMetres(row: EditableRowState, feetToMetre = 0.305): number | null {
+  const num = (v?: string) => (v !== undefined && v.trim() !== '' && isFinite(Number(v)) ? Number(v) : null);
+  const f = new Decimal(feetToMetre || 0.305);
+  switch (row.lengthUnit) {
+    case 'metres': {
+      const v = num(row.lengthMetres);
+      return v;
+    }
+    case 'mm': {
+      const v = num(row.lengthValue);
+      return v === null ? null : new Decimal(v).dividedBy(1000).toNumber();
+    }
+    case 'ft': {
+      const v = num(row.lengthValue);
+      return v === null ? null : f.times(v).toNumber();
+    }
+    case 'in': {
+      const v = num(row.lengthValue);
+      return v === null ? null : f.times(v).dividedBy(12).toNumber();
+    }
+    case 'ft_in': {
+      const ft = num(row.lengthFeet) ?? 0;
+      const inch = num(row.lengthInches) ?? 0;
+      return ft === 0 && inch === 0 ? null : f.times(new Decimal(ft).plus(new Decimal(inch).dividedBy(12))).toNumber();
+    }
+    default:
+      return null;
+  }
+}
+
+/** Switch a steel line's length unit, keeping the same length (e.g. 6 m → 6000 mm). */
+export function switchSteelLengthUnit(row: EditableRowState, unit: RowLengthUnit, feetToMetre = 0.305): Partial<EditableRowState> {
+  const m = steelLengthMetres(row, feetToMetre);
+  if (m === null) return { lengthUnit: unit };
+  const metres = new Decimal(m);
+  const feet = metres.dividedBy(feetToMetre || 0.305);
+  const tidy = (d: Decimal, dp: number) => String(Number(d.toDecimalPlaces(dp, Decimal.ROUND_HALF_UP).toString()));
+  switch (unit) {
+    case 'metres':
+      return { lengthUnit: unit, lengthMetres: tidy(metres, 3) };
+    case 'mm':
+      return { lengthUnit: unit, lengthValue: tidy(metres.times(1000), 1) };
+    case 'ft':
+      return { lengthUnit: unit, lengthValue: tidy(feet, 2) };
+    case 'in':
+      return { lengthUnit: unit, lengthValue: tidy(feet.times(12), 1) };
+    case 'ft_in': {
+      const whole = feet.floor();
+      return { lengthUnit: unit, lengthFeet: whole.toString(), lengthInches: tidy(feet.minus(whole).times(12), 1) };
+    }
+    default:
+      return { lengthUnit: unit };
+  }
+}
+
+/** A new line by item type (sheet, accessory or steel), boxes still to fill. */
+export function createSteelSizeRow(shape: SteelSizeKind = 'SHEET_SQM'): EditableRowState {
+  return { ...createInitialRow(), ...itemTypeReset(shape) };
+}
+
+/** The line's quantity method: from its product, or from its item type before the boxes are filled. */
+export function rowMethod(row: Pick<EditableRowState, 'product' | 'steelSize'>): QuantityMethod | undefined {
+  if (row.product) return row.product.qtyMethod as QuantityMethod;
+  return row.steelSize ? STEEL_SIZE_KINDS[row.steelSize.shape]?.method : undefined;
+}
+
+/** Rebuilds the line's one-off product after a box or the type changes. */
 export function applySteelSize(row: EditableRowState): EditableRowState {
   if (!row.steelSize) return row;
   const product = steelSizeProduct(row.steelSize, row.id, row.product?.gstRate ?? 18);
-  return { ...row, product, productSearch: product ? product.name : '' };
+  const colour = kindHasColour(row.steelSize.shape) ? (row.steelSize.dims.colour ?? '') : row.colour;
+  return { ...row, product, productSearch: product ? product.name : '', colour };
 }
 
 /** Methods whose quantity comes from a feet + inches length on the line. */
@@ -193,7 +280,8 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
   if (snap.qtyMethod === 'SQM') {
     lengthUnit = 'ft_in';
   } else if (snap.qtyMethod === 'SECTION_WEIGHT') {
-    lengthUnit = line.lengthFeet !== undefined && line.lengthFeet !== null ? 'ft_in' : 'metres';
+    const typed = line.lengthValue !== undefined && line.lengthValue !== null && (line.lengthUnit === 'mm' || line.lengthUnit === 'ft' || line.lengthUnit === 'in');
+    lengthUnit = typed ? (line.lengthUnit as RowLengthUnit) : line.lengthFeet !== undefined && line.lengthFeet !== null ? 'ft_in' : 'metres';
   } else if (snap.qtyMethod === 'SHEET_WEIGHT') {
     lengthUnit = 'ft_in';
   }
@@ -205,6 +293,7 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
           steelSize: {
             shape: snap.steelShape as SteelSizeKind,
             dims: snap.steelSizeDims ? { ...snap.steelSizeDims } : legacySteelSizeDims(snap.steelShape, snap.steelSizeText || ''),
+            hsn: snap.hsn,
           },
         }
       : {}),
@@ -212,7 +301,7 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
     rate: str(line.rate),
     nos: str(line.nos, '1'),
     lengthUnit,
-    lengthValue: '',
+    lengthValue: snap.qtyMethod === 'SECTION_WEIGHT' && (lengthUnit === 'mm' || lengthUnit === 'ft' || lengthUnit === 'in') ? str(line.lengthValue) : '',
     lengthFeet: legacySqm ? legacySqm.feet : str(line.lengthFeet, base.lengthFeet),
     lengthInches: legacySqm ? legacySqm.inches : str(line.lengthInches, '0'),
     lengthMetres: str(line.lengthM, base.lengthMetres),
@@ -259,7 +348,7 @@ export function computeRowCalculation(
 ): { calculatedLine: QuotationLine | null; validationError: string | null } {
   const result = computeRowCalculationInner(row, taxMode, widthFactor, feetToMetre);
   const colour = row.colour?.trim();
-  if (result.calculatedLine && colour && isSheetLike(row.product)) {
+  if (result.calculatedLine && colour && (isSheetLike(row.product) || kindHasColour(row.steelSize?.shape))) {
     return { ...result, calculatedLine: { ...result.calculatedLine, colour } };
   }
   return result;
@@ -365,7 +454,7 @@ function computeRowCalculationInner(
         : {}),
     };
 
-    let lengthParam: { feet?: number; inches?: number; metres?: number } = {};
+    let lengthParam: { feet?: number; inches?: number; metres?: number; value?: number; unit?: LengthUnit } = {};
     let lengthVal: number | undefined;
     let lengthU: LengthUnit | undefined;
 
@@ -391,6 +480,11 @@ function computeRowCalculationInner(
       lengthParam = {
         metres: row.lengthMetres.trim() !== '' ? Number(row.lengthMetres) : 0,
       };
+    } else if (row.product.qtyMethod === 'SECTION_WEIGHT' && (row.lengthUnit === 'mm' || row.lengthUnit === 'ft' || row.lengthUnit === 'in')) {
+      // Kept on the line too, so the quote shows the length as typed (e.g. 2500 mm)
+      lengthVal = (row.lengthValue ?? '').trim() !== '' ? Number(row.lengthValue) : 0;
+      lengthU = row.lengthUnit;
+      lengthParam = { value: lengthVal, unit: lengthU };
     }
 
     const kgPerPieceVal = row.kgPerPiece && row.kgPerPiece.trim() !== ''

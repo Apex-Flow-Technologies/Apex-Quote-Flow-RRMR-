@@ -15,9 +15,11 @@ export function approxLengths(kg: number, kgPerLength: number): number | null {
 /** Description under the product name for a steel line, e.g. "6m × 3 nos · 11.672 kg/m". */
 export function describeSteelLine(line: QuotationLine, sep = '·'): string {
   const len =
-    line.lengthFeet !== undefined && line.lengthFeet !== null
-      ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
-      : `${line.lengthM || 0}m`;
+    line.lengthValue !== undefined && line.lengthValue !== null && line.lengthUnit
+      ? `${line.lengthValue} ${line.lengthUnit}`
+      : line.lengthFeet !== undefined && line.lengthFeet !== null
+        ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
+        : `${line.lengthM || 0}m`;
   const kgm = `${formatKgPerMetre(line.snapshot.kgPerMetre)} kg/m`;
   if (isSteelByKg(line)) {
     const n = approxLengths(Number(line.quantity), Number(line.perPieceQuantity));

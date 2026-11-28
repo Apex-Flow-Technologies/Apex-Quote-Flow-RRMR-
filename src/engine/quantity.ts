@@ -206,6 +206,22 @@ export function calculateLineQuantity(params: QuantityCalculationParams): Quanti
     };
   }
 
+  // Steel by weight: length × kg/m × Nos, rounded once at the end (as RR's reference calculator)
+  if (params.method === 'SECTION_WEIGHT') {
+    const kgPerM = new Decimal(params.kgPerMetre || 0);
+    const lengthM = toMetres(params.length || {}, params.feetToMetre || undefined);
+    const perPiece = kgPerM.lte(0) || lengthM.lte(0) ? new Decimal(0) : lengthM.times(kgPerM);
+    const total = perPiece.times(nos);
+    return {
+      perPieceQuantity: perPiece.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
+      unroundedPerPieceQuantity: perPiece,
+      lineQuantity: total.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
+      unroundedLineQuantity: total,
+      isManual: false,
+      unit: 'Kgs',
+    };
+  }
+
   // Sprint 2 PIECE: quantity
   if (params.method === 'PIECE') {
     return {

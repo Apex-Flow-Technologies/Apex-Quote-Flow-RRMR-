@@ -27,6 +27,7 @@ export {
   type EditableRowState,
   createInitialRow,
   createCustomRow,
+  createSteelSizeRow,
   rowFromSavedLine,
   computeRowCalculation,
 } from './quotationRows';
@@ -41,11 +42,16 @@ import {
   weightPreview,
   isLengthMethod,
   isSheetLike,
-  createSteelSizeRow,
+  createCustomRow,
   applySteelSize,
+  itemTypeReset,
+  rowMethod,
+  STEEL_LENGTH_UNITS,
+  switchSteelLengthUnit,
 } from './quotationRows';
 import { formatKgPerMetre } from '../../engine/steel';
-import { STEEL_SIZE_KINDS, STEEL_SIZE_KIND_ORDER, parseSteelSize, type SteelSizeKind } from './steelSize';
+import { STEEL_SIZE_KINDS, STEEL_SIZE_KIND_ORDER, ITEM_GROUPS, fieldUnit, parseSteelSize, type SteelSizeKind } from './steelSize';
+import { SUGGESTED_UNITS } from '../../types/product';
 import { approxLengths } from '../../utils/steelLine';
 
 interface DropdownPosition {
@@ -111,13 +117,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     setIsCustomModalOpen(false);
   };
 
-  // Steel by size: pick the shape, type the size, the weight per metre is worked out
-  const handleAddSteelSize = () => {
-    const newRow = createSteelSizeRow('SQUARE_PIPE');
-    const last = rows[rows.length - 1];
-    const lastIsBlank = last && !last.product && !last.isCustomItem && !last.steelSize && !last.productSearch.trim();
-    onRowsChange(lastIsBlank ? [...rows.slice(0, -1), newRow] : [...rows, newRow]);
-    setTimeout(() => getActiveInput(`${newRow.id}_steel_a`)?.focus(), 50);
+  // Custom item: an inline line where staff type the name, unit, quantity and rate
+  const handleAddCustomLine = () => {
+    const newRow = createCustomRow();
+    onRowsChange([...rows, newRow]);
+    setTimeout(() => getActiveInput(`${newRow.id}_customDesc`)?.focus(), 50);
   };
 
   // Product Autocomplete Dropdown Portal Positioning State
@@ -447,7 +451,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
   const getFilteredProducts = (query: string) => searchProducts(products, query);
 
-  /** Type picker + one box per dimension for a "Steel by size" line (desktop cell or phone card). */
+  /** Item type picker + one box per detail (desktop cell or phone card). */
   const renderSteelSize = (row: EditableRowState, mobile: boolean) => {
     const size = row.steelSize!;
     const cfg = STEEL_SIZE_KINDS[size.shape];
@@ -456,19 +460,16 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     const sizeError = !parsed.ok && !parsed.missing ? parsed.error : null;
     const setDim = (key: string, value: string) => updateRow(row.id, { steelSize: { ...size, dims: { ...size.dims, [key]: value } } });
     const boxClass = mobile
-      ? 'w-full h-10 px-2 text-center text-sm font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white'
-      : 'w-full py-1.5 px-1.5 text-center text-xs font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white';
+      ? 'w-full h-10 px-2 text-sm font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white'
+      : 'w-full py-1.5 px-1.5 text-xs font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white';
+    const cols = cfg.fields.length === 1 ? 'grid-cols-1' : cfg.fields.length === 2 || (mobile && cfg.fields.length > 3) ? 'grid-cols-2' : 'grid-cols-3';
     return (
       <div className={mobile ? 'space-y-2' : 'space-y-1.5'}>
         <select
           value={size.shape}
           onChange={(e) => {
             const shape = e.target.value as SteelSizeKind;
-            updateRow(row.id, {
-              steelSize: { shape, dims: {} },
-              lengthUnit: 'metres',
-              lengthMetres: String(STEEL_SIZE_KINDS[shape].defaultLengthM),
-            });
+            updateRow(row.id, itemTypeReset(shape));
             setTimeout(() => getActiveInput(`${row.id}_steel_${STEEL_SIZE_KINDS[shape].fields[0].key}`)?.focus(), 30);
           }}
           className={
@@ -476,61 +477,76 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               ? 'w-full h-10 px-2.5 text-sm font-semibold rounded-control border border-line-strong bg-white text-ink focus:border-brand'
               : 'w-full py-1.5 px-2 text-xs font-semibold rounded-control border border-line-strong bg-white text-ink focus:border-brand'
           }
-          aria-label="Steel type"
+          aria-label="Item type"
         >
-          {STEEL_SIZE_KIND_ORDER.map((k) => (
-            <option key={k} value={k}>
-              {STEEL_SIZE_KINDS[k].label}
-            </option>
+          {!STEEL_SIZE_KIND_ORDER.includes(size.shape) && <option value={size.shape}>{cfg.label}</option>}
+          {ITEM_GROUPS.map((g) => (
+            <optgroup key={g.group} label={g.group}>
+              {g.kinds.map((k) => (
+                <option key={k} value={k}>
+                  {STEEL_SIZE_KINDS[k].label}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
-        <div className={`grid gap-1.5 ${cfg.fields.length === 1 ? 'grid-cols-1' : cfg.fields.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+        <div className={`grid gap-1.5 ${cols}`}>
           {cfg.fields.map((fd, i) => {
             const refKey = `${row.id}_steel_${fd.key}${mobile ? '_mobile' : ''}`;
             const next = cfg.fields[i + 1];
+            const unit = fieldUnit(fd);
+            const kind = fd.kind ?? 'number';
+            const listId = `rr-dl-${row.id}-${fd.key}${mobile ? '-m' : ''}`;
             const onEnter = (e: React.KeyboardEvent) => {
               if (e.key !== 'Enter') return;
               e.preventDefault();
               if (next) getActiveInput(`${row.id}_steel_${next.key}`)?.focus();
-              else (getActiveInput(`${row.id}_lengthMetres`) || getActiveInput(`${row.id}_nos`))?.focus();
+              else (getActiveInput(`${row.id}_lengthMetres`) || getActiveInput(`${row.id}_lengthFeet`) || getActiveInput(`${row.id}_nos`))?.focus();
             };
             return (
               <label key={fd.key} className="block min-w-0">
                 <span className="block text-[11px] text-muted mb-0.5 truncate" title={fd.label}>
                   {mobile ? fd.label : fd.short}
-                  {!fd.options && ' (mm)'}
+                  {unit && ` (${unit})`}
+                  {!fd.optional && kind !== 'number' && <span className="text-danger"> *</span>}
                 </span>
-                {fd.options ? (
-                  <select
-                    value={size.dims[fd.key] ?? ''}
-                    onChange={(e) => setDim(fd.key, e.target.value)}
-                    className={boxClass}
-                    aria-label={fd.label}
-                  >
+                {kind === 'select' ? (
+                  <select value={size.dims[fd.key] ?? ''} onChange={(e) => setDim(fd.key, e.target.value)} className={boxClass} aria-label={fd.label}>
                     <option value="">Pick…</option>
-                    {fd.options.map((o) => (
+                    {(fd.options || []).map((o) => (
                       <option key={o} value={o}>
                         {o.replace(/x/g, ' × ')}
                       </option>
                     ))}
                   </select>
                 ) : (
-                  <input
-                    ref={(el) => {
-                      if (el) inputRefs.current.set(refKey, el);
-                      else inputRefs.current.delete(refKey);
-                    }}
-                    type="number"
-                    inputMode="decimal"
-                    step="any"
-                    min="0"
-                    value={size.dims[fd.key] ?? ''}
-                    onChange={(e) => setDim(fd.key, e.target.value)}
-                    onKeyDown={onEnter}
-                    className={boxClass}
-                    aria-label={`${fd.label} in mm`}
-                    title={`${fd.label} (mm)`}
-                  />
+                  <>
+                    <input
+                      ref={(el) => {
+                        if (el) inputRefs.current.set(refKey, el);
+                        else inputRefs.current.delete(refKey);
+                      }}
+                      type={kind === 'number' ? 'number' : 'text'}
+                      inputMode={kind === 'number' || fd.numeric ? 'decimal' : undefined}
+                      step={kind === 'number' ? 'any' : undefined}
+                      min={kind === 'number' ? '0' : undefined}
+                      list={kind === 'combo' ? listId : undefined}
+                      autoComplete="off"
+                      value={size.dims[fd.key] ?? ''}
+                      onChange={(e) => setDim(fd.key, e.target.value)}
+                      onKeyDown={onEnter}
+                      className={`${boxClass} ${kind === 'number' ? 'text-center' : ''}`}
+                      aria-label={unit ? `${fd.label} in ${unit}` : fd.label}
+                      title={unit ? `${fd.label} (${unit})` : fd.label}
+                    />
+                    {kind === 'combo' && (
+                      <datalist id={listId}>
+                        {(fd.options || []).map((o) => (
+                          <option key={o} value={o} />
+                        ))}
+                      </datalist>
+                    )}
+                  </>
                 )}
               </label>
             );
@@ -544,25 +560,29 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
             </>
           ) : sizeError ? (
             <span className="text-danger font-medium">{sizeError}</span>
-          ) : (
+          ) : cfg.method === 'SECTION_WEIGHT' ? (
             'Enter the sizes; the weight is worked out.'
+          ) : (
+            'Pick from the list or type your own.'
           )}
         </div>
-        <div className="flex items-center justify-between text-[11px] text-muted gap-2">
-          <span className="tabular-nums">{row.product ? `HSN ${row.product.hsn}` : ''}</span>
-          <button
-            type="button"
-            onClick={() => updateRow(row.id, { steelSize: undefined, product: null, productSearch: '', isProductDropdownOpen: true })}
-            className="text-brand hover:underline font-semibold"
-          >
-            Catalog &rarr;
-          </button>
-        </div>
+        <label className="flex items-center gap-1.5 text-[11px] text-muted">
+          HSN
+          <input
+            type="text"
+            inputMode="numeric"
+            value={size.hsn ?? row.product?.hsn ?? ''}
+            placeholder={row.product?.hsn}
+            onChange={(e) => updateRow(row.id, { steelSize: { ...size, hsn: e.target.value } })}
+            className={`${mobile ? 'w-28 h-8' : 'w-24 py-0.5'} px-1.5 text-[11px] tabular-nums rounded-control border border-line bg-surface-2 text-ink focus:bg-white focus:border-brand`}
+            aria-label="HSN code"
+          />
+        </label>
         {/* The phone card shows line errors itself */}
         {!mobile && row.product && row.validationError && (
           <div className={isRateHint(row) ? 'p-2 bg-brand-soft border border-brand/20 rounded-control text-brand-deep text-xs flex items-center gap-1.5' : 'flex items-center gap-1 text-[11px] text-danger font-medium'}>
             <AlertCircle className="w-3 h-3 shrink-0" />
-            <span>{isRateHint(row) ? 'Enter the rate per kg to price this line.' : row.validationError}</span>
+            <span>{isRateHint(row) ? `Enter the rate per ${cfg.unit === 'Kgs' ? 'kg' : cfg.unit} to price this line.` : row.validationError}</span>
           </div>
         )}
       </div>
@@ -615,8 +635,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         onAddRow();
         setTimeout(() => {
           const nextRowInputs = Array.from(inputRefs.current.entries());
-          const lastSearch = nextRowInputs.filter(([k]) => k.includes('_productSearch') && !k.endsWith('_mobile')).pop() ||
-            nextRowInputs.filter(([k]) => k.includes('_productSearch')).pop();
+          const isFirstBox = ([k]: [string, HTMLInputElement]) => k.includes('_productSearch') || k.includes('_steel_');
+          const lastSearch = nextRowInputs.filter((e) => isFirstBox(e) && !e[0].endsWith('_mobile')).pop() ||
+            nextRowInputs.filter(isFirstBox).pop();
           if (lastSearch) lastSearch[1]?.focus();
         }, 60);
       } else {
@@ -625,6 +646,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         if (nextRow) {
           if (nextRow.isCustomItem) {
             getActiveInput(`${nextRow.id}_customDesc`)?.focus();
+          } else if (nextRow.steelSize) {
+            getActiveInput(`${nextRow.id}_steel_${STEEL_SIZE_KINDS[nextRow.steelSize.shape].fields[0].key}`)?.focus();
           } else if (!nextRow.product) {
             getActiveInput(`${nextRow.id}_productSearch`)?.focus();
           } else {
@@ -652,20 +675,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
-            onClick={() => setIsCustomModalOpen(true)}
+            onClick={handleAddCustomLine}
             className="flex-1 sm:flex-initial min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
           >
             <Plus className="w-3.5 h-3.5 text-brand" />
             <span>Custom Item</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleAddSteelSize}
-            className="flex-1 sm:flex-initial min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
-            title="Pick the steel type and enter the sizes; the weight is worked out"
-          >
-            <Plus className="w-3.5 h-3.5 text-brand" />
-            <span>Steel by size</span>
           </button>
           <button
             type="button"
@@ -678,13 +692,19 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         </div>
       </div>
 
+      <datalist id="rr-line-units">
+        {SUGGESTED_UNITS.map((u) => (
+          <option key={u} value={u} />
+        ))}
+      </datalist>
+
       {/* Desktop Table View (hidden on mobile, visible on md and up) */}
       <div className="hidden md:block overflow-x-auto min-w-full">
-        <table className="w-full text-left border-collapse text-xs min-w-[920px]">
+        <table className="w-full text-left border-collapse text-xs min-w-[1000px]">
           <thead>
             <tr className="bg-surface-2/70 border-b border-line text-faint font-semibold text-[10.5px] uppercase tracking-wider">
               <th className="py-2.5 px-3 text-center w-10">#</th>
-              <th className="py-2.5 px-3 w-[260px]">Product / Description</th>
+              <th className="py-2.5 px-3 w-[340px]">Item / Description</th>
               <th className="py-2.5 px-3 w-[180px]">Dimensions / Length</th>
               <th className="py-2.5 px-3 text-center w-[75px]">Nos</th>
               <th className="py-2.5 px-3 text-right w-[110px]">Quantity</th>
@@ -697,13 +717,14 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
             {rows.map((row, index) => {
               const filtered = getFilteredProducts(row.productSearch);
               const isCustom = Boolean(row.isCustomItem);
-              const isSqm = row.product?.qtyMethod === 'SQM';
-              const isWeightPerPiece = row.product?.qtyMethod === 'WEIGHT_PER_PIECE';
-              const isSheet = row.product?.qtyMethod === 'SHEET_WEIGHT';
-              const isPipe = row.product?.qtyMethod === 'SECTION_WEIGHT' || Boolean(row.steelSize);
-              const isPiece = row.product?.qtyMethod === 'PIECE';
-              const isFeetInches = isSheet || isLengthMethod(row.product?.qtyMethod);
-              const takesColour = isSheetLike(row.product);
+              const method = rowMethod(row);
+              const isSqm = method === 'SQM';
+              const isWeightPerPiece = method === 'WEIGHT_PER_PIECE';
+              const isSheet = method === 'SHEET_WEIGHT';
+              const isPipe = method === 'SECTION_WEIGHT';
+              const isPiece = method === 'PIECE';
+              const isFeetInches = isSheet || isLengthMethod(method);
+              const takesColour = isSheetLike(row.product) && !row.steelSize; // type lines have their own Colour box
               const hasError = Boolean(row.validationError);
 
               return (
@@ -884,18 +905,14 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       <div className="space-y-1 pt-1">
                         <div className="flex items-center gap-1">
                           <span className="text-[10px] text-faint font-medium">Unit:</span>
-                          <select
-                            value={row.customUnit || 'Nos'}
+                          <input
+                            type="text"
+                            list="rr-line-units"
+                            value={row.customUnit ?? 'Nos'}
                             onChange={(e) => updateRow(row.id, { customUnit: e.target.value as ProductUnit })}
-                            className="py-1 px-1.5 text-xs font-semibold rounded-control border border-line-strong bg-white text-ink focus:border-brand"
-                          >
-                            <option value="Nos">Nos</option>
-                            <option value="Sq.Mtr">Sq.Mtr</option>
-                            <option value="Kgs">Kgs</option>
-                            <option value="Ft">Ft</option>
-                            <option value="R.Mtr">R.Mtr</option>
-                            <option value="Metre">Metre</option>
-                          </select>
+                            className="w-20 py-1 px-1.5 text-xs font-semibold rounded-control border border-line-strong bg-white text-ink focus:border-brand"
+                            aria-label="Unit"
+                          />
                         </div>
                       </div>
                     ) : isWeightPerPiece ? (
@@ -970,7 +987,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     ) : isPipe ? (
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-1.5">
-                          {row.lengthUnit === 'metres' ? (
+                          {row.lengthUnit !== 'ft_in' ? (
                             <div className="flex items-center gap-1">
                               <input
                                 ref={(el) => {
@@ -979,10 +996,10 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                                 }}
                                 type="number"
                                 inputMode="decimal"
-                                step="0.01"
-                                min="0.1"
-                                value={row.lengthMetres}
-                                onChange={(e) => updateRow(row.id, { lengthMetres: e.target.value })}
+                                step="any"
+                                min="0"
+                                value={row.lengthUnit === 'metres' ? row.lengthMetres : row.lengthValue ?? ''}
+                                onChange={(e) => updateRow(row.id, row.lengthUnit === 'metres' ? { lengthMetres: e.target.value } : { lengthValue: e.target.value })}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
                                     e.preventDefault();
@@ -990,9 +1007,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                                   }
                                 }}
                                 className="w-16 py-1.5 px-2 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
-                                title="Length in Metres"
+                                title="Length"
                               />
-                              <span className="font-semibold text-muted text-xs">m</span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1">
@@ -1042,18 +1058,19 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                             </div>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateRow(row.id, {
-                                lengthUnit: row.lengthUnit === 'metres' ? 'ft_in' : 'metres',
-                              })
-                            }
-                            className="text-[10px] px-1.5 py-0.5 rounded-control bg-surface-2 border border-line text-muted hover:text-ink font-semibold"
-                            title="Toggle between metres and feet/inches"
+                          <select
+                            value={row.lengthUnit}
+                            onChange={(e) => updateRow(row.id, switchSteelLengthUnit(row, e.target.value as RowLengthUnit, feetToMetre))}
+                            className="py-1 px-1 text-xs font-semibold rounded-control border border-line-strong bg-surface-2 text-ink focus:border-brand"
+                            aria-label="Length unit"
+                            title="Length unit"
                           >
-                            {row.lengthUnit === 'metres' ? '⇄ ft/in' : '⇄ m'}
-                          </button>
+                            {STEEL_LENGTH_UNITS.map((u) => (
+                              <option key={u.value} value={u.value}>
+                                {u.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                     ) : isPiece ? (
@@ -1262,12 +1279,13 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
         {rows.map((row, index) => {
           const filtered = getFilteredProducts(row.productSearch);
           const isCustom = Boolean(row.isCustomItem);
-          const isSqm = row.product?.qtyMethod === 'SQM';
-          const isWeightPerPiece = row.product?.qtyMethod === 'WEIGHT_PER_PIECE';
-          const isSheet = row.product?.qtyMethod === 'SHEET_WEIGHT';
-          const isPipe = row.product?.qtyMethod === 'SECTION_WEIGHT' || Boolean(row.steelSize);
-          const isFeetInches = isSheet || isLengthMethod(row.product?.qtyMethod);
-          const takesColour = isSheetLike(row.product);
+          const method = rowMethod(row);
+          const isSqm = method === 'SQM';
+          const isWeightPerPiece = method === 'WEIGHT_PER_PIECE';
+          const isSheet = method === 'SHEET_WEIGHT';
+          const isPipe = method === 'SECTION_WEIGHT';
+          const isFeetInches = isSheet || isLengthMethod(method);
+          const takesColour = isSheetLike(row.product) && !row.steelSize; // type lines have their own Colour box
           const hasError = Boolean(row.validationError);
 
           return (
@@ -1285,7 +1303,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   </span>
                   {row.steelSize ? (
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20 shrink-0">
-                      Steel by size
+                      {STEEL_SIZE_KINDS[row.steelSize.shape].label}
                     </span>
                   ) : isCustom ? (
                     <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-control bg-amber-50 text-amber-800 border border-amber-300 shrink-0">
@@ -1476,18 +1494,14 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               {isCustom ? (
                 <div className="flex items-center justify-between gap-3 pt-1">
                   <label className="text-xs font-semibold text-muted">Measurement Unit:</label>
-                  <select
-                    value={row.customUnit || 'Nos'}
+                  <input
+                    type="text"
+                    list="rr-line-units"
+                    value={row.customUnit ?? 'Nos'}
                     onChange={(e) => updateRow(row.id, { customUnit: e.target.value as ProductUnit })}
-                    className="h-10 px-3 text-xs font-semibold rounded-control border border-line-strong bg-white text-ink focus:border-brand"
-                  >
-                    <option value="Nos">Nos</option>
-                    <option value="Sq.Mtr">Sq.Mtr</option>
-                    <option value="Kgs">Kgs</option>
-                    <option value="Ft">Ft</option>
-                    <option value="R.Mtr">R.Mtr</option>
-                    <option value="Metre">Metre</option>
-                  </select>
+                    className="w-28 h-10 px-3 text-xs font-semibold rounded-control border border-line-strong bg-white text-ink focus:border-brand"
+                    aria-label="Unit"
+                  />
                 </div>
               ) : isWeightPerPiece ? (
                 <div className="flex items-center justify-between gap-3 pt-1">
@@ -1578,19 +1592,21 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
                       {row.isManualQuantity ? 'Bar length' : 'Length'}
                     </label>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateRow(row.id, {
-                          lengthUnit: row.lengthUnit === 'metres' ? 'ft_in' : 'metres',
-                        })
-                      }
-                      className="min-h-[30px] text-[11px] px-2 py-0.5 rounded-control bg-surface-2 border border-line text-brand font-semibold"
-                    >
-                      {row.lengthUnit === 'metres' ? 'Switch to ft/in' : 'Switch to metres'}
-                    </button>
+                    <select
+                            value={row.lengthUnit}
+                            onChange={(e) => updateRow(row.id, switchSteelLengthUnit(row, e.target.value as RowLengthUnit, feetToMetre))}
+                            className="h-9 px-2 text-xs font-semibold rounded-control border border-line-strong bg-surface-2 text-ink focus:border-brand"
+                            aria-label="Length unit"
+                            title="Length unit"
+                          >
+                            {STEEL_LENGTH_UNITS.map((u) => (
+                              <option key={u.value} value={u.value}>
+                                {u.label}
+                              </option>
+                            ))}
+                          </select>
                   </div>
-                  {row.lengthUnit === 'metres' ? (
+                  {row.lengthUnit !== 'ft_in' ? (
                     <div className="flex items-center gap-2">
                       <input
                         ref={(el) => {
@@ -1599,14 +1615,14 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                         }}
                         type="number"
                         inputMode="decimal"
-                        step="0.01"
-                        min="0.1"
-                        value={row.lengthMetres}
-                        onChange={(e) => updateRow(row.id, { lengthMetres: e.target.value })}
+                        step="any"
+                        min="0"
+                        value={row.lengthUnit === 'metres' ? row.lengthMetres : row.lengthValue ?? ''}
+                        onChange={(e) => updateRow(row.id, row.lengthUnit === 'metres' ? { lengthMetres: e.target.value } : { lengthValue: e.target.value })}
                         className="flex-1 min-w-0 w-full h-10 px-3 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
-                        placeholder="6.0"
+                        placeholder="6"
                       />
-                      <span className="font-semibold text-muted text-xs">m</span>
+                      <span className="font-semibold text-muted text-xs">{row.lengthUnit === 'metres' ? 'm' : row.lengthUnit}</span>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">
@@ -1801,19 +1817,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setIsCustomModalOpen(true)}
+            onClick={handleAddCustomLine}
             className="w-full sm:w-auto min-h-[44px] sm:min-h-[36px] inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
           >
             <Plus className="w-4 h-4 text-brand" />
             <span>Custom Item</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleAddSteelSize}
-            className="w-full sm:w-auto min-h-[44px] sm:min-h-[36px] inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
-          >
-            <Plus className="w-4 h-4 text-brand" />
-            <span>Steel by size</span>
           </button>
         </div>
 
