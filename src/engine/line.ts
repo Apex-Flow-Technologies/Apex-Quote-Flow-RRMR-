@@ -7,6 +7,8 @@ import { calculateTaxForGroup, type TaxMode } from './tax';
 
 export interface LineBuilderInput {
   id?: string;
+  /** Sq.Mtr: round each piece's area down to 2 decimals before × Nos (RR's flashing sheets: 2.6352 → 2.63). */
+  roundPerPieceDown?: boolean;
   snapshot: QuotationLineSnapshot;
   length?: LengthInput;
   lengthValue?: number | string | Decimal;
@@ -52,6 +54,7 @@ export function calculateQuotationLine(
     densityFactor: snapshot.densityFactor,
     kgPerMetre: snapshot.kgPerMetre,
     isManual: Boolean(input.isManualQuantity),
+    roundPerPieceDown: Boolean(input.roundPerPieceDown),
     manualQuantity: input.manualQuantity,
   });
 
@@ -223,7 +226,7 @@ export function validateLineDraft(params: LineValidationInput): LineValidationRe
         return { isValid: false, error: 'Please enter valid numeric values.' };
       }
     }
-  } else if (method === 'SHEET_WEIGHT' || method === 'SQM' || (method === 'SECTION_WEIGHT' && params.lengthUnit === 'ft_in')) {
+  } else if (((method === 'SHEET_WEIGHT' || method === 'SQM') && (!params.lengthUnit || params.lengthUnit === 'ft_in')) || (method === 'SECTION_WEIGHT' && params.lengthUnit === 'ft_in')) {
     const fRaw = params.lengthFeet;
     const iRaw = params.lengthInches;
     if (

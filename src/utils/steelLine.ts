@@ -1,5 +1,5 @@
 import type { QuotationLine } from '../types/quotation';
-import { formatKgPerMetre } from '../engine/steel';
+import { weightRateText, flashingPerSheet } from '../components/quotations/steelSize';
 
 /** A steel (by-weight) line where the salesperson typed the kg instead of a number of lengths. */
 export function isSteelByKg(line: Pick<QuotationLine, 'isManualQuantity' | 'snapshot'>): boolean {
@@ -20,10 +20,21 @@ export function describeSteelLine(line: QuotationLine, sep = '·'): string {
       : line.lengthFeet !== undefined && line.lengthFeet !== null
         ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
         : `${line.lengthM || 0}m`;
-  const kgm = `${formatKgPerMetre(line.snapshot.kgPerMetre)} kg/m`;
+  const kgm = weightRateText(line.snapshot.steelShape, line.snapshot.kgPerMetre, line.snapshot.steelSizeDims);
   if (isSteelByKg(line)) {
     const n = approxLengths(Number(line.quantity), Number(line.perPieceQuantity));
     return n !== null ? `By weight ${sep} ≈ ${n} lengths of ${len} ${sep} ${kgm}` : `By weight ${sep} ${kgm}`;
   }
   return `${len} × ${line.nos} nos ${sep} ${kgm}`;
+}
+
+/** Flashing cut from sheets, e.g. "10 pcs · 4 per 48 in sheet → 3 sheets" (null for other lines). */
+export function describeFlashingLine(line: QuotationLine, sep = '·'): string | null {
+  const dims = line.snapshot.steelSizeDims;
+  if (line.snapshot.steelShape !== 'FLASHING' || !dims?.pcs) return null;
+  const width = Number(dims.sheet || 48);
+  const cut = flashingPerSheet(dims.size ?? '', width);
+  if ('error' in cut) return null;
+  const sheets = Number(line.nos);
+  return `${dims.pcs} pcs ${sep} ${cut.perSheet} per ${width} in sheet → ${sheets} sheet${sheets === 1 ? '' : 's'}`;
 }

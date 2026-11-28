@@ -24,6 +24,8 @@ export interface QuantityCalculationParams {
   kgPerMetre?: number | string | Decimal;
   // Manual override
   isManual?: boolean;
+  /** SQM only: area per piece rounded down to 2 decimals before × Nos */
+  roundPerPieceDown?: boolean;
   manualQuantity?: number | string | Decimal;
 }
 
@@ -178,7 +180,8 @@ export function calculateLineQuantity(params: QuantityCalculationParams): Quanti
       lengthM = toMetres(params.length || {}, params.feetToMetre || DEFAULT_FEET_TO_METRE);
     }
     const width = new Decimal(params.widthFactor ?? DEFAULT_WIDTH_FACTOR);
-    const perPieceArea = lengthM.times(width);
+    const exactArea = lengthM.times(width);
+    const perPieceArea = params.roundPerPieceDown ? exactArea.toDecimalPlaces(2, Decimal.ROUND_DOWN) : exactArea;
     const totalArea = perPieceArea.times(nos);
 
     return {
@@ -230,7 +233,7 @@ export function calculateLineQuantity(params: QuantityCalculationParams): Quanti
       lineQuantity: nos.toDecimalPlaces(0, Decimal.ROUND_HALF_UP),
       unroundedLineQuantity: nos,
       isManual: false,
-      unit: 'Nos',
+      unit: params.customUnit || 'Nos',
     };
   }
 

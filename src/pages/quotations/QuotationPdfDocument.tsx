@@ -10,7 +10,7 @@ import {
 } from '@react-pdf/renderer';
 import type { Quotation } from '../../types/quotation';
 import { formatRoundOff } from '../../engine';
-import { describeSteelLine, isSteelByKg } from '../../utils/steelLine';
+import { describeSteelLine, describeFlashingLine, isSteelByKg } from '../../utils/steelLine';
 
 export const FONT_FAMILY = 'Noto Sans';
 
@@ -621,7 +621,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                   <Text style={styles.productName}>{line.productName}{line.colour ? ` • Colour: ${line.colour}` : ''}</Text>
                   <Text style={styles.productSpecs}>
                     {isSqm && (
-                      `${lineLengthText(line)} × ${line.nos} nos • Width: ${line.widthFactor || snap.widthFactor || quotation.widthFactor || 1.08}`
+                      `${describeFlashingLine(line, '•') ? `${describeFlashingLine(line, '•')} • ` : ''}${lineLengthText(line)} × ${line.nos} ${describeFlashingLine(line) ? 'sheets' : 'nos'} • Width: ${line.widthFactor || snap.widthFactor || quotation.widthFactor || 1.08}`
                     )}
                     {isWeightPerPiece && (
                       `${line.nos} nos × ${line.kgPerPiece || snap.kgPerPiece || 0} kg/pc`
@@ -633,7 +633,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                       `${line.lengthFeet || 0}'${line.lengthInches || 0}" × ${line.nos} nos • ${snap.thicknessMm}mm • ${snap.coilWidthM}m coil`
                     )}
                     {isPipe && describeSteelLine(line, '•')}
-                    {isPiece && `${line.nos} nos • Per piece`}
+                    {isPiece && (describeFlashingLine(line, '•') ?? `${line.nos} nos • Per piece`)}
                     {(snap.qtyMethod === 'AREA' || snap.qtyMethod === 'RUNNING_LENGTH' || snap.qtyMethod === 'LENGTH_FT') && (
                       `${line.lengthFeet || 0}'${line.lengthInches || 0}" × ${line.nos} nos`
                     )}

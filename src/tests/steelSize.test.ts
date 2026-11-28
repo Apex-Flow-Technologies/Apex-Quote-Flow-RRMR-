@@ -3,6 +3,7 @@ import {
   parseSteelSize,
   legacySteelSizeDims,
   steelSizeProduct,
+  flashingPerSheet,
   STEEL_SIZE_KINDS,
   STEEL_SIZE_KIND_ORDER,
   type SteelSizeKind,
@@ -14,8 +15,10 @@ import {
   rowFromSavedLine,
   rowMethod,
   switchSteelLengthUnit,
+  workingText,
   type EditableRowState,
 } from '../components/quotations/quotationRows';
+import { describeSteelLine, describeFlashingLine } from '../utils/steelLine';
 
 const kg = (shape: SteelSizeKind, dims: Record<string, string>) => {
   const r = parseSteelSize({ shape, dims });
@@ -52,14 +55,15 @@ describe('Steel by type: weight per metre (maiak-m.bg formulas)', () => {
   for (const [shape, dims, kgm, name] of cases) {
     it(`${shape} ${JSON.stringify(dims)}`, () => {
       const r = kg(shape, dims);
-      expect(r.kgPerMetre).toBe(kgm);
+      expect(r.kgPerMetre).toBeCloseTo(kgm, 6);
       expect(r.name).toBe(name);
     });
   }
 
   it('every type in the picker has boxes', () => {
     expect(STEEL_SIZE_KIND_ORDER).not.toContain('UNEQUAL_ANGLE');
-    expect(STEEL_SIZE_KIND_ORDER).toHaveLength(Object.keys(STEEL_SIZE_KINDS).length - 1);
+    expect(STEEL_SIZE_KIND_ORDER).not.toContain('SHEET_WEIGHT'); // replaced by the kg/ft sheet
+    expect(STEEL_SIZE_KIND_ORDER).toHaveLength(Object.keys(STEEL_SIZE_KINDS).length - 2);
     for (const k of STEEL_SIZE_KIND_ORDER) expect(STEEL_SIZE_KINDS[k].fields.length).toBeGreaterThan(0);
   });
 
@@ -73,12 +77,12 @@ describe('Sheets and accessories by type', () => {
   it('roofing sheet (Sq.Mtr): name from the boxes, colour on the line, 17 ft 4 in × 10', () => {
     const row = line(
       'SHEET_SQM',
-      { brand: 'JSW Colouron+', profile: 'Crimp 8+1', t: '0.47', coating: '150 GSM', colour: 'Red' },
+      { brand: 'JSW Colouron+', profile: 'Crimp', t: '0.47', colour: 'Red' },
       { lengthFeet: '17', lengthInches: '4', nos: '10', rate: '117' }
     );
     expect(rowMethod(row)).toBe('SQM');
     const l = calc(row).calculatedLine!;
-    expect(l.productName).toBe('JSW Colouron+ Crimp 8+1 0.47 mm 150 GSM');
+    expect(l.productName).toBe('JSW Colouron+ Crimp 0.47 mm');
     expect(l.colour).toBe('Red');
     expect(l.unit).toBe('Sq.Mtr');
     expect(l.quantity).toBe(56.04);
@@ -112,7 +116,7 @@ describe('Sheets and accessories by type', () => {
   });
 
   it('ridge priced per piece', () => {
-    const row = line('FLASHING', { item: 'Ridge', size: '12x12', length: '8 ft', brand: 'JSW Colouron+', t: '0.47' }, { nos: '5', rate: '690' });
+    const row = line('RIDGE_GUTTER', { item: 'Ridge', size: '12x12', length: '8 ft', brand: 'JSW Colouron+', t: '0.47' }, { nos: '5', rate: '690' });
     expect(rowMethod(row)).toBe('PIECE');
     const l = calc(row).calculatedLine!;
     expect(l.productName).toBe('JSW Colouron+ Ridge 12 × 12 0.47 mm – 8 ft');
@@ -120,8 +124,8 @@ describe('Sheets and accessories by type', () => {
     expect(l.taxableAmount).toBe(3450);
   });
 
-  it('flashing needs the item', () => {
-    expect(parseSteelSize({ shape: 'FLASHING', dims: { size: '12x12' } }).ok).toBe(false);
+  it('ridge / gutter needs the item', () => {
+    expect(parseSteelSize({ shape: 'RIDGE_GUTTER', dims: { size: '12x12' } }).ok).toBe(false);
   });
 
   it('screws', () => {
@@ -133,6 +137,158 @@ describe('Sheets and accessories by type', () => {
   it('HSN can be changed on the line', () => {
     const p = steelSizeProduct({ shape: 'SHEET_SQM', dims: {}, hsn: '72107000' }, 'z')!;
     expect(p.hsn).toBe('72107000');
+  });
+});
+
+describe('Roofing sheet by weight (kg per foot)', () => {
+  it('126 in × 1.24 kg/ft: 13.02 kg a sheet, 5 sheets 65.10 kg', () => {
+    const row = line('SHEET_KGFT', { brand: 'JSW Colouron+', profile: 'Crimp', colour: 'Red' }, { lengthUnit: 'in', lengthValue: '126', nos: '5', rate: '114' });
+    expect(row.steelSize!.dims.kgft).toBe('1.24');
+    expect(row.lengthUnit).toBe('in');
+    const l = calc(row).calculatedLine!;
+    expect(l.perPieceQuantity).toBe(13.02);
+    expect(l.quantity).toBe(65.1);
+    expect(l.unit).toBe('Kgs');
+    expect(l.productName).toBe('JSW Colouron+ Crimp');
+    expect(l.colour).toBe('Red');
+    expect(l.taxableAmount).toBe(7421.4);
+  });
+
+  it('quote and PDF describe it in kg/ft', () => {
+    const l = calc(line('SHEET_KGFT', {}, { lengthUnit: 'in', lengthValue: '126', nos: '5', rate: '1' })).calculatedLine!;
+    expect(describeSteelLine(l)).toBe('126 in × 5 nos · 1.24 kg/ft');
+    const t = calc(line('RECT_PIPE', { a: '80', b: '40', t: '2' }, { nos: '1', rate: '1' })).calculatedLine!;
+    expect(describeSteelLine(t)).toBe('6m × 1 nos · 3.588 kg/m');
+  });
+
+  it('the same sheet in ft + in, ft, m and mm', () => {
+    const q = (extra: Partial<EditableRowState>) => calc(line('SHEET_KGFT', {}, { nos: '5', rate: '1', ...extra })).calculatedLine!.quantity;
+    expect(q({ lengthUnit: 'ft_in', lengthFeet: '10', lengthInches: '6' })).toBe(65.1);
+    expect(q({ lengthUnit: 'ft', lengthValue: '10.5' })).toBe(65.1);
+    expect(q({ lengthUnit: 'metres', lengthMetres: '3.2025' })).toBe(65.1);
+  });
+
+  it('new lines start in ft + in, and kg/ft can be changed', () => {
+    expect(createSteelSizeRow('SHEET_KGFT').lengthUnit).toBe('ft_in');
+    const l = calc(line('SHEET_KGFT', { kgft: '1.5' }, { lengthUnit: 'ft', lengthValue: '10', nos: '1', rate: '1' })).calculatedLine!;
+    expect(l.quantity).toBe(15);
+  });
+
+  it('kg/ft is required', () => {
+    const r = parseSteelSize({ shape: 'SHEET_KGFT', dims: { kgft: '' } });
+    expect(!r.ok && r.missing).toBe(true);
+  });
+});
+
+describe('Flashing cut from 8 ft × 4 ft sheets', () => {
+  const cut = (size: string, pcs: string, extra: Record<string, string> = {}) =>
+    calc(line('FLASHING', { size, ...extra }, { nos: pcs, rate: '1500' })).calculatedLine!;
+
+  it('pieces per 48 in sheet: 6x6 → 4, 8x8 → 3, 1x1 ft → 2, 18x18 → 1', () => {
+    expect(flashingPerSheet('6x6', 48)).toMatchObject({ girth: 12, perSheet: 4 });
+    expect(flashingPerSheet('8x8', 48)).toMatchObject({ girth: 16, perSheet: 3 });
+    expect(flashingPerSheet('1x1 ft', 48)).toMatchObject({ girth: 24, perSheet: 2 });
+    expect(flashingPerSheet('1x1', 48)).toMatchObject({ girth: 24, perSheet: 2 });
+    expect(flashingPerSheet('12x12', 48)).toMatchObject({ girth: 24, perSheet: 2 });
+    expect(flashingPerSheet('18x18', 48)).toMatchObject({ perSheet: 1 });
+  });
+
+  it('whole sheets, priced by Sq.Mtr: 8 ft × 0.305 × 1.08 = 2.63 a sheet (rounded down)', () => {
+    expect(cut('6x6', '4').nos).toBe(1);
+    expect(cut('6x6', '4').quantity).toBe(2.63); // 2.6352 → 2.63
+    const l = cut('6x6', '12');
+    expect(l.nos).toBe(3);
+    expect(l.quantity).toBe(7.89); // RR's example: 2.63 × 3
+    expect(l.unit).toBe('Sq.Mtr');
+    expect(l.widthFactor).toBe(1.08);
+    expect(l.taxableAmount).toBe(11835); // 7.89 × 1500
+    const ten = cut('6x6', '10');
+    expect(ten.snapshot.steelSizeDims?.pcs).toBe('10');
+    expect(describeFlashingLine(ten)).toBe('10 pcs · 4 per 48 in sheet → 3 sheets');
+  });
+
+  it('8x8 × 3 pcs → 1 sheet; 1x1 ft × 2 pcs → 1 sheet; 12 pcs of 6x6 → 3 sheets', () => {
+    expect(cut('8x8', '3').nos).toBe(1);
+    expect(cut('1x1 ft', '2').nos).toBe(1);
+    expect(cut('6x6', '12').nos).toBe(3);
+  });
+
+  it('the width factor and sheet length can be changed', () => {
+    const l = calc(line('FLASHING', { size: '6x6', wf: '1.22' }, { nos: '4', rate: '1', lengthFeet: '10', lengthInches: '0' })).calculatedLine!;
+    expect(l.quantity).toBe(3.72); // 10 × 0.305 × 1.22 = 3.721 → 3.72
+  });
+
+  it('a piece wider than the sheet is explained', () => {
+    const r = parseSteelSize({ shape: 'FLASHING', dims: { item: 'L flashing', size: '30x30', sheet: '48', wf: '1.28' } });
+    expect(!r.ok && r.error).toMatch(/wider than the 48 in sheet/);
+  });
+
+  it('revise shows the pieces again, not the sheets', () => {
+    const back = rowFromSavedLine(cut('6x6', '10'));
+    expect(back.nos).toBe('10');
+    expect(calc(back).calculatedLine!.quantity).toBe(7.89);
+  });
+});
+
+describe('Width factor on the line and the working shown', () => {
+  it('Sq.Mtr sheet: line width factor 1.08 → 126 in × 5 = 17.29 Sq.Mtr (client example)', () => {
+    const row = line('SHEET_SQM', { wf: '1.08' }, { lengthUnit: 'in', lengthValue: '126', nos: '5', rate: '1' });
+    const l = calc(row).calculatedLine!;
+    expect(l.quantity).toBe(17.29);
+    expect(l.widthFactor).toBe(1.08);
+  });
+
+  it('empty width box uses the quotation width factor', () => {
+    const l = calc(line('SHEET_SQM', {}, { lengthUnit: 'in', lengthValue: '126', nos: '5', rate: '1' })).calculatedLine!;
+    expect(l.widthFactor).toBe(1.06);
+    expect(l.quantity).toBe(16.97);
+  });
+
+  it('working text for each kind of line', () => {
+    const show = (r: EditableRowState) => workingText({ ...r, ...calc(r) });
+    expect(show(line('FLASHING', { size: '6x6' }, { nos: '12', rate: '1' }))).toBe(
+      '12 pcs ÷ 4 a sheet = 3 sheets · 8 ft = 2.44 m × 1.08 = 2.63 Sq.Mtr a sheet × 3 = 7.89 Sq.Mtr'
+    );
+    expect(show(line('RECT_PIPE', { a: '80', b: '40', t: '2' }, { nos: '1', rate: '1' }))).toBe(
+      '6 m × 3.588 kg/m = 21.53 kg each × 1 = 21.53 kg'
+    );
+    expect(show(line('SHEET_KGFT', {}, { lengthUnit: 'in', lengthValue: '126', nos: '5', rate: '1' }))).toBe(
+      '126 in = 10.5 ft × 1.24 kg/ft = 13.02 kg each × 5 = 65.1 kg'
+    );
+    expect(show(line('SHEET_SQM', { wf: '1.08' }, { lengthUnit: 'in', lengthValue: '126', nos: '5', rate: '1' }))).toBe(
+      '126 in = 3.2025 m × 1.08 = 3.4587 Sq.Mtr each × 5 = 17.29 Sq.Mtr'
+    );
+  });
+});
+
+describe('Sheet length in any unit', () => {
+  const sheet = (extra: Partial<EditableRowState>) => line('SHEET_SQM', { brand: 'JSW Colouron+', t: '0.47' }, { nos: '10', rate: '117', ...extra });
+
+  it('5.3 m, 5300 mm and 5.3 m typed as ft give the same Sq.Mtr', () => {
+    const m = calc(sheet({ lengthUnit: 'metres', lengthMetres: '5.3' })).calculatedLine!;
+    const mm = calc(sheet({ lengthUnit: 'mm', lengthValue: '5300' })).calculatedLine!;
+    expect(mm.quantity).toBe(m.quantity);
+    expect(m.quantity).toBe(56.18); // 5.3 × 1.06 × 10
+  });
+
+  it('17.4 ft (decimal feet) and 17 ft 4.8 in are the same', () => {
+    const ft = calc(sheet({ lengthUnit: 'ft', lengthValue: '17.4' })).calculatedLine!;
+    const ftIn = calc(sheet({ lengthUnit: 'ft_in', lengthFeet: '17', lengthInches: '4.8' })).calculatedLine!;
+    expect(ft.quantity).toBe(ftIn.quantity);
+  });
+
+  it('a by-weight sheet in inches', () => {
+    const l = calc(line('SHEET_WEIGHT', { t: '0.47' }, { lengthUnit: 'in', lengthValue: '150', nos: '8', rate: '114' })).calculatedLine!;
+    expect(l.quantity).toBe(121.04); // 150 in = 12 ft 6 in
+  });
+
+  it('revise keeps a sheet length typed in mm or m', () => {
+    for (const extra of [{ lengthUnit: 'mm' as const, lengthValue: '5300' }, { lengthUnit: 'metres' as const, lengthMetres: '5.3' }]) {
+      const l = calc(sheet(extra)).calculatedLine!;
+      const back = rowFromSavedLine(l);
+      expect(back.lengthUnit).toBe(extra.lengthUnit);
+      expect(calc(back).calculatedLine!.quantity).toBe(l.quantity);
+    }
   });
 });
 
@@ -153,8 +309,12 @@ describe('Steel length in any unit', () => {
   it('switching the unit keeps the length', () => {
     const row = tube({ lengthUnit: 'metres', lengthMetres: '6' });
     expect(switchSteelLengthUnit(row, 'mm')).toMatchObject({ lengthUnit: 'mm', lengthValue: '6000' });
-    expect(switchSteelLengthUnit(row, 'ft')).toMatchObject({ lengthUnit: 'ft', lengthValue: '19.67' });
-    expect(switchSteelLengthUnit(row, 'ft_in')).toMatchObject({ lengthUnit: 'ft_in', lengthFeet: '19', lengthInches: '8.1' });
+    expect(switchSteelLengthUnit(row, 'ft')).toMatchObject({ lengthUnit: 'ft', lengthValue: '19.672' });
+    expect(switchSteelLengthUnit(row, 'ft_in')).toMatchObject({ lengthUnit: 'ft_in', lengthFeet: '19', lengthInches: '8.07' });
+    // switching back and forth does not change the weight
+    for (const u of ['mm', 'ft', 'in', 'ft_in'] as const) {
+      expect(calc({ ...row, ...switchSteelLengthUnit(row, u) }).calculatedLine!.quantity).toBe(calc(row).calculatedLine!.quantity);
+    }
   });
 
   it('revise keeps a length typed in mm', () => {
@@ -192,7 +352,8 @@ describe('Steel by type: on a quote line', () => {
     ['RECT_PIPE', { a: '80', b: '40', t: '3' }, { nos: '4', rate: '68' }],
     ['SHEET_SQM', { brand: 'JSW Pragathi+', t: '0.47', colour: 'Blue' }, { nos: '6', rate: '400', lengthFeet: '10' }],
     ['SHEET_WEIGHT', { t: '0.5' }, { nos: '3', rate: '118' }],
-    ['FLASHING', { item: 'Valley gutter', size: '24 inch' }, { nos: '2', rate: '980' }],
+    ['RIDGE_GUTTER', { item: 'Valley gutter', size: '24 inch' }, { nos: '2', rate: '980' }],
+    ['FLASHING', { size: '6x6' }, { nos: '10', rate: '1500' }],
     ['FIXING', { item: 'EPDM washer' }, { nos: '200', rate: '2' }],
   ] as [SteelSizeKind, Record<string, string>, Partial<EditableRowState>][]) {
     it(`revise brings back a ${shape} line with the same amount`, () => {

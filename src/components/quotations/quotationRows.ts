@@ -6,7 +6,7 @@ import type { Product, QuantityMethod, ProductUnit } from '../../types/product';
 import type { QuotationLine, QuotationLineSnapshot } from '../../types/quotation';
 import { calculateQuotationLine, validateLineDraft, type TaxMode, type LengthUnit } from '../../engine';
 import { Decimal } from 'decimal.js';
-import { steelSizeProduct, parseSteelSize, legacySteelSizeDims, defaultDims, kindHasColour, STEEL_SIZE_KINDS, type SteelSizeInput, type SteelSizeKind } from './steelSize';
+import { steelSizeProduct, parseSteelSize, flashingPerSheet, legacySteelSizeDims, defaultDims, kindHasColour, STEEL_SIZE_KINDS, type SteelSizeInput, type SteelSizeKind } from './steelSize';
 
 export type RowLengthUnit = 'ft_in' | 'metres' | 'ft' | 'in' | 'mm' | 'm';
 
@@ -44,7 +44,7 @@ export interface EditableRowState {
 /** What a line needs when its item type is picked or changed: default boxes and length entry. */
 export function itemTypeReset(shape: SteelSizeKind): Partial<EditableRowState> {
   const cfg = STEEL_SIZE_KINDS[shape];
-  const steel = cfg.method === 'SECTION_WEIGHT';
+  const steel = cfg.method === 'SECTION_WEIGHT' && !cfg.lengthInFeet;
   return {
     steelSize: { shape, dims: defaultDims(shape) },
     lengthUnit: steel ? 'metres' : 'ft_in',
@@ -109,12 +109,12 @@ export function switchSteelLengthUnit(row: EditableRowState, unit: RowLengthUnit
     case 'mm':
       return { lengthUnit: unit, lengthValue: tidy(metres.times(1000), 1) };
     case 'ft':
-      return { lengthUnit: unit, lengthValue: tidy(feet, 2) };
+      return { lengthUnit: unit, lengthValue: tidy(feet, 3) };
     case 'in':
-      return { lengthUnit: unit, lengthValue: tidy(feet.times(12), 1) };
+      return { lengthUnit: unit, lengthValue: tidy(feet.times(12), 2) };
     case 'ft_in': {
       const whole = feet.floor();
-      return { lengthUnit: unit, lengthFeet: whole.toString(), lengthInches: tidy(feet.minus(whole).times(12), 1) };
+      return { lengthUnit: unit, lengthFeet: whole.toString(), lengthInches: tidy(feet.minus(whole).times(12), 2) };
     }
     default:
       return { lengthUnit: unit };
@@ -130,6 +130,40 @@ export function createSteelSizeRow(shape: SteelSizeKind = 'SHEET_SQM'): Editable
 export function rowMethod(row: Pick<EditableRowState, 'product' | 'steelSize'>): QuantityMethod | undefined {
   if (row.product) return row.product.qtyMethod as QuantityMethod;
   return row.steelSize ? STEEL_SIZE_KINDS[row.steelSize.shape]?.method : undefined;
+}
+
+/** Flashing lines: pieces typed in Nos → pieces per sheet → sheets to charge (whole sheets). */
+export function flashingSheets(
+  row: Pick<EditableRowState, 'steelSize' | 'nos'>
+): { pieces: number; perSheet: number; girth: number; sheets: number; widthFactor: number } | null {
+  if (row.steelSize?.shape !== 'FLASHING') return null;
+  const cut = flashingPerSheet(row.steelSize.dims.size ?? '', Number(row.steelSize.dims.sheet || 48));
+  const pieces = Number(row.nos);
+  if ('error' in cut || !(pieces > 0)) return null;
+  const wf = Number(row.steelSize.dims.wf || 1.08);
+  return {
+    pieces,
+    perSheet: cut.perSheet,
+    girth: cut.girth,
+    sheets: Math.ceil(pieces / cut.perSheet - 1e-9),
+    widthFactor: wf > 0 ? wf : 1.08,
+  };
+}
+
+/** Width factor typed on the line (Sq.Mtr sheets, flashing), if any. */
+export function rowWidthOverride(row: Pick<EditableRowState, 'steelSize'>): number | null {
+  const v = Number(row.steelSize?.dims.wf);
+  return row.steelSize?.dims.wf !== undefined && String(row.steelSize.dims.wf).trim() !== '' && v > 0 ? v : null;
+}
+
+/** Width factor shown and used on a line: the line's own box, otherwise the quotation's. */
+export function lineWidthFactor(row: Pick<EditableRowState, 'steelSize' | 'product'>, quotationWidth?: number): number {
+  const own = rowWidthOverride(row);
+  if (own !== null) return own;
+  if (row.steelSize?.shape === 'FLASHING') return 1.08;
+  if (quotationWidth !== undefined) return quotationWidth;
+  const p = row.product as { widthFactor?: number } | null;
+  return p?.widthFactor || 1.08;
 }
 
 /** Rebuilds the line's one-off product after a box or the type changes. */
@@ -164,8 +198,9 @@ export function legacyLengthToFeetInches(value: number, unit: string | undefined
 }
 
 /** "17 ft 4 in" from a saved line (or the old single value, e.g. "17.4 ft"). */
-export function lineLengthText(line: Pick<QuotationLine, 'lengthValue' | 'lengthUnit' | 'lengthFeet' | 'lengthInches'>): string {
+export function lineLengthText(line: Pick<QuotationLine, 'lengthValue' | 'lengthUnit' | 'lengthFeet' | 'lengthInches' | 'lengthM'>): string {
   if (line.lengthValue !== undefined && line.lengthValue !== null) return `${line.lengthValue} ${line.lengthUnit || 'ft'}`;
+  if ((line.lengthFeet === undefined || line.lengthFeet === null) && line.lengthM) return `${line.lengthM} m`;
   const inches = Number(line.lengthInches || 0);
   return `${line.lengthFeet || 0} ft${inches ? ` ${inches} in` : ''}`;
 }
@@ -272,18 +307,16 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
 
   const base = createInitialRow(undefined, product);
   let lengthUnit: RowLengthUnit = base.lengthUnit;
-  // Old Sq.Mtr lines kept one value + unit; turn it into feet + inches of the same length
-  const legacySqm =
-    snap.qtyMethod === 'SQM' && line.lengthValue !== undefined && line.lengthValue !== null
-      ? legacyLengthToFeetInches(line.lengthValue, line.lengthUnit, snap.feetToMetre || 0.305)
+  // Sheets and steel come back in the unit the length was typed in
+  const typedUnit =
+    line.lengthValue !== undefined && line.lengthValue !== null && ['mm', 'ft', 'in', 'm'].includes(line.lengthUnit || '')
+      ? (line.lengthUnit as 'mm' | 'ft' | 'in' | 'm')
       : null;
-  if (snap.qtyMethod === 'SQM') {
-    lengthUnit = 'ft_in';
-  } else if (snap.qtyMethod === 'SECTION_WEIGHT') {
-    const typed = line.lengthValue !== undefined && line.lengthValue !== null && (line.lengthUnit === 'mm' || line.lengthUnit === 'ft' || line.lengthUnit === 'in');
-    lengthUnit = typed ? (line.lengthUnit as RowLengthUnit) : line.lengthFeet !== undefined && line.lengthFeet !== null ? 'ft_in' : 'metres';
-  } else if (snap.qtyMethod === 'SHEET_WEIGHT') {
-    lengthUnit = 'ft_in';
+  const hasFeet = line.lengthFeet !== undefined && line.lengthFeet !== null;
+  if (snap.qtyMethod === 'SQM' || snap.qtyMethod === 'SHEET_WEIGHT' || snap.qtyMethod === 'SECTION_WEIGHT') {
+    if (typedUnit) lengthUnit = typedUnit === 'm' ? 'metres' : typedUnit;
+    else if (snap.qtyMethod === 'SECTION_WEIGHT') lengthUnit = hasFeet ? 'ft_in' : 'metres';
+    else lengthUnit = hasFeet || !line.lengthM ? 'ft_in' : 'metres';
   }
 
   return {
@@ -299,12 +332,13 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
       : {}),
     colour: line.colour ?? '',
     rate: str(line.rate),
-    nos: str(line.nos, '1'),
+    // flashing: Nos was the sheets charged; staff typed the pieces
+    nos: snap.steelShape === 'FLASHING' && snap.steelSizeDims?.pcs ? snap.steelSizeDims.pcs : str(line.nos, '1'),
     lengthUnit,
-    lengthValue: snap.qtyMethod === 'SECTION_WEIGHT' && (lengthUnit === 'mm' || lengthUnit === 'ft' || lengthUnit === 'in') ? str(line.lengthValue) : '',
-    lengthFeet: legacySqm ? legacySqm.feet : str(line.lengthFeet, base.lengthFeet),
-    lengthInches: legacySqm ? legacySqm.inches : str(line.lengthInches, '0'),
-    lengthMetres: str(line.lengthM, base.lengthMetres),
+    lengthValue: typedUnit && typedUnit !== 'm' ? str(line.lengthValue) : '',
+    lengthFeet: str(line.lengthFeet, base.lengthFeet),
+    lengthInches: str(line.lengthInches, '0'),
+    lengthMetres: typedUnit === 'm' ? str(line.lengthValue) : str(line.lengthM, base.lengthMetres),
     kgPerPiece: str(line.kgPerPiece ?? snap.kgPerPiece, base.kgPerPiece),
     ...discount,
     ...manual,
@@ -430,6 +464,7 @@ function computeRowCalculationInner(
       }
     }
 
+    const cut = flashingSheets(row);
     const snapshot: QuotationLineSnapshot = {
       productId: row.product.id,
       productName: row.product.name,
@@ -449,7 +484,11 @@ function computeRowCalculationInner(
       ...(row.steelSize
         ? {
             steelShape: row.steelSize.shape,
-            steelSizeDims: Object.fromEntries(Object.entries(row.steelSize.dims).map(([k, v]) => [k, String(v).trim()])),
+            steelSizeDims: {
+              ...Object.fromEntries(Object.entries(row.steelSize.dims).filter(([k]) => k !== 'pcs').map(([k, v]) => [k, String(v).trim()])),
+              // flashing: the pieces typed (the line's Nos is the sheets charged)
+              ...(cut ? { pcs: String(cut.pieces) } : {}),
+            },
           }
         : {}),
     };
@@ -458,48 +497,35 @@ function computeRowCalculationInner(
     let lengthVal: number | undefined;
     let lengthU: LengthUnit | undefined;
 
-    if (row.product.qtyMethod === 'SQM') {
-      if (row.lengthValue && row.lengthValue.trim() !== '') {
-        const parsedVal = Number(row.lengthValue.trim());
-        if (!isNaN(parsedVal)) {
-          lengthVal = parsedVal;
-          lengthU = (['ft', 'in', 'mm', 'm'].includes(row.lengthUnit) ? row.lengthUnit : 'ft') as LengthUnit;
-        }
-      } else if (row.lengthFeet.trim() !== '' || row.lengthInches.trim() !== '') {
-        lengthParam = {
-          feet: row.lengthFeet.trim() !== '' ? Number(row.lengthFeet) : 0,
-          inches: row.lengthInches.trim() !== '' ? Number(row.lengthInches) : 0,
-        };
-      }
-    } else if (row.product.qtyMethod === 'SHEET_WEIGHT' || row.lengthUnit === 'ft_in') {
-      lengthParam = {
-        feet: row.lengthFeet.trim() !== '' ? Number(row.lengthFeet) : 0,
-        inches: row.lengthInches.trim() !== '' ? Number(row.lengthInches) : 0,
-      };
-    } else if (row.product.qtyMethod === 'SECTION_WEIGHT' && row.lengthUnit === 'metres') {
-      lengthParam = {
-        metres: row.lengthMetres.trim() !== '' ? Number(row.lengthMetres) : 0,
-      };
-    } else if (row.product.qtyMethod === 'SECTION_WEIGHT' && (row.lengthUnit === 'mm' || row.lengthUnit === 'ft' || row.lengthUnit === 'in')) {
+    // Sheets (Sq.Mtr / by weight) and steel take the length in m, mm, ft, in or ft + in
+    const method = row.product.qtyMethod;
+    const num = (v?: string) => ((v ?? '').trim() !== '' ? Number(v) : 0);
+    const takesUnit = method === 'SQM' || method === 'SHEET_WEIGHT' || method === 'SECTION_WEIGHT';
+    if (takesUnit && row.lengthUnit === 'metres') {
+      lengthParam = { metres: num(row.lengthMetres) };
+    } else if (takesUnit && (row.lengthUnit === 'mm' || row.lengthUnit === 'ft' || row.lengthUnit === 'in' || row.lengthUnit === 'm')) {
       // Kept on the line too, so the quote shows the length as typed (e.g. 2500 mm)
-      lengthVal = (row.lengthValue ?? '').trim() !== '' ? Number(row.lengthValue) : 0;
+      lengthVal = num(row.lengthValue);
       lengthU = row.lengthUnit;
       lengthParam = { value: lengthVal, unit: lengthU };
+    } else if (method === 'SQM' || method === 'SHEET_WEIGHT' || row.lengthUnit === 'ft_in') {
+      lengthParam = { feet: num(row.lengthFeet), inches: num(row.lengthInches) };
     }
 
     const kgPerPieceVal = row.kgPerPiece && row.kgPerPiece.trim() !== ''
       ? Number(row.kgPerPiece.trim())
       : ('kgPerPiece' in row.product ? row.product.kgPerPiece : undefined);
 
-    const nosNum = row.nos.trim() !== '' ? Number(row.nos) : 1;
+    const nosNum = cut ? cut.sheets : row.nos.trim() !== '' ? Number(row.nos) : 1;
 
-    const effectiveWidthFactor = widthFactor ?? ('widthFactor' in row.product && row.product.widthFactor ? row.product.widthFactor : 1.08);
+    const effectiveWidthFactor = cut ? cut.widthFactor : rowWidthOverride(row) ?? widthFactor ?? ('widthFactor' in row.product && row.product.widthFactor ? row.product.widthFactor : 1.08);
     const effectiveFeetToMetre = feetToMetre ?? (row.product.qtyMethod === 'SQM' ? 0.305 : undefined);
 
     const calcLine = calculateQuotationLine(
       {
         id: row.id,
         snapshot,
+        roundPerPieceDown: Boolean(cut),
         length: lengthParam,
         lengthValue: lengthVal,
         lengthUnit: lengthU,
@@ -564,4 +590,39 @@ export function weightPreview(
   return calculatedLine
     ? { quantity: calculatedLine.quantity, unit: calculatedLine.unit, perPiece: calculatedLine.perPieceQuantity }
     : null;
+}
+
+/**
+ * The line's working in plain words, e.g.
+ * "12 pcs ÷ 4 a sheet = 3 sheets · 8 ft = 2.44 m × 1.08 = 2.63 Sq.Mtr a sheet × 3 = 7.89 Sq.Mtr".
+ */
+export function workingText(row: EditableRowState): string | null {
+  const l = row.calculatedLine;
+  if (!l || !row.steelSize || l.isManualQuantity) return null;
+  const cfg = STEEL_SIZE_KINDS[row.steelSize.shape];
+  const num = (v: number | undefined, dp = 4) => String(Number(Number(v || 0).toFixed(dp)));
+  const len = lineLengthText(l);
+  const metres = num(l.lengthM);
+  const lenM = /\bm$/.test(len) && !/mm$/.test(len) ? len : `${len} = ${metres} m`;
+  if (cfg.method === 'SQM') {
+    const wf = num(l.widthFactor, 3);
+    const cut = flashingSheets(row);
+    if (cut) {
+      return `${cut.pieces} pcs ÷ ${cut.perSheet} a sheet = ${cut.sheets} sheet${cut.sheets === 1 ? '' : 's'} · ${lenM} × ${wf} = ${num(l.perPieceQuantity, 2)} Sq.Mtr a sheet × ${cut.sheets} = ${num(l.quantity, 2)} Sq.Mtr`;
+    }
+    return `${lenM} × ${wf} = ${num(l.unroundedQuantity ? l.unroundedQuantity / l.nos : l.perPieceQuantity)} Sq.Mtr each × ${l.nos} = ${num(l.quantity, 2)} Sq.Mtr`;
+  }
+  if (cfg.method === 'SECTION_WEIGHT') {
+    const kgm = l.snapshot.kgPerMetre || 0;
+    if (cfg.perFoot) {
+      const ft = num((l.lengthM || 0) / 0.305);
+      const kgft = row.steelSize.dims.kgft || num(kgm * 0.305, 3);
+      return `${len}${/ft$/.test(len) && !/in/.test(len) ? '' : ` = ${ft} ft`} × ${kgft} kg/ft = ${num(l.perPieceQuantity, 2)} kg each × ${l.nos} = ${num(l.quantity, 2)} kg`;
+    }
+    return `${lenM} × ${num(kgm, 3)} kg/m = ${num(l.perPieceQuantity, 2)} kg each × ${l.nos} = ${num(l.quantity, 2)} kg`;
+  }
+  if (cfg.method === 'SHEET_WEIGHT') {
+    return `${num(l.perPieceQuantity, 2)} kg each × ${l.nos} = ${num(l.quantity, 2)} kg`;
+  }
+  return null;
 }

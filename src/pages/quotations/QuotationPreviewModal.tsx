@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { QUOTATION_STATUS_LABELS, type Quotation, type QuotationLine, type QuotationStatus } from '../../types/quotation';
 import { formatRoundOff } from '../../engine';
 import { QuotationPdfActions } from './QuotationPdfActions';
-import { describeSteelLine, isSteelByKg } from '../../utils/steelLine';
+import { describeSteelLine, describeFlashingLine, isSteelByKg } from '../../utils/steelLine';
 import {
   FileText,
   X,
@@ -24,7 +24,8 @@ function describeLine(line: QuotationLine, quotation: Quotation): string {
   const m = line.snapshot.qtyMethod;
   let s = '';
   if (m === 'SQM') {
-    s = `${lineLengthText(line)} × ${line.nos} nos · Width ${line.widthFactor || line.snapshot.widthFactor || quotation.widthFactor || 1.08}`;
+    const flash = describeFlashingLine(line);
+    s = `${flash ? `${flash} · ` : ''}${lineLengthText(line)} × ${line.nos} ${flash ? 'sheets' : 'nos'} · Width ${line.widthFactor || line.snapshot.widthFactor || quotation.widthFactor || 1.08}`;
   } else if (m === 'WEIGHT_PER_PIECE') {
     s = `${line.nos} nos × ${line.kgPerPiece || line.snapshot.kgPerPiece || 0} kg/pc`;
   } else if (m === 'CUSTOM') {
@@ -34,7 +35,7 @@ function describeLine(line: QuotationLine, quotation: Quotation): string {
   } else if (m === 'SECTION_WEIGHT') {
     return describeSteelLine(line);
   } else if (m === 'PIECE') {
-    s = `${line.nos} nos`;
+    s = describeFlashingLine(line) ?? `${line.nos} nos`;
   } else if (m === 'AREA' || m === 'RUNNING_LENGTH' || m === 'LENGTH_FT') {
     s = `${line.lengthFeet || 0}'${line.lengthInches || 0}" × ${line.nos} nos`;
   }
@@ -331,7 +332,7 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                             </span>
                           )}
                           {line.snapshot.qtyMethod === 'SECTION_WEIGHT' && <span>{describeSteelLine(line, '•')}</span>}
-                          {line.snapshot.qtyMethod === 'PIECE' && <span>{line.nos} nos &bull; Per piece</span>}
+                          {line.snapshot.qtyMethod === 'PIECE' && <span>{describeFlashingLine(line, '•') ?? `${line.nos} nos • Per piece`}</span>}
                           {line.isManualQuantity && !isSteelByKg(line) && (
                             <span className="ml-1.5 text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-1 py-0.5 rounded border border-amber-200">
                               (Manual)

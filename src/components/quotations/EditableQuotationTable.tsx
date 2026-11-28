@@ -46,11 +46,14 @@ import {
   applySteelSize,
   itemTypeReset,
   rowMethod,
+  flashingSheets,
+  lineWidthFactor,
+  workingText,
   STEEL_LENGTH_UNITS,
   switchSteelLengthUnit,
 } from './quotationRows';
 import { formatKgPerMetre } from '../../engine/steel';
-import { STEEL_SIZE_KINDS, STEEL_SIZE_KIND_ORDER, ITEM_GROUPS, fieldUnit, parseSteelSize, type SteelSizeKind } from './steelSize';
+import { STEEL_SIZE_KINDS, STEEL_SIZE_KIND_ORDER, ITEM_GROUPS, fieldUnit, weightRateText, parseSteelSize, type SteelSizeKind } from './steelSize';
 import { SUGGESTED_UNITS } from '../../types/product';
 import { approxLengths } from '../../utils/steelLine';
 
@@ -506,7 +509,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
             return (
               <label key={fd.key} className="block min-w-0">
                 <span className="block text-[11px] text-muted mb-0.5 truncate" title={fd.label}>
-                  {mobile ? fd.label : fd.short}
+                  {fd.label}
                   {unit && ` (${unit})`}
                   {!fd.optional && kind !== 'number' && <span className="text-danger"> *</span>}
                 </span>
@@ -532,7 +535,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       min={kind === 'number' ? '0' : undefined}
                       list={kind === 'combo' ? listId : undefined}
                       autoComplete="off"
-                      value={size.dims[fd.key] ?? ''}
+                      value={size.dims[fd.key] ?? (fd.key === 'wf' ? String(lineWidthFactor(row, widthFactor)) : '')}
                       onChange={(e) => setDim(fd.key, e.target.value)}
                       onKeyDown={onEnter}
                       className={`${boxClass} ${kind === 'number' ? 'text-center' : ''}`}
@@ -556,7 +559,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           {row.product ? (
             <>
               <span className="text-ink font-medium">{row.product.name}</span>
-              {kgm !== undefined && <span className="tabular-nums"> · {formatKgPerMetre(kgm)} kg/m</span>}
+              {kgm !== undefined && <span className="tabular-nums"> · {weightRateText(size.shape, kgm, size.dims)}</span>}
+              {(() => {
+                const working = workingText(row);
+                return working ? <span className="block tabular-nums text-ink mt-0.5">{working}</span> : null;
+              })()}
             </>
           ) : sizeError ? (
             <span className="text-danger font-medium">{sizeError}</span>
@@ -704,11 +711,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           <thead>
             <tr className="bg-surface-2/70 border-b border-line text-faint font-semibold text-[10.5px] uppercase tracking-wider">
               <th className="py-2.5 px-3 text-center w-10">#</th>
-              <th className="py-2.5 px-3 w-[340px]">Item / Description</th>
-              <th className="py-2.5 px-3 w-[180px]">Dimensions / Length</th>
-              <th className="py-2.5 px-3 text-center w-[75px]">Nos</th>
-              <th className="py-2.5 px-3 text-right w-[110px]">Quantity</th>
-              <th className="py-2.5 px-3 text-right w-[95px]">Rate (₹)</th>
+              <th className="py-2.5 px-3 w-[340px]">Item & sizes</th>
+              <th className="py-2.5 px-3 w-[180px]">Length of each piece</th>
+              <th className="py-2.5 px-3 text-center w-[75px]">Pieces</th>
+              <th className="py-2.5 px-3 text-right w-[110px]">Billed qty</th>
+              <th className="py-2.5 px-3 text-right w-[95px]">Rate ₹ / unit</th>
               <th className="py-2.5 px-3 text-right w-[130px]">Amount before GST</th>
               <th className="py-2.5 px-3 text-center w-[70px]">Actions</th>
             </tr>
@@ -723,7 +730,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               const isSheet = method === 'SHEET_WEIGHT';
               const isPipe = method === 'SECTION_WEIGHT';
               const isPiece = method === 'PIECE';
-              const isFeetInches = isSheet || isLengthMethod(method);
+              const takesLengthUnit = isPipe || isSqm || isSheet; // m / mm / ft / in / ft + in
+              const isFeetInches = !takesLengthUnit && isLengthMethod(method);
               const takesColour = isSheetLike(row.product) && !row.steelSize; // type lines have their own Colour box
               const hasError = Boolean(row.validationError);
 
@@ -982,9 +990,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                             <span className="font-semibold text-muted text-xs">in</span>
                           </div>
                         </div>
-                        {isSqm && <div className="text-[10px] text-faint">Width: {widthFactor ?? ('widthFactor' in (row.product || {}) && (row.product as any).widthFactor ? (row.product as any).widthFactor : 1.08)}</div>}
+                        {isSqm && <div className="text-[10px] text-faint">Width: {lineWidthFactor(row, widthFactor)}</div>}
                       </div>
-                    ) : isPipe ? (
+                    ) : takesLengthUnit ? (
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-1.5">
                           {row.lengthUnit !== 'ft_in' ? (
@@ -1072,6 +1080,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                             ))}
                           </select>
                         </div>
+                        {isSqm && <div className="text-[10px] text-faint">Width: {lineWidthFactor(row, widthFactor)}</div>}
                       </div>
                     ) : isPiece ? (
                       <div className="text-muted text-xs pt-1.5">—</div>
@@ -1158,7 +1167,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                               {Number(row.calculatedLine.quantity).toFixed(2)}{' '}
                               <span className="font-medium text-muted text-[11px]">{row.calculatedLine.unit}</span>
                             </div>
-                            {row.calculatedLine.perPieceQuantity > 0 && !row.isManualQuantity && (
+                            {row.calculatedLine.perPieceQuantity > 0 && !row.isManualQuantity && !flashingSheets(row) && (
                               <div className="text-[10px] text-faint font-mono tabular-nums">
                                 {row.calculatedLine.perPieceQuantity} {row.calculatedLine.unit}/pc
                               </div>
@@ -1284,7 +1293,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           const isWeightPerPiece = method === 'WEIGHT_PER_PIECE';
           const isSheet = method === 'SHEET_WEIGHT';
           const isPipe = method === 'SECTION_WEIGHT';
-          const isFeetInches = isSheet || isLengthMethod(method);
+          const takesLengthUnit = isPipe || isSqm || isSheet; // m / mm / ft / in / ft + in
+              const isFeetInches = !takesLengthUnit && isLengthMethod(method);
           const takesColour = isSheetLike(row.product) && !row.steelSize; // type lines have their own Colour box
           const hasError = Boolean(row.validationError);
 
@@ -1526,7 +1536,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
                       {isSheet || isSqm ? 'Sheet Length' : 'Length'}
                     </label>
-                    {isSqm && <span className="text-[11px] text-muted">Width: {widthFactor ?? ('widthFactor' in (row.product || {}) && (row.product as any).widthFactor ? (row.product as any).widthFactor : 1.08)}</span>}
+                    {isSqm && <span className="text-[11px] text-muted">Width: {lineWidthFactor(row, widthFactor)}</span>}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center gap-1.5">
@@ -1566,8 +1576,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     </div>
                   </div>
                 </div>
-              ) : isPipe ? (
+              ) : takesLengthUnit ? (
                 <div className="space-y-1.5 pt-1">
+                  {isPipe && (
                   <div className="flex items-center justify-between gap-2 pb-1.5">
                     <span className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">Sell by</span>
                     <div role="radiogroup" aria-label="Sell by" className="inline-flex p-0.5 bg-surface-2 border border-line rounded-control">
@@ -1588,9 +1599,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     })}
                   </div>
                   </div>
-                  <div className="flex items-center justify-between">
+                  )}
+                  <div className="flex items-center justify-between gap-2">
                     <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
-                      {row.isManualQuantity ? 'Bar length' : 'Length'}
+                      {row.isManualQuantity ? 'Bar length' : isSqm || isSheet ? 'Sheet length' : 'Length'}
+                      {isSqm && <span className="ml-2 normal-case tracking-normal font-normal text-muted">Width: {lineWidthFactor(row, widthFactor)}</span>}
                     </label>
                     <select
                             value={row.lengthUnit}
