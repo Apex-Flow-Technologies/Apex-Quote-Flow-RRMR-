@@ -1,5 +1,5 @@
 import type { QuotationLine } from '../types/quotation';
-import { weightRateText, flashingPerSheet } from '../components/quotations/steelSize';
+import { weightRateText, flashingPerSheet, isSheetCut } from '../components/quotations/steelSize';
 
 /** A steel (by-weight) line where the salesperson typed the kg instead of a number of lengths. */
 export function isSteelByKg(line: Pick<QuotationLine, 'isManualQuantity' | 'snapshot'>): boolean {
@@ -31,7 +31,7 @@ export function describeSteelLine(line: QuotationLine, sep = '·'): string {
 /** Flashing cut from sheets, e.g. "10 pcs · 4 per 48 in sheet → 3 sheets" (null for other lines). */
 export function describeFlashingLine(line: QuotationLine, sep = '·'): string | null {
   const dims = line.snapshot.steelSizeDims;
-  if (line.snapshot.steelShape !== 'FLASHING' || !dims?.pcs) return null;
+  if (!isSheetCut(line.snapshot.steelShape) || !dims?.pcs) return null;
   const width = Number(dims.sheet || 48);
   const cut = flashingPerSheet(dims.size ?? '', width);
   if ('error' in cut) return null;

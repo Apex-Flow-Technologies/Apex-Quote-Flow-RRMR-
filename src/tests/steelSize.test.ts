@@ -6,6 +6,7 @@ import {
   flashingPerSheet,
   STEEL_SIZE_KINDS,
   STEEL_SIZE_KIND_ORDER,
+  ITEM_PRESETS,
   type SteelSizeKind,
 } from '../components/quotations/steelSize';
 import {
@@ -63,7 +64,8 @@ describe('Steel by type: weight per metre (maiak-m.bg formulas)', () => {
   it('every type in the picker has boxes', () => {
     expect(STEEL_SIZE_KIND_ORDER).not.toContain('UNEQUAL_ANGLE');
     expect(STEEL_SIZE_KIND_ORDER).not.toContain('SHEET_WEIGHT'); // replaced by the kg/ft sheet
-    expect(STEEL_SIZE_KIND_ORDER).toHaveLength(Object.keys(STEEL_SIZE_KINDS).length - 2);
+    expect(STEEL_SIZE_KIND_ORDER).not.toContain('RIDGE_GUTTER'); // split into Ridge and Gutter
+    expect(STEEL_SIZE_KIND_ORDER).toHaveLength(Object.keys(STEEL_SIZE_KINDS).length - 3);
     for (const k of STEEL_SIZE_KIND_ORDER) expect(STEEL_SIZE_KINDS[k].fields.length).toBeGreaterThan(0);
   });
 
@@ -122,6 +124,29 @@ describe('Sheets and accessories by type', () => {
     expect(l.productName).toBe('JSW Colouron+ Ridge 12 × 12 0.47 mm – 8 ft');
     expect(l.unit).toBe('Nos');
     expect(l.taxableAmount).toBe(3450);
+  });
+
+  it('ridge and gutter are cut from the sheet too', () => {
+    const r = calc(line('RIDGE', { item: 'Profile ridge', size: '1x1 ft' }, { nos: '4', rate: '1' })).calculatedLine!;
+    expect(r.productName).toBe('Profile ridge 1 × 1 ft');
+    expect(r.nos).toBe(2); // 24 in → 2 a sheet; 4 pcs → 2 sheets
+    expect(r.unit).toBe('Sq.Mtr');
+    expect(r.quantity).toBe(5.26); // 2 × 2.63
+    // non-standard 1.5 × 1.5 ft ridge: 36 in → only 1 a sheet
+    expect(calc(line('RIDGE', { size: '1.5x1.5 ft' }, { nos: '3', rate: '1' })).calculatedLine!.nos).toBe(3);
+    // gutter: 24 in girth → 2 a sheet; anything over 24 in → 1
+    expect(calc(line('GUTTER', { item: 'Barge gutter', size: '24' }, { nos: '4', rate: '1' })).calculatedLine!.nos).toBe(2);
+    expect(calc(line('GUTTER', { size: '30' }, { nos: '4', rate: '1' })).calculatedLine!.nos).toBe(4);
+    const back = rowFromSavedLine(r);
+    expect(back.nos).toBe('4');
+    expect(back.steelSize!.dims.item).toBe('Profile ridge');
+    expect(ITEM_PRESETS.RIDGE).toEqual(['Ridge', 'Profile ridge']);
+    expect(ITEM_PRESETS.GUTTER).toEqual(['Gutter', 'Barge gutter']);
+    expect(ITEM_PRESETS.FLASHING).toEqual(['L flashing', 'Ridge', 'Barge L flashing']);
+    // picked in the main dropdown, so no separate item box
+    expect(STEEL_SIZE_KINDS.FLASHING.fields.some((f) => f.key === 'item')).toBe(false);
+    expect(createSteelSizeRow('GUTTER', 'Barge gutter').steelSize!.dims.item).toBe('Barge gutter');
+    expect(createSteelSizeRow('FLASHING').steelSize!.dims.item).toBe('L flashing');
   });
 
   it('ridge / gutter needs the item', () => {

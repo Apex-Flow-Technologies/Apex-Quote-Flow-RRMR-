@@ -30,7 +30,7 @@ export function chequeredKgPerSqm(t: number): Decimal {
 }
 import { Decimal } from 'decimal.js';
 
-export type SheetItemKind = 'SHEET_SQM' | 'SHEET_KGFT' | 'SHEET_WEIGHT' | 'POLYCARBONATE' | 'FLASHING' | 'RIDGE_GUTTER' | 'FIXING';
+export type SheetItemKind = 'SHEET_SQM' | 'SHEET_KGFT' | 'SHEET_WEIGHT' | 'POLYCARBONATE' | 'FLASHING' | 'RIDGE' | 'GUTTER' | 'RIDGE_GUTTER' | 'FIXING';
 export type SteelItemKind =
   | 'PLATE'
   | 'CHEQUERED_PLATE'
@@ -81,6 +81,8 @@ export interface SteelSizeKindConfig {
   lengthInFeet?: boolean;
   /** Weight is given per foot (kg/ft) rather than worked out per metre. */
   perFoot?: boolean;
+  /** Cut from a plain sheet: pieces typed, whole sheets priced by Sq.Mtr (flashing, ridge, gutter). */
+  sheetCut?: boolean;
   category: string;
   /** The item name, HSN and (steel) kg/m, or what is wrong. */
   compute: (v: Record<string, number | string>) => ItemBuild | { error: string };
@@ -93,8 +95,10 @@ export const SHEET_THICKNESSES = ['0.30', '0.35', '0.40', '0.45', '0.47', '0.50'
 export const SHEET_COLOURS = ['Red', 'Blue', 'Green', 'Grey', 'White', 'Off-white', 'Brick red', 'Terracotta', 'Silver', 'Bare'];
 export const POLY_THICKNESSES = ['1.5', '2', '3', '4', '6', '8', '10'];
 export const POLY_COLOURS = ['Clear', 'Bronze', 'Opal', 'Blue', 'Green', 'Grey'];
-export const FLASHING_ITEMS = ['L flashing', 'Ridge flashing', 'Apron flashing'];
+export const FLASHING_ITEMS = ['L flashing', 'Ridge', 'Barge L flashing'];
 export const RIDGE_GUTTER_ITEMS = ['Ridge', 'Valley gutter', 'Gutter', 'End cap'];
+export const RIDGE_ITEMS = ['Ridge', 'Profile ridge'];
+export const GUTTER_ITEMS = ['Gutter', 'Barge gutter'];
 export const RIDGE_GUTTER_SIZES = ['12x12', '18x18', '24 inch'];
 export const FLASHING_SIZES = ['6x6', '8x8', '1x1 ft', '18x18', '24'];
 export const FLASHING_LENGTHS = ['8 ft', '10 ft', '12 ft'];
@@ -127,6 +131,36 @@ const mm = (t: number | string) => (f(t) ? `${f(t)} mm` : '');
 const steel = (label: string, category: string, fields: SteelSizeField[], compute: SteelSizeKindConfig['compute'], defaultLengthM = 6): SteelSizeKindConfig => ({
   label, group: 'Steel', method: 'SECTION_WEIGHT', unit: 'Kgs', fields, defaultLengthM, category, compute,
 });
+
+export const RIDGE_SIZES = ['1x1 ft', '1.5x1.5 ft', '12x12', '18x18'];
+export const GUTTER_SIZES = ['18', '24', '30', '36'];
+
+/** A sheet-cut item (ridge, gutter): same boxes and pricing as flashing; the item is picked in the main dropdown. */
+function sheetCut(label: string, sizeLabel: string, sizes: string[]): SteelSizeKindConfig {
+  return {
+    label,
+    group: 'Accessories',
+    method: 'SQM',
+    unit: 'Sq.Mtr',
+    fields: [
+      combo('size', sizeLabel, sizes, { optional: false }),
+      combo('sheet', 'Sheet width', ['48'], { unit: 'in', optional: false, numeric: true, default: '48' }),
+      combo('wf', 'Width factor', ['1.08', '1.28'], { optional: false, numeric: true, default: '1.08' }),
+      BRAND,
+      SHEET_T,
+      COLOUR,
+    ],
+    defaultLengthM: 0,
+    lengthInFeet: true,
+    sheetCut: true,
+    category: 'Flashing',
+    compute: ({ item, size, sheet, brand, t }) => {
+      const cut = flashingPerSheet(String(size), Number(sheet));
+      if ('error' in cut) return { error: cut.error };
+      return { name: join(brand, item, f(size).replace(/\s*x\s*/gi, ' × '), mm(t)), hsn: '72109090' };
+    },
+  };
+}
 
 export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
   // ── Sheets ───────────────────────────────────────────────────────────────────
@@ -204,7 +238,6 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
     method: 'SQM',
     unit: 'Sq.Mtr',
     fields: [
-      combo('item', 'Flashing type', FLASHING_ITEMS, { optional: false, default: 'L flashing' }),
       combo('size', 'Size A × B (inches)', FLASHING_SIZES, { optional: false }),
       combo('sheet', 'Sheet width', ['48'], { unit: 'in', optional: false, numeric: true, default: '48' }),
       combo('wf', 'Width factor', ['1.08', '1.28'], { optional: false, numeric: true, default: '1.08' }),
@@ -214,6 +247,7 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
     ],
     defaultLengthM: 0,
     lengthInFeet: true,
+    sheetCut: true,
     category: 'Flashing',
     compute: ({ item, size, sheet, brand, t }) => {
       const cut = flashingPerSheet(String(size), Number(sheet));
@@ -221,6 +255,7 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
       return { name: join(brand, item, f(size).replace(/\s*x\s*/gi, ' × '), mm(t)), hsn: '72109090' };
     },
   },
+  // Earlier combined type; no longer offered, older quotes still open
   RIDGE_GUTTER: {
     label: 'Ridge / gutter',
     group: 'Accessories',
@@ -241,6 +276,10 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
       hsn: '72109090',
     }),
   },
+  // Ridge and gutter are cut from the same 8 ft × 4 ft sheet as flashing:
+  // pieces per sheet = 48 in ÷ width used (1 × 1 ft ridge → 2; 1.5 × 1.5 ft → 1; gutter over 24 in → 1)
+  RIDGE: sheetCut('Ridge', 'Size A × B (inches)', RIDGE_SIZES),
+  GUTTER: sheetCut('Gutter', 'Girth (inches)', GUTTER_SIZES),
   FIXING: {
     label: 'Screws & fixings',
     group: 'Accessories',
@@ -306,21 +345,55 @@ export const STEEL_SIZE_KINDS: Record<SteelSizeKind, SteelSizeKindConfig> = {
   }),
 };
 
-export const ITEM_GROUPS: { group: ItemGroup; kinds: SteelSizeKind[] }[] = [
-  { group: 'Sheets', kinds: ['SHEET_SQM', 'SHEET_KGFT', 'POLYCARBONATE'] },
-  { group: 'Accessories', kinds: ['FLASHING', 'RIDGE_GUTTER', 'FIXING'] },
+/** Items picked straight from the main dropdown (the line then has no separate "type" box). */
+export const ITEM_PRESETS: Partial<Record<SteelSizeKind, string[]>> = {
+  FLASHING: FLASHING_ITEMS,
+  RIDGE: RIDGE_ITEMS,
+  GUTTER: GUTTER_ITEMS,
+};
+
+export interface ItemOption {
+  value: string; // "FLASHING::L flashing" or a plain type, e.g. "SQUARE_PIPE"
+  kind: SteelSizeKind;
+  item?: string;
+  label: string;
+}
+const opt = (kind: SteelSizeKind): ItemOption => ({ value: kind, kind, label: STEEL_SIZE_KINDS[kind].label });
+const presets = (kind: SteelSizeKind): ItemOption[] =>
+  (ITEM_PRESETS[kind] || []).map((item) => ({ value: `${kind}::${item}`, kind, item, label: item }));
+
+/** The main dropdown, grouped. */
+export const ITEM_GROUPS: { group: string; options: ItemOption[] }[] = [
+  { group: 'Sheets', options: (['SHEET_SQM', 'SHEET_KGFT', 'POLYCARBONATE'] as SteelSizeKind[]).map(opt) },
+  { group: 'Flashing (cut from sheet)', options: presets('FLASHING') },
+  { group: 'Ridge (cut from sheet)', options: presets('RIDGE') },
+  { group: 'Gutter (cut from sheet)', options: presets('GUTTER') },
+  { group: 'Fixings', options: [opt('FIXING')] },
   {
     group: 'Steel',
     // Unequal angle is not offered (RR's choice); quotes that already have one still open
-    kinds: ['SQUARE_PIPE', 'RECT_PIPE', 'ROUND_PIPE', 'PLATE', 'CHEQUERED_PLATE', 'FLAT', 'ROUND_BAR', 'SQUARE_BAR', 'EQUAL_ANGLE', 'CHANNEL', 'BEAM'],
+    options: (['SQUARE_PIPE', 'RECT_PIPE', 'ROUND_PIPE', 'PLATE', 'CHEQUERED_PLATE', 'FLAT', 'ROUND_BAR', 'SQUARE_BAR', 'EQUAL_ANGLE', 'CHANNEL', 'BEAM'] as SteelSizeKind[]).map(opt),
   },
 ];
-export const STEEL_SIZE_KIND_ORDER: SteelSizeKind[] = ITEM_GROUPS.flatMap((g) => g.kinds);
+export const STEEL_SIZE_KIND_ORDER: SteelSizeKind[] = [...new Set(ITEM_GROUPS.flatMap((g) => g.options.map((o) => o.kind)))];
+
+/** Dropdown value for a line: the type, plus the item for preset types. */
+export function itemOptionValue(shape: SteelSizeKind, dims: Record<string, string>): string {
+  return ITEM_PRESETS[shape] ? `${shape}::${dims.item ?? ''}` : shape;
+}
+export function parseItemOptionValue(value: string): { kind: SteelSizeKind; item?: string } {
+  const [kind, item] = value.split('::');
+  return { kind: kind as SteelSizeKind, item };
+}
 
 /** The unit shown after a field's label: steel measurement boxes are in mm unless set. */
 export function fieldUnit(fd: SteelSizeField): string {
   if (fd.unit !== undefined) return fd.unit;
   return fd.kind === 'select' ? '' : 'mm';
+}
+
+export function isSheetCut(shape?: string): boolean {
+  return Boolean(shape && STEEL_SIZE_KINDS[shape as SteelSizeKind]?.sheetCut);
 }
 
 export function kindHasColour(shape?: string): boolean {
@@ -364,9 +437,11 @@ export function weightRateText(shape: string | undefined, kgPerMetre: number | u
   return isFinite(v) ? `${Number(v.toFixed(3))} kg/m` : '';
 }
 
-/** Boxes filled in when a type is picked (e.g. coil width 1.06). */
-export function defaultDims(shape: SteelSizeKind): Record<string, string> {
+/** Boxes filled in when a type is picked (e.g. coil width 1.06); preset types start on their first item. */
+export function defaultDims(shape: SteelSizeKind, item?: string): Record<string, string> {
   const dims: Record<string, string> = {};
+  const presetItems = ITEM_PRESETS[shape];
+  if (presetItems) dims.item = item ?? presetItems[0];
   for (const fd of STEEL_SIZE_KINDS[shape].fields) if (fd.default) dims[fd.key] = fd.default;
   return dims;
 }
@@ -391,7 +466,7 @@ export function parseSteelSize(input: SteelSizeInput): SteelSizeResult {
   if (empty.length) {
     return { ok: false, missing: true, error: `Enter ${empty.map((fd) => fd.label.toLowerCase()).join(', ')}.` };
   }
-  const values: Record<string, number | string> = {};
+  const values: Record<string, number | string> = Object.fromEntries(Object.entries(input.dims || {}).map(([k, v]) => [k, String(v ?? '').trim()]));
   for (const fd of cfg.fields) {
     const raw = text(fd.key);
     const isNumber = (fd.kind ?? 'number') === 'number' || fd.numeric;

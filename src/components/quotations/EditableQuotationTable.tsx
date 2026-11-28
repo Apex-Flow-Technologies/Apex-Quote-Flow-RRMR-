@@ -53,7 +53,7 @@ import {
   switchSteelLengthUnit,
 } from './quotationRows';
 import { formatKgPerMetre } from '../../engine/steel';
-import { STEEL_SIZE_KINDS, STEEL_SIZE_KIND_ORDER, ITEM_GROUPS, fieldUnit, weightRateText, parseSteelSize, type SteelSizeKind } from './steelSize';
+import { STEEL_SIZE_KINDS, ITEM_GROUPS, itemOptionValue, parseItemOptionValue, fieldUnit, weightRateText, parseSteelSize } from './steelSize';
 import { SUGGESTED_UNITS } from '../../types/product';
 import { approxLengths } from '../../utils/steelLine';
 
@@ -469,10 +469,15 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     return (
       <div className={mobile ? 'space-y-2' : 'space-y-1.5'}>
         <select
-          value={size.shape}
+          value={itemOptionValue(size.shape, size.dims)}
           onChange={(e) => {
-            const shape = e.target.value as SteelSizeKind;
-            updateRow(row.id, itemTypeReset(shape));
+            const { kind: shape, item } = parseItemOptionValue(e.target.value);
+            // Same type, another item (e.g. L flashing → Ridge): keep the boxes already filled
+            if (shape === size.shape && item !== undefined) {
+              updateRow(row.id, { steelSize: { ...size, dims: { ...size.dims, item } } });
+              return;
+            }
+            updateRow(row.id, itemTypeReset(shape, item));
             setTimeout(() => getActiveInput(`${row.id}_steel_${STEEL_SIZE_KINDS[shape].fields[0].key}`)?.focus(), 30);
           }}
           className={
@@ -482,12 +487,14 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           }
           aria-label="Item type"
         >
-          {!STEEL_SIZE_KIND_ORDER.includes(size.shape) && <option value={size.shape}>{cfg.label}</option>}
+          {!ITEM_GROUPS.some((g) => g.options.some((o) => o.value === itemOptionValue(size.shape, size.dims))) && (
+            <option value={itemOptionValue(size.shape, size.dims)}>{size.dims.item || cfg.label}</option>
+          )}
           {ITEM_GROUPS.map((g) => (
             <optgroup key={g.group} label={g.group}>
-              {g.kinds.map((k) => (
-                <option key={k} value={k}>
-                  {STEEL_SIZE_KINDS[k].label}
+              {g.options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </optgroup>

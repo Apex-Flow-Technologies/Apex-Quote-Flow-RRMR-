@@ -321,8 +321,8 @@ export const QuotationBuilder: React.FC<QuotationBuilderProps> = ({
   // New lines are picked by type; a new line starts as the same type as the line above it
   const handleAddRow = () => {
     setRows((prev) => {
-      const lastType = [...prev].reverse().find((r) => r.steelSize)?.steelSize?.shape;
-      return [...prev, createSteelSizeRow(lastType)];
+      const last = [...prev].reverse().find((r) => r.steelSize)?.steelSize;
+      return [...prev, createSteelSizeRow(last?.shape, last?.dims.item)];
     });
   };
 

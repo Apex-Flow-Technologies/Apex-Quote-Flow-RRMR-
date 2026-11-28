@@ -6,7 +6,7 @@ import type { Product, QuantityMethod, ProductUnit } from '../../types/product';
 import type { QuotationLine, QuotationLineSnapshot } from '../../types/quotation';
 import { calculateQuotationLine, validateLineDraft, type TaxMode, type LengthUnit } from '../../engine';
 import { Decimal } from 'decimal.js';
-import { steelSizeProduct, parseSteelSize, flashingPerSheet, legacySteelSizeDims, defaultDims, kindHasColour, STEEL_SIZE_KINDS, type SteelSizeInput, type SteelSizeKind } from './steelSize';
+import { steelSizeProduct, parseSteelSize, flashingPerSheet, isSheetCut, legacySteelSizeDims, defaultDims, kindHasColour, STEEL_SIZE_KINDS, type SteelSizeInput, type SteelSizeKind } from './steelSize';
 
 export type RowLengthUnit = 'ft_in' | 'metres' | 'ft' | 'in' | 'mm' | 'm';
 
@@ -42,11 +42,11 @@ export interface EditableRowState {
 
 /** A new "Steel by size" line: 6 m lengths, size still to be typed. */
 /** What a line needs when its item type is picked or changed: default boxes and length entry. */
-export function itemTypeReset(shape: SteelSizeKind): Partial<EditableRowState> {
+export function itemTypeReset(shape: SteelSizeKind, item?: string): Partial<EditableRowState> {
   const cfg = STEEL_SIZE_KINDS[shape];
   const steel = cfg.method === 'SECTION_WEIGHT' && !cfg.lengthInFeet;
   return {
-    steelSize: { shape, dims: defaultDims(shape) },
+    steelSize: { shape, dims: defaultDims(shape, item) },
     lengthUnit: steel ? 'metres' : 'ft_in',
     lengthMetres: steel ? String(cfg.defaultLengthM) : '6',
     lengthValue: '',
@@ -122,8 +122,8 @@ export function switchSteelLengthUnit(row: EditableRowState, unit: RowLengthUnit
 }
 
 /** A new line by item type (sheet, accessory or steel), boxes still to fill. */
-export function createSteelSizeRow(shape: SteelSizeKind = 'SHEET_SQM'): EditableRowState {
-  return { ...createInitialRow(), ...itemTypeReset(shape) };
+export function createSteelSizeRow(shape: SteelSizeKind = 'SHEET_SQM', item?: string): EditableRowState {
+  return { ...createInitialRow(), ...itemTypeReset(shape, item) };
 }
 
 /** The line's quantity method: from its product, or from its item type before the boxes are filled. */
@@ -136,11 +136,12 @@ export function rowMethod(row: Pick<EditableRowState, 'product' | 'steelSize'>):
 export function flashingSheets(
   row: Pick<EditableRowState, 'steelSize' | 'nos'>
 ): { pieces: number; perSheet: number; girth: number; sheets: number; widthFactor: number } | null {
-  if (row.steelSize?.shape !== 'FLASHING') return null;
-  const cut = flashingPerSheet(row.steelSize.dims.size ?? '', Number(row.steelSize.dims.sheet || 48));
+  const size = row.steelSize;
+  if (!size || !isSheetCut(size.shape)) return null;
+  const cut = flashingPerSheet(size.dims.size ?? '', Number(size.dims.sheet || 48));
   const pieces = Number(row.nos);
   if ('error' in cut || !(pieces > 0)) return null;
-  const wf = Number(row.steelSize.dims.wf || 1.08);
+  const wf = Number(size.dims.wf || 1.08);
   return {
     pieces,
     perSheet: cut.perSheet,
@@ -160,7 +161,7 @@ export function rowWidthOverride(row: Pick<EditableRowState, 'steelSize'>): numb
 export function lineWidthFactor(row: Pick<EditableRowState, 'steelSize' | 'product'>, quotationWidth?: number): number {
   const own = rowWidthOverride(row);
   if (own !== null) return own;
-  if (row.steelSize?.shape === 'FLASHING') return 1.08;
+  if (isSheetCut(row.steelSize?.shape)) return 1.08;
   if (quotationWidth !== undefined) return quotationWidth;
   const p = row.product as { widthFactor?: number } | null;
   return p?.widthFactor || 1.08;
@@ -333,7 +334,7 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
     colour: line.colour ?? '',
     rate: str(line.rate),
     // flashing: Nos was the sheets charged; staff typed the pieces
-    nos: snap.steelShape === 'FLASHING' && snap.steelSizeDims?.pcs ? snap.steelSizeDims.pcs : str(line.nos, '1'),
+    nos: isSheetCut(snap.steelShape) && snap.steelSizeDims?.pcs ? snap.steelSizeDims.pcs : str(line.nos, '1'),
     lengthUnit,
     lengthValue: typedUnit && typedUnit !== 'm' ? str(line.lengthValue) : '',
     lengthFeet: str(line.lengthFeet, base.lengthFeet),
