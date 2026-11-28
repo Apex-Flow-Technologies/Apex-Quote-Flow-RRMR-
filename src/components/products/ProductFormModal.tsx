@@ -3,6 +3,7 @@ import React, { useState, useMemo, useId } from 'react';
 import { Decimal } from 'decimal.js';
 import { AlertCircle, X } from 'lucide-react';
 import type { Product, ProductUnit, QuantityMethod, CreateProductInput } from '../../types/product';
+import { SUGGESTED_UNITS, isTypedQuantityMethod } from '../../types/product';
 import {
   type SteelShape,
   STEEL_SHAPE_LABELS,
@@ -163,21 +164,33 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <option value="AREA">By area (Sq.Mtr)</option>
                     <option value="RUNNING_LENGTH">By running metre (R.Mtr)</option>
                     <option value="LENGTH_FT">By feet (Ft)</option>
-                    <option value="MANUAL">Manual</option>
+                    <option value="MANUAL">Manual · type any quantity, unit and rate</option>
                   </select>
-                  {formData.qtyMethod === 'CUSTOM' && (
-                    <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-faint uppercase tracking-wider">
-                      Unit
-                      <select
-                        value={formData.unit}
-                        onChange={(e) => setFormData({ ...formData, unit: e.target.value as ProductUnit })}
-                        className="py-1 px-2 rounded-control border border-line-strong bg-white font-medium text-ink normal-case tracking-normal focus:outline-none focus:border-brand"
-                      >
-                        {(['Nos', 'Kgs', 'Sq.Mtr', 'R.Mtr', 'Ft'] as ProductUnit[]).map((u) => (
-                          <option key={u} value={u}>{u}</option>
-                        ))}
-                      </select>
-                    </label>
+                  {isTypedQuantityMethod(formData.qtyMethod) && (
+                    <div className="mt-2">
+                      <label className="flex items-center gap-2 text-[13px] font-medium text-muted">
+                        Unit
+                        <input
+                          type="text"
+                          list="rr-unit-suggestions"
+                          value={formData.unit}
+                          onChange={(e) => setFormData({ ...formData, unit: e.target.value as ProductUnit })}
+                          placeholder="Nos, Set, Lot, Trip…"
+                          className="w-36 py-1 px-2 rounded-control border border-line-strong bg-white font-medium text-ink focus:outline-none focus:border-brand"
+                        />
+                        <datalist id="rr-unit-suggestions">
+                          {SUGGESTED_UNITS.map((u) => (
+                            <option key={u} value={u} />
+                          ))}
+                        </datalist>
+                      </label>
+                      {formErrors.unit && <p className="text-[11px] text-danger mt-1">{formErrors.unit}</p>}
+                      {formData.qtyMethod === 'MANUAL' && (
+                        <p className="text-[12px] text-muted mt-1">
+                          Pick a unit or type your own. On the quote you type the quantity (decimals allowed) and the rate; nothing is calculated for you.
+                        </p>
+                      )}
+                    </div>
                   )}
                   {editingProduct && (
                     <span className="text-[10px] text-muted mt-0.5 block">

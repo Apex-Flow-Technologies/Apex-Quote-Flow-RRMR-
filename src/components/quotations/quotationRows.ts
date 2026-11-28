@@ -39,7 +39,32 @@ export interface EditableRowState {
 
 /** Methods whose quantity comes from a feet + inches length on the line. */
 export function isLengthMethod(method?: QuantityMethod | string): boolean {
-  return method === 'AREA' || method === 'RUNNING_LENGTH' || method === 'LENGTH_FT';
+  return method === 'SQM' || method === 'AREA' || method === 'RUNNING_LENGTH' || method === 'LENGTH_FT';
+}
+
+/**
+ * Quotes saved before Sq.Mtr lines took feet + inches stored one length value with a unit
+ * (e.g. 17.4 ft). Split it into feet + inches with the same exact length, so a revise gives
+ * the same quantity. Metres / mm go through the company's feet-to-metre factor.
+ */
+export function legacyLengthToFeetInches(value: number, unit: string | undefined, feetToMetre = 0.305): { feet: string; inches: string } {
+  let totalFeet: Decimal;
+  const v = new Decimal(value || 0);
+  if (unit === 'in') totalFeet = v.dividedBy(12);
+  else if (unit === 'm') totalFeet = v.dividedBy(feetToMetre);
+  else if (unit === 'mm') totalFeet = v.dividedBy(1000).dividedBy(feetToMetre);
+  else totalFeet = v;
+  if (totalFeet.lte(0)) return { feet: '0', inches: '0' };
+  const feet = totalFeet.floor();
+  const inches = totalFeet.minus(feet).times(12).toDecimalPlaces(4, Decimal.ROUND_HALF_UP);
+  return { feet: feet.toString(), inches: inches.toString() };
+}
+
+/** "17 ft 4 in" from a saved line (or the old single value, e.g. "17.4 ft"). */
+export function lineLengthText(line: Pick<QuotationLine, 'lengthValue' | 'lengthUnit' | 'lengthFeet' | 'lengthInches'>): string {
+  if (line.lengthValue !== undefined && line.lengthValue !== null) return `${line.lengthValue} ${line.lengthUnit || 'ft'}`;
+  const inches = Number(line.lengthInches || 0);
+  return `${line.lengthFeet || 0} ft${inches ? ` ${inches} in` : ''}`;
 }
 
 /** Roofing sheets get a colour box on the quote line. */
@@ -67,8 +92,6 @@ export function createInitialRow(customId?: string, product?: Product): Editable
   let defaultUnit: RowLengthUnit = 'ft_in';
   if (product?.qtyMethod === 'SECTION_WEIGHT') {
     defaultUnit = 'metres';
-  } else if (product?.qtyMethod === 'SQM') {
-    defaultUnit = 'ft';
   }
   const defaultKgPerPiece = product && 'kgPerPiece' in product && product.kgPerPiece ? String(product.kgPerPiece) : '';
 
@@ -82,7 +105,7 @@ export function createInitialRow(customId?: string, product?: Product): Editable
     customDescription: '',
     customUnit: 'Nos',
     customHsn: '73089090',
-    lengthValue: product?.qtyMethod === 'SQM' ? '17.4' : '',
+    lengthValue: '',
     lengthFeet: '8',
     lengthInches: '0',
     lengthMetres: productDefaultLengthM(product) ?? '6',
@@ -146,8 +169,13 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
 
   const base = createInitialRow(undefined, product);
   let lengthUnit: RowLengthUnit = base.lengthUnit;
+  // Old Sq.Mtr lines kept one value + unit; turn it into feet + inches of the same length
+  const legacySqm =
+    snap.qtyMethod === 'SQM' && line.lengthValue !== undefined && line.lengthValue !== null
+      ? legacyLengthToFeetInches(line.lengthValue, line.lengthUnit, snap.feetToMetre || 0.305)
+      : null;
   if (snap.qtyMethod === 'SQM') {
-    lengthUnit = line.lengthUnit || 'ft';
+    lengthUnit = 'ft_in';
   } else if (snap.qtyMethod === 'SECTION_WEIGHT') {
     lengthUnit = line.lengthFeet !== undefined && line.lengthFeet !== null ? 'ft_in' : 'metres';
   } else if (snap.qtyMethod === 'SHEET_WEIGHT') {
@@ -160,9 +188,9 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
     rate: str(line.rate),
     nos: str(line.nos, '1'),
     lengthUnit,
-    lengthValue: str(line.lengthValue, base.lengthValue),
-    lengthFeet: str(line.lengthFeet, base.lengthFeet),
-    lengthInches: str(line.lengthInches, '0'),
+    lengthValue: '',
+    lengthFeet: legacySqm ? legacySqm.feet : str(line.lengthFeet, base.lengthFeet),
+    lengthInches: legacySqm ? legacySqm.inches : str(line.lengthInches, '0'),
     lengthMetres: str(line.lengthM, base.lengthMetres),
     kgPerPiece: str(line.kgPerPiece ?? snap.kgPerPiece, base.kgPerPiece),
     ...discount,

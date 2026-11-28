@@ -122,7 +122,7 @@ export function formDataFromProduct(product: Product): ProductFormData {
 
 /** The unit that goes with each calculation method. */
 export function unitForMethod(method: QuantityMethod): ProductUnit {
-  if (method === 'PIECE' || method === 'CUSTOM') return 'Nos';
+  if (method === 'PIECE' || method === 'CUSTOM' || method === 'MANUAL') return 'Nos';
   if (method === 'AREA' || method === 'SQM') return 'Sq.Mtr';
   if (method === 'RUNNING_LENGTH') return 'R.Mtr';
   if (method === 'LENGTH_FT') return 'Ft';
@@ -204,6 +204,10 @@ export function validateProductForm(formData: ProductFormData): Record<string, s
       'Weight per metre must be greater than 0 kg/m', 'Invalid weight per metre number');
   }
 
+  if ((formData.qtyMethod === 'MANUAL' || formData.qtyMethod === 'CUSTOM') && !String(formData.unit || '').trim()) {
+    errors.unit = 'Enter a unit, e.g. Nos, Set, Lot';
+  }
+
   for (const field of ['baseRate', 'minRate'] as const) {
     if (formData[field].trim() !== '') {
       try {
@@ -228,7 +232,7 @@ export function buildProductPayload(formData: ProductFormData): CreateProductInp
     hsn: formData.hsn.trim(),
     ratePerUnit: new Decimal(formData.ratePerUnit).toNumber(),
     gstRate: new Decimal(formData.gstRate).toNumber(),
-    unit: formData.unit,
+    unit: String(formData.unit || '').trim() || 'Nos',
     active: formData.active,
     baseRate: formData.baseRate.trim() ? new Decimal(formData.baseRate).toNumber() : undefined,
     minRate: formData.minRate.trim() ? new Decimal(formData.minRate).toNumber() : undefined,

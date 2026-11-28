@@ -1,3 +1,4 @@
+import { lineLengthText } from '../../components/quotations/quotationRows';
 import React, { useState } from 'react';
 import { QUOTATION_STATUS_LABELS, type Quotation, type QuotationLine, type QuotationStatus } from '../../types/quotation';
 import { formatRoundOff } from '../../engine';
@@ -23,7 +24,7 @@ function describeLine(line: QuotationLine, quotation: Quotation): string {
   const m = line.snapshot.qtyMethod;
   let s = '';
   if (m === 'SQM') {
-    s = `${line.lengthValue !== undefined ? line.lengthValue : line.lengthFeet || 0} ${line.lengthUnit || 'ft'} × ${line.nos} nos · Width ${line.widthFactor || line.snapshot.widthFactor || quotation.widthFactor || 1.08}`;
+    s = `${lineLengthText(line)} × ${line.nos} nos · Width ${line.widthFactor || line.snapshot.widthFactor || quotation.widthFactor || 1.08}`;
   } else if (m === 'WEIGHT_PER_PIECE') {
     s = `${line.nos} nos × ${line.kgPerPiece || line.snapshot.kgPerPiece || 0} kg/pc`;
   } else if (m === 'CUSTOM') {
@@ -313,7 +314,7 @@ export const QuotationPreviewModal: React.FC<QuotationPreviewModalProps> = ({
                         <div className="text-[11px] text-muted">
                           {line.snapshot.qtyMethod === 'SQM' && (
                             <span>
-                              {line.lengthValue !== undefined ? line.lengthValue : (line.lengthFeet || 0)} {line.lengthUnit || 'ft'} &times; {line.nos} nos &bull; Width: {line.widthFactor || line.snapshot.widthFactor || quotation.widthFactor || 1.08}
+                              {lineLengthText(line)} &times; {line.nos} nos &bull; Width: {line.widthFactor || line.snapshot.widthFactor || quotation.widthFactor || 1.08}
                             </span>
                           )}
                           {line.snapshot.qtyMethod === 'WEIGHT_PER_PIECE' && (

@@ -145,7 +145,7 @@ export function calculateLineQuantity(params: QuantityCalculationParams): Quanti
     defaultUnit = 'Kgs';
   } else if (params.method === 'PIECE') {
     defaultUnit = 'Nos';
-  } else if (params.method === 'CUSTOM') {
+  } else if (params.method === 'CUSTOM' || params.method === 'MANUAL') {
     defaultUnit = params.customUnit || 'Nos';
   } else if (params.method === 'RUNNING_LENGTH') {
     defaultUnit = 'R.Mtr';
@@ -218,8 +218,8 @@ export function calculateLineQuantity(params: QuantityCalculationParams): Quanti
     };
   }
 
-  // Sprint 2 CUSTOM: user-entered quantity and unit
-  if (params.method === 'CUSTOM') {
+  // CUSTOM / MANUAL: user-entered quantity and unit
+  if (params.method === 'CUSTOM' || params.method === 'MANUAL') {
     return {
       perPieceQuantity: new Decimal(1),
       unroundedPerPieceQuantity: new Decimal(1),

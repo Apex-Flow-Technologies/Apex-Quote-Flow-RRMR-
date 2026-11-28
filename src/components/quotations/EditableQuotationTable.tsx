@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { Product, ProductUnit, CreateProductInput } from '../../types/product';
+import { isTypedQuantityMethod } from '../../types/product';
 import { ProductFormModal } from '../products/ProductFormModal';
 import { oneOffProduct } from '../products/productForm';
 import { createProduct } from '../../services/productService';
 import { useAuth } from '../../hooks/useAuth';
-import { formatQtyMethodLabel, type TaxMode, type LengthUnit } from '../../engine';
+import { formatQtyMethodLabel, type TaxMode } from '../../engine';
 import { Decimal } from 'decimal.js';
 import {
   Plus,
@@ -400,7 +401,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           isProductDropdownOpen: false,
           rate: defaultRate,
           lengthUnit: defaultUnit,
-          lengthValue: r.lengthValue || '17.4',
+          lengthValue: '',
           kgPerPiece: defaultKgPerPiece || r.kgPerPiece || '',
           lengthFeet: r.lengthFeet || '8',
           lengthInches: r.lengthInches || '0',
@@ -418,11 +419,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
     // Auto-advance focus to the next field (Feet, Metres, or Nos)
     setTimeout(() => {
-      if (product.qtyMethod === 'SQM') {
-        getActiveInput(`${rowId}_lengthValue`)?.focus();
-      } else if (product.qtyMethod === 'WEIGHT_PER_PIECE') {
+      if (product.qtyMethod === 'WEIGHT_PER_PIECE') {
         getActiveInput(`${rowId}_nos`)?.focus();
-      } else if (product.qtyMethod === 'SHEET_WEIGHT') {
+      } else if (product.qtyMethod === 'SHEET_WEIGHT' || product.qtyMethod === 'SQM') {
         getActiveInput(`${rowId}_lengthFeet`)?.focus();
       } else if (product.qtyMethod === 'SECTION_WEIGHT') {
         getActiveInput(`${rowId}_lengthMetres`)?.focus();
@@ -752,46 +751,6 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           </select>
                         </div>
                       </div>
-                    ) : isSqm ? (
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            ref={(el) => {
-                              if (el) inputRefs.current.set(`${row.id}_lengthValue`, el);
-                              else inputRefs.current.delete(`${row.id}_lengthValue`);
-                            }}
-                            type="number"
-                            inputMode="decimal"
-                            step="any"
-                            min="0"
-                            value={row.lengthValue ?? ''}
-                            placeholder="17.4"
-                            onChange={(e) => updateRow(row.id, { lengthValue: e.target.value })}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                inputRefs.current.get(`${row.id}_nos`)?.focus();
-                              }
-                            }}
-                            className="w-16 py-1.5 px-2 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
-                            title="Length value"
-                          />
-                          <select
-                            value={row.lengthUnit && ['ft', 'in', 'mm', 'm'].includes(row.lengthUnit) ? row.lengthUnit : 'ft'}
-                            onChange={(e) => updateRow(row.id, { lengthUnit: e.target.value as LengthUnit })}
-                            className="py-1.5 px-1 text-xs font-semibold rounded-control border border-line-strong bg-surface-2 text-ink focus:border-brand"
-                            title="Length unit"
-                          >
-                            <option value="ft">ft</option>
-                            <option value="in">in</option>
-                            <option value="mm">mm</option>
-                            <option value="m">m</option>
-                          </select>
-                        </div>
-                        <div className="text-[10px] text-faint">
-                          Width: {widthFactor ?? ('widthFactor' in (row.product || {}) && (row.product as any).widthFactor ? (row.product as any).widthFactor : 1.08)}
-                        </div>
-                      </div>
                     ) : isWeightPerPiece ? (
                       <div className="flex items-center gap-1.5 pt-1">
                         <input
@@ -859,6 +818,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                             <span className="font-semibold text-muted text-xs">in</span>
                           </div>
                         </div>
+                        {isSqm && <div className="text-[10px] text-faint">Width: {widthFactor ?? ('widthFactor' in (row.product || {}) && (row.product as any).widthFactor ? (row.product as any).widthFactor : 1.08)}</div>}
                       </div>
                     ) : isPipe ? (
                       <div className="space-y-1.5">
@@ -951,6 +911,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       </div>
                     ) : isPiece ? (
                       <div className="text-muted text-xs pt-1.5">—</div>
+                    ) : isTypedQuantityMethod(row.product?.qtyMethod) ? (
+                      <div className="text-faint text-xs pt-1.5">Typed quantity</div>
                     ) : (
                       <div className="text-faint text-xs pt-1.5">Direct</div>
                     )}
@@ -1005,9 +967,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                         else inputRefs.current.delete(`${row.id}_nos`);
                       }}
                       type="number"
-                      inputMode="numeric"
-                      step="1"
-                      min="1"
+                      inputMode={isTypedQuantityMethod(row.product?.qtyMethod) ? 'decimal' : 'numeric'}
+                      step={isTypedQuantityMethod(row.product?.qtyMethod) ? 'any' : '1'}
+                      min={isTypedQuantityMethod(row.product?.qtyMethod) ? '0' : '1'}
                       value={row.nos}
                       onChange={(e) => updateRow(row.id, { nos: e.target.value })}
                       onKeyDown={(e) => {
@@ -1016,8 +978,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           inputRefs.current.get(`${row.id}_rate`)?.focus();
                         }
                       }}
-                      className="w-14 py-1.5 px-1.5 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white"
-                      title={row.product?.qtyMethod === 'SECTION_WEIGHT' ? 'Number of lengths (pieces)' : 'Number of pieces (Nos)'}
+                      className={`${isTypedQuantityMethod(row.product?.qtyMethod) ? 'w-[72px]' : 'w-14'} py-1.5 px-1.5 text-center text-xs font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white`}
+                      title={row.product?.qtyMethod === 'SECTION_WEIGHT' ? 'Number of lengths (pieces)' : isTypedQuantityMethod(row.product?.qtyMethod) ? `Quantity (${row.product?.unit})` : 'Number of pieces (Nos)'}
                     />
                     )}
                   </td>
@@ -1374,44 +1336,6 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                     <option value="Metre">Metre</option>
                   </select>
                 </div>
-              ) : isSqm ? (
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
-                      Length Dimension
-                    </label>
-                    <span className="text-[11px] text-muted">
-                      Width: {widthFactor ?? ('widthFactor' in (row.product || {}) && (row.product as any).widthFactor ? (row.product as any).widthFactor : 1.08)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={(el) => {
-                        if (el) inputRefs.current.set(`${row.id}_lengthValue_mobile`, el);
-                        else inputRefs.current.delete(`${row.id}_lengthValue_mobile`);
-                      }}
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      min="0"
-                      value={row.lengthValue ?? ''}
-                      placeholder="17.4"
-                      onChange={(e) => updateRow(row.id, { lengthValue: e.target.value })}
-                      className="flex-1 min-w-0 w-full h-10 px-3 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"
-                      title="Length value"
-                    />
-                    <select
-                      value={row.lengthUnit && ['ft', 'in', 'mm', 'm'].includes(row.lengthUnit) ? row.lengthUnit : 'ft'}
-                      onChange={(e) => updateRow(row.id, { lengthUnit: e.target.value as LengthUnit })}
-                      className="w-20 h-10 px-2 text-xs font-semibold rounded-control border border-line-strong bg-surface-2 text-ink focus:border-brand"
-                    >
-                      <option value="ft">ft</option>
-                      <option value="in">in</option>
-                      <option value="mm">mm</option>
-                      <option value="m">m</option>
-                    </select>
-                  </div>
-                </div>
               ) : isWeightPerPiece ? (
                 <div className="flex items-center justify-between gap-3 pt-1">
                   <label className="text-xs font-semibold text-muted">Weight per Piece:</label>
@@ -1431,9 +1355,12 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                 </div>
               ) : isFeetInches ? (
                 <div className="space-y-1.5 pt-1">
-                  <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
-                    {isSheet ? 'Sheet Length' : 'Length'}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10.5px] font-semibold text-faint uppercase tracking-wider">
+                      {isSheet || isSqm ? 'Sheet Length' : 'Length'}
+                    </label>
+                    {isSqm && <span className="text-[11px] text-muted">Width: {widthFactor ?? ('widthFactor' in (row.product || {}) && (row.product as any).widthFactor ? (row.product as any).widthFactor : 1.08)}</span>}
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex items-center gap-1.5">
                       <input
@@ -1608,7 +1535,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                 ) : (
                 <div className="space-y-1">
                   <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
-                    {row.product?.qtyMethod === 'SECTION_WEIGHT' ? 'No. of lengths' : 'Pieces (Nos)'} <span className="text-danger">*</span>
+                    {row.product?.qtyMethod === 'SECTION_WEIGHT' ? 'No. of lengths' : isTypedQuantityMethod(row.product?.qtyMethod) ? `Quantity (${row.product?.unit})` : 'Pieces (Nos)'} <span className="text-danger">*</span>
                   </label>
                   <input
                     ref={(el) => {
@@ -1616,9 +1543,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       else inputRefs.current.delete(`${row.id}_nos_mobile`);
                     }}
                     type="number"
-                    inputMode="numeric"
-                    step="1"
-                    min="1"
+                    inputMode={isTypedQuantityMethod(row.product?.qtyMethod) ? 'decimal' : 'numeric'}
+                    step={isTypedQuantityMethod(row.product?.qtyMethod) ? 'any' : '1'}
+                    min={isTypedQuantityMethod(row.product?.qtyMethod) ? '0' : '1'}
                     value={row.nos}
                     onChange={(e) => updateRow(row.id, { nos: e.target.value })}
                     className="w-full h-10 px-2.5 text-center text-sm font-mono tabular-nums font-bold rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white"

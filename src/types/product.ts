@@ -12,7 +12,15 @@ export type QuantityMethod =
   | 'LENGTH_FT'
   | 'MANUAL';
 
-export type ProductUnit = 'Kgs' | 'Nos' | 'Sq.Mtr' | 'R.Mtr' | 'Ft';
+export type ProductUnit = 'Kgs' | 'Nos' | 'Sq.Mtr' | 'R.Mtr' | 'Ft' | (string & {});
+
+/** Units offered on Manual / Custom lines; any other unit can be typed. */
+export const SUGGESTED_UNITS = ['Nos', 'Kgs', 'Sq.Mtr', 'Sq.Ft', 'R.Mtr', 'Mtr', 'Ft', 'Set', 'Lot', 'Bundle', 'Box', 'Roll', 'Litre', 'Trip', 'Day', 'Job'];
+
+/** Manual and Custom lines: the quantity, unit and rate are all typed by hand. */
+export function isTypedQuantityMethod(method?: string): boolean {
+  return method === 'MANUAL' || method === 'CUSTOM';
+}
 
 export type StockMethod = 'WEIGHT' | 'PIECE' | 'NONE';
 
@@ -142,7 +150,7 @@ export function formatQtyMethodLabel(method: QuantityMethod | string): string {
     case 'LENGTH_FT':
       return 'By feet';
     case 'MANUAL':
-      return 'Manual';
+      return 'Manual (any quantity and unit)';
     default:
       return method;
   }

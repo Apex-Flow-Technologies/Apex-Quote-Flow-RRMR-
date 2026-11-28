@@ -58,7 +58,7 @@ describe('custom item uses the product form (every calculation method)', () => {
 
   it('adds each quote method exactly as the Custom Item button does, with the right quantity', () => {
     const expected: Partial<Record<QuantityMethod, [number, string]>> = {
-      SQM: [5.73, 'Sq.Mtr'], // 17.4 ft × 0.305 × 1.08
+      SQM: [2.64, 'Sq.Mtr'], // 8 ft × 0.305 × 1.08
       WEIGHT_PER_PIECE: [40, 'Kgs'],
       PIECE: [1, 'Nos'],
       CUSTOM: [1, 'Nos'],

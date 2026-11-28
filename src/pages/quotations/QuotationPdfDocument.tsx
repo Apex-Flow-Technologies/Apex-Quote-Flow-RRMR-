@@ -1,3 +1,4 @@
+import { lineLengthText } from '../../components/quotations/quotationRows';
 import React from 'react';
 import {
   Document,
@@ -620,7 +621,7 @@ export const QuotationPdfDocument: React.FC<QuotationPdfDocumentProps> = ({
                   <Text style={styles.productName}>{line.productName}{line.colour ? ` • Colour: ${line.colour}` : ''}</Text>
                   <Text style={styles.productSpecs}>
                     {isSqm && (
-                      `${line.lengthValue !== undefined ? line.lengthValue : (line.lengthFeet || 0)} ${line.lengthUnit || 'ft'} × ${line.nos} nos • Width: ${line.widthFactor || snap.widthFactor || quotation.widthFactor || 1.08}`
+                      `${lineLengthText(line)} × ${line.nos} nos • Width: ${line.widthFactor || snap.widthFactor || quotation.widthFactor || 1.08}`
                     )}
                     {isWeightPerPiece && (
                       `${line.nos} nos × ${line.kgPerPiece || snap.kgPerPiece || 0} kg/pc`

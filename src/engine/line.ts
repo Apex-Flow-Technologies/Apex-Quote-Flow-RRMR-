@@ -198,8 +198,8 @@ export function validateLineDraft(params: LineValidationInput): LineValidationRe
 
   // Dimension validation for SQM products
   const method = params.product.qtyMethod;
-  if (method === 'SQM') {
-    const valRaw = params.lengthValue ?? params.lengthFeet ?? params.lengthMetres;
+  if (method === 'SQM' && params.lengthValue !== undefined && params.lengthValue !== null && params.lengthValue !== '') {
+    const valRaw = params.lengthValue;
     if (valRaw === undefined || valRaw === null || (typeof valRaw === 'string' && valRaw.trim() === '')) {
       return { isValid: false, error: 'Length must be greater than 0.' };
     }
@@ -223,7 +223,7 @@ export function validateLineDraft(params: LineValidationInput): LineValidationRe
         return { isValid: false, error: 'Please enter valid numeric values.' };
       }
     }
-  } else if (method === 'SHEET_WEIGHT' || (method === 'SECTION_WEIGHT' && params.lengthUnit === 'ft_in')) {
+  } else if (method === 'SHEET_WEIGHT' || method === 'SQM' || (method === 'SECTION_WEIGHT' && params.lengthUnit === 'ft_in')) {
     const fRaw = params.lengthFeet;
     const iRaw = params.lengthInches;
     if (
