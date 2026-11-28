@@ -155,7 +155,7 @@ const RECT_PIPES: Record<string, number[]> = {
 const PLATES = [5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 32, 36, 40, 45, 50, 56, 63];
 
 // ── Chequered plates (weight card, kg/m²) ─────────────────────────────────────
-const CHEQUERED_PLATES: Record<string, number> = { '5': 43.5, '6': 52.3, '7': 61.3, '10': 83.4, '12': 100.6 };
+export const CHEQUERED_PLATES: Record<string, number> = { '5': 43.5, '6': 52.3, '7': 61.3, '10': 83.4, '12': 100.6 };
 
 // ── Flats (weight card) — "W×T" ───────────────────────────────────────────────
 const FLATS = [
@@ -171,7 +171,7 @@ const FLATS = [
 const BARS = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 32, 36, 40, 45, 50, 56, 63, 80, 90, 100, 110, 125, 140, 160, 180, 200];
 
 // ── Equal angles (weight card kg/m) ───────────────────────────────────────────
-const ANGLES: Record<string, number> = {
+export const ANGLES: Record<string, number> = {
   '19x19x3': 0.9, '25x25x3': 1.1, '25x25x6': 2.2, '32x32x3': 1.6, '35x35x5': 2.6, '35x35x6': 3.0,
   '40x40x3': 1.8, '40x40x5': 3.0, '40x40x6': 3.5, '45x45x5': 3.4, '45x45x6': 4.0, '50x50x6': 4.5,
   '65x65x6': 5.8, '65x65x8': 7.7, '65x65x10': 9.4, '75x75x6': 6.8, '75x75x8': 8.9, '75x75x10': 11.0,
@@ -183,13 +183,13 @@ const ANGLES: Record<string, number> = {
 };
 
 // ── Channels ISMC (weight card kg/m) ──────────────────────────────────────────
-const CHANNELS: Record<string, number> = {
+export const CHANNELS: Record<string, number> = {
   '75x40': 7.1, '100x50': 9.6, '125x65': 13.7, '150x75': 16.8, '175x75': 19.6, '200x75': 22.3,
   '225x80': 26.1, '250x80': 30.5, '300x90': 36.3, '350x100': 42.7, '400x100': 50.1,
 };
 
 // ── Beams ISMB / RS joist (weight card kg/m) ──────────────────────────────────
-const BEAMS: Record<string, number> = {
+export const BEAMS: Record<string, number> = {
   '100x50': 8.34, '110x100': 23.0, '125x70': 13.2, '150x75': 15.0, '175x85': 19.5, '200x100': 25.9,
   '225x100': 31.3, '250x125': 38.1, '300x140': 45.0, '350x140': 52.9, '400x140': 62.6,
   '450x150': 73.1, '500x180': 87.7, '600x210': 122.6,

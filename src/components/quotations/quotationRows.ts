@@ -6,7 +6,7 @@ import type { Product, QuantityMethod, ProductUnit } from '../../types/product';
 import type { QuotationLine, QuotationLineSnapshot } from '../../types/quotation';
 import { calculateQuotationLine, validateLineDraft, type TaxMode, type LengthUnit } from '../../engine';
 import { Decimal } from 'decimal.js';
-import { steelSizeProduct, parseSteelSize, type SteelSizeInput } from './steelSize';
+import { steelSizeProduct, parseSteelSize, legacySteelSizeDims, STEEL_SIZE_KINDS, type SteelSizeInput, type SteelSizeKind } from './steelSize';
 
 export type RowLengthUnit = 'ft_in' | 'metres' | 'ft' | 'in' | 'mm' | 'm';
 
@@ -41,9 +41,9 @@ export interface EditableRowState {
 }
 
 /** A new "Steel by size" line: 6 m lengths, size still to be typed. */
-export function createSteelSizeRow(shape: SteelSizeInput['shape'] = 'SQUARE_PIPE'): EditableRowState {
+export function createSteelSizeRow(shape: SteelSizeKind = 'SQUARE_PIPE'): EditableRowState {
   const base = createInitialRow();
-  return { ...base, steelSize: { shape, text: '' }, lengthUnit: 'metres', lengthMetres: '6' };
+  return { ...base, steelSize: { shape, dims: {} }, lengthUnit: 'metres', lengthMetres: String(STEEL_SIZE_KINDS[shape].defaultLengthM) };
 }
 
 /** Rebuilds the line's one-off steel product after the size or shape changes. */
@@ -200,7 +200,14 @@ export function rowFromSavedLine(line: QuotationLine): EditableRowState {
 
   return {
     ...base,
-    ...(snap.steelShape && snap.steelSizeText ? { steelSize: { shape: snap.steelShape, text: snap.steelSizeText } } : {}),
+    ...(snap.steelShape && (snap.steelSizeDims || snap.steelSizeText)
+      ? {
+          steelSize: {
+            shape: snap.steelShape as SteelSizeKind,
+            dims: snap.steelSizeDims ? { ...snap.steelSizeDims } : legacySteelSizeDims(snap.steelShape, snap.steelSizeText || ''),
+          },
+        }
+      : {}),
     colour: line.colour ?? '',
     rate: str(line.rate),
     nos: str(line.nos, '1'),
@@ -317,7 +324,8 @@ function computeRowCalculationInner(
   if (!row.product) {
     if (row.steelSize) {
       const res = parseSteelSize(row.steelSize);
-      return { calculatedLine: null, validationError: res.ok ? null : res.error };
+      // Empty boxes are not an error yet; the line shows a hint until the sizes are in
+      return { calculatedLine: null, validationError: res.ok || res.missing ? null : res.error };
     }
     return { calculatedLine: null, validationError: null };
   }
@@ -349,7 +357,12 @@ function computeRowCalculationInner(
       rate: rateNum,
       gstRate: row.product.gstRate,
       widthFactor: 'widthFactor' in row.product ? row.product.widthFactor : undefined,
-      ...(row.steelSize ? { steelShape: row.steelSize.shape, steelSizeText: row.steelSize.text.trim() } : {}),
+      ...(row.steelSize
+        ? {
+            steelShape: row.steelSize.shape,
+            steelSizeDims: Object.fromEntries(Object.entries(row.steelSize.dims).map(([k, v]) => [k, String(v).trim()])),
+          }
+        : {}),
     };
 
     let lengthParam: { feet?: number; inches?: number; metres?: number } = {};

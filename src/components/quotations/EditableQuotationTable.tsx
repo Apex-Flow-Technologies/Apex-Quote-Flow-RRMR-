@@ -44,7 +44,7 @@ import {
   createSteelSizeRow,
   applySteelSize,
 } from './quotationRows';
-import { STEEL_SIZE_SHAPES } from './steelSize';
+import { STEEL_SIZE_KINDS, STEEL_SIZE_KIND_ORDER, parseSteelSize, type SteelSizeKind } from './steelSize';
 import { approxLengths } from '../../utils/steelLine';
 
 interface DropdownPosition {
@@ -116,7 +116,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     const last = rows[rows.length - 1];
     const lastIsBlank = last && !last.product && !last.isCustomItem && !last.steelSize && !last.productSearch.trim();
     onRowsChange(lastIsBlank ? [...rows.slice(0, -1), newRow] : [...rows, newRow]);
-    setTimeout(() => getActiveInput(`${newRow.id}_steelSize`)?.focus(), 50);
+    setTimeout(() => getActiveInput(`${newRow.id}_steel_a`)?.focus(), 50);
   };
 
   // Product Autocomplete Dropdown Portal Positioning State
@@ -446,52 +446,94 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
   const getFilteredProducts = (query: string) => searchProducts(products, query);
 
-  /** The size box of a "Steel by size" line (desktop cell or phone card). */
+  /** Type picker + one box per dimension for a "Steel by size" line (desktop cell or phone card). */
   const renderSteelSize = (row: EditableRowState, mobile: boolean) => {
     const size = row.steelSize!;
-    const cfg = STEEL_SIZE_SHAPES[size.shape];
+    const cfg = STEEL_SIZE_KINDS[size.shape];
+    const parsed = parseSteelSize(size);
     const kgm = row.product && 'kgPerMetre' in row.product ? row.product.kgPerMetre : undefined;
-    const showError = Boolean(row.validationError) && (Boolean(row.product) || size.text.trim() !== '');
+    const sizeError = !parsed.ok && !parsed.missing ? parsed.error : null;
+    const setDim = (key: string, value: string) => updateRow(row.id, { steelSize: { ...size, dims: { ...size.dims, [key]: value } } });
+    const boxClass = mobile
+      ? 'w-full h-10 px-2 text-center text-sm font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white'
+      : 'w-full py-1.5 px-1.5 text-center text-xs font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white';
     return (
-      <div className={mobile ? 'space-y-1.5' : 'space-y-1'}>
-        {mobile && (
-          <label className="block text-[12px] font-medium text-muted">
-            {cfg?.label} size (mm) <span className="text-danger">*</span>
-          </label>
-        )}
-        <div className="flex items-center gap-1.5">
-          {!mobile && (
-            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20 shrink-0">
-              {cfg?.label}
-            </span>
-          )}
-          <input
-            ref={(el) => {
-              const key = `${row.id}_steelSize${mobile ? '_mobile' : ''}`;
-              if (el) inputRefs.current.set(key, el);
-              else inputRefs.current.delete(key);
-            }}
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder={cfg?.placeholder}
-            value={size.text}
-            onChange={(e) => updateRow(row.id, { steelSize: { ...size, text: e.target.value } })}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                (getActiveInput(`${row.id}_lengthMetres`) || getActiveInput(`${row.id}_nos`))?.focus();
-              }
-            }}
-            className={
-              mobile
-                ? 'w-full h-10 px-3 text-sm font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white'
-                : 'w-full min-w-0 py-1.5 px-2 text-xs font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white'
-            }
-            title={cfg?.hint}
-            aria-label={`${cfg?.label} size in mm`}
-          />
-          {!mobile && <span className="text-[11px] text-muted shrink-0">mm</span>}
+      <div className={mobile ? 'space-y-2' : 'space-y-1.5'}>
+        <select
+          value={size.shape}
+          onChange={(e) => {
+            const shape = e.target.value as SteelSizeKind;
+            updateRow(row.id, {
+              steelSize: { shape, dims: {} },
+              lengthUnit: 'metres',
+              lengthMetres: String(STEEL_SIZE_KINDS[shape].defaultLengthM),
+            });
+            setTimeout(() => getActiveInput(`${row.id}_steel_${STEEL_SIZE_KINDS[shape].fields[0].key}`)?.focus(), 30);
+          }}
+          className={
+            mobile
+              ? 'w-full h-10 px-2.5 text-sm font-semibold rounded-control border border-line-strong bg-white text-ink focus:border-brand'
+              : 'w-full py-1.5 px-2 text-xs font-semibold rounded-control border border-line-strong bg-white text-ink focus:border-brand'
+          }
+          aria-label="Steel type"
+        >
+          {STEEL_SIZE_KIND_ORDER.map((k) => (
+            <option key={k} value={k}>
+              {STEEL_SIZE_KINDS[k].label}
+            </option>
+          ))}
+        </select>
+        <div className={`grid gap-1.5 ${cfg.fields.length === 1 ? 'grid-cols-1' : cfg.fields.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          {cfg.fields.map((fd, i) => {
+            const refKey = `${row.id}_steel_${fd.key}${mobile ? '_mobile' : ''}`;
+            const next = cfg.fields[i + 1];
+            const onEnter = (e: React.KeyboardEvent) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              if (next) getActiveInput(`${row.id}_steel_${next.key}`)?.focus();
+              else (getActiveInput(`${row.id}_lengthMetres`) || getActiveInput(`${row.id}_nos`))?.focus();
+            };
+            return (
+              <label key={fd.key} className="block min-w-0">
+                <span className="block text-[11px] text-muted mb-0.5 truncate" title={fd.label}>
+                  {mobile ? fd.label : fd.short}
+                  {!fd.options && ' (mm)'}
+                </span>
+                {fd.options ? (
+                  <select
+                    value={size.dims[fd.key] ?? ''}
+                    onChange={(e) => setDim(fd.key, e.target.value)}
+                    className={boxClass}
+                    aria-label={fd.label}
+                  >
+                    <option value="">Pick…</option>
+                    {fd.options.map((o) => (
+                      <option key={o} value={o}>
+                        {o.replace(/x/g, ' × ')}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    ref={(el) => {
+                      if (el) inputRefs.current.set(refKey, el);
+                      else inputRefs.current.delete(refKey);
+                    }}
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    min="0"
+                    value={size.dims[fd.key] ?? ''}
+                    onChange={(e) => setDim(fd.key, e.target.value)}
+                    onKeyDown={onEnter}
+                    className={boxClass}
+                    aria-label={`${fd.label} in mm`}
+                    title={`${fd.label} (mm)`}
+                  />
+                )}
+              </label>
+            );
+          })}
         </div>
         <div className="text-[11px] text-muted leading-snug">
           {row.product ? (
@@ -499,12 +541,14 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               <span className="text-ink font-medium">{row.product.name}</span>
               {kgm !== undefined && <span className="tabular-nums"> · {kgm} kg/m</span>}
             </>
+          ) : sizeError ? (
+            <span className="text-danger font-medium">{sizeError}</span>
           ) : (
-            cfg?.hint
+            'Enter the sizes; the weight is worked out.'
           )}
         </div>
         <div className="flex items-center justify-between text-[11px] text-muted gap-2">
-          <span className="tabular-nums">HSN {row.product?.hsn ?? cfg?.hsn}</span>
+          <span className="tabular-nums">{row.product ? `HSN ${row.product.hsn}` : ''}</span>
           <button
             type="button"
             onClick={() => updateRow(row.id, { steelSize: undefined, product: null, productSearch: '', isProductDropdownOpen: true })}
@@ -513,7 +557,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
             Catalog &rarr;
           </button>
         </div>
-        {showError && (
+        {/* The phone card shows line errors itself */}
+        {!mobile && row.product && row.validationError && (
           <div className={isRateHint(row) ? 'p-2 bg-brand-soft border border-brand/20 rounded-control text-brand-deep text-xs flex items-center gap-1.5' : 'flex items-center gap-1 text-[11px] text-danger font-medium'}>
             <AlertCircle className="w-3 h-3 shrink-0" />
             <span>{isRateHint(row) ? 'Enter the rate per kg to price this line.' : row.validationError}</span>
@@ -616,7 +661,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
             type="button"
             onClick={handleAddSteelSize}
             className="flex-1 sm:flex-initial min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
-            title="Type a steel size, e.g. 40x40x1.3, and the weight is worked out"
+            title="Pick the steel type and enter the sizes; the weight is worked out"
           >
             <Plus className="w-3.5 h-3.5 text-brand" />
             <span>Steel by size</span>

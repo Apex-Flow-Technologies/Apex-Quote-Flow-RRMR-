@@ -5,7 +5,26 @@
  * Drafts are cleared on save, on Discard and on logout.
  */
 import type { Customer } from '../types/customer';
-import type { EditableRowState } from '../components/quotations/quotationRows';
+import { legacyLengthToFeetInches, type EditableRowState } from '../components/quotations/quotationRows';
+import { legacySteelSizeDims } from '../components/quotations/steelSize';
+
+/**
+ * Drafts written by older versions of the app: Sq.Mtr lines kept one length value
+ * (e.g. 17.4 ft) and the first "Steel by size" lines kept one size text ("40x40x1.3").
+ * Turn them into today's boxes so what is shown is what is priced.
+ */
+export function migrateDraftRow(row: EditableRowState): EditableRowState {
+  let r = row;
+  if (r.product?.qtyMethod === 'SQM' && (r.lengthValue ?? '').trim() !== '') {
+    const { feet, inches } = legacyLengthToFeetInches(Number(r.lengthValue), r.lengthUnit, 0.305);
+    r = { ...r, lengthFeet: feet, lengthInches: inches, lengthValue: '', lengthUnit: 'ft_in' };
+  }
+  const steel = r.steelSize as (EditableRowState['steelSize'] & { text?: string }) | undefined;
+  if (steel && !steel.dims) {
+    r = { ...r, steelSize: { shape: steel.shape, dims: legacySteelSizeDims(steel.shape, steel.text || '') } };
+  }
+  return r;
+}
 
 const PREFIX = 'rrmr.quoteDraft.v1.';
 
@@ -76,7 +95,7 @@ export function loadDraft(key: string): QuoteDraft | null {
     if (!raw) return null;
     const d = JSON.parse(raw) as QuoteDraft;
     if (!d || !Array.isArray(d.rows)) return null;
-    return d;
+    return { ...d, rows: d.rows.map(migrateDraftRow) };
   } catch {
     return null;
   }

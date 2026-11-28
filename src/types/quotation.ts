@@ -17,8 +17,10 @@ export interface QuotationLineSnapshot {
   kgPerPiece?: number;
   densityFactor?: number;
   feetToMetre?: number;
-  /** "Steel by size" lines: the shape and the size as typed, e.g. SQUARE_PIPE + "40x40x1.3". */
-  steelShape?: import('../engine/steel').SteelShape;
+  /** "Steel by size" lines: the steel type and each box as typed, e.g. SQUARE_PIPE + { a: '40', t: '1.3' }. */
+  steelShape?: string;
+  steelSizeDims?: Record<string, string>;
+  /** Older single-box lines ("40x40x1.3"); read only. */
   steelSizeText?: string;
   rate: number;
   gstRate: number; // e.g. 18

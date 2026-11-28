@@ -44,3 +44,18 @@ describe('Sq.Mtr lines take feet + inches', () => {
     expect(legacyLengthToFeetInches(210, 'in')).toEqual({ feet: '17', inches: '6' });
   });
 });
+
+import { migrateDraftRow } from '../utils/quoteDraft';
+
+describe('Drafts saved before feet + inches', () => {
+  it('a 17.4 ft draft line reopens as 17 ft 4.8 in and prices the same', () => {
+    const old = { ...createInitialRow('d1', sqm), lengthValue: '17.4', lengthUnit: 'ft' as const, nos: '10' };
+    const before = computeRowCalculation(old, 'intra', 1.06, 0.305).calculatedLine!;
+    const migrated = migrateDraftRow(old);
+    expect(migrated.lengthFeet).toBe('17');
+    expect(migrated.lengthInches).toBe('4.8');
+    expect(migrated.lengthValue).toBe('');
+    const after = computeRowCalculation(migrated, 'intra', 1.06, 0.305).calculatedLine!;
+    expect(after.quantity).toBe(before.quantity);
+  });
+});
