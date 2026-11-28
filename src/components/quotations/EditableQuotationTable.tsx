@@ -41,7 +41,10 @@ import {
   weightPreview,
   isLengthMethod,
   isSheetLike,
+  createSteelSizeRow,
+  applySteelSize,
 } from './quotationRows';
+import { STEEL_SIZE_SHAPES } from './steelSize';
 import { approxLengths } from '../../utils/steelLine';
 
 interface DropdownPosition {
@@ -102,9 +105,18 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     const newRow: EditableRowState = { ...base, calculatedLine, validationError };
     // Fill the empty last row if there is one, otherwise add a new line
     const last = rows[rows.length - 1];
-    const lastIsBlank = last && !last.product && !last.isCustomItem && !last.productSearch.trim();
+    const lastIsBlank = last && !last.product && !last.isCustomItem && !last.steelSize && !last.productSearch.trim();
     onRowsChange(lastIsBlank ? [...rows.slice(0, -1), newRow] : [...rows, newRow]);
     setIsCustomModalOpen(false);
+  };
+
+  // Steel by size: pick the shape, type the size, the weight per metre is worked out
+  const handleAddSteelSize = () => {
+    const newRow = createSteelSizeRow('SQUARE_PIPE');
+    const last = rows[rows.length - 1];
+    const lastIsBlank = last && !last.product && !last.isCustomItem && !last.steelSize && !last.productSearch.trim();
+    onRowsChange(lastIsBlank ? [...rows.slice(0, -1), newRow] : [...rows, newRow]);
+    setTimeout(() => getActiveInput(`${newRow.id}_steelSize`)?.focus(), 50);
   };
 
   // Product Autocomplete Dropdown Portal Positioning State
@@ -274,7 +286,8 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
     onRowsChange(
       rows.map((r) => {
         if (r.id !== rowId) return r;
-        const updated = { ...r, ...updates };
+        // A new size (or shape) on a "Steel by size" line rebuilds its steel product
+        const updated = 'steelSize' in updates ? applySteelSize({ ...r, ...updates }) : { ...r, ...updates };
         const { calculatedLine, validationError } = computeRowCalculation(updated, taxMode, widthFactor, feetToMetre);
         return {
           ...updated,
@@ -433,6 +446,83 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
   const getFilteredProducts = (query: string) => searchProducts(products, query);
 
+  /** The size box of a "Steel by size" line (desktop cell or phone card). */
+  const renderSteelSize = (row: EditableRowState, mobile: boolean) => {
+    const size = row.steelSize!;
+    const cfg = STEEL_SIZE_SHAPES[size.shape];
+    const kgm = row.product && 'kgPerMetre' in row.product ? row.product.kgPerMetre : undefined;
+    const showError = Boolean(row.validationError) && (Boolean(row.product) || size.text.trim() !== '');
+    return (
+      <div className={mobile ? 'space-y-1.5' : 'space-y-1'}>
+        {mobile && (
+          <label className="block text-[12px] font-medium text-muted">
+            {cfg?.label} size (mm) <span className="text-danger">*</span>
+          </label>
+        )}
+        <div className="flex items-center gap-1.5">
+          {!mobile && (
+            <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20 shrink-0">
+              {cfg?.label}
+            </span>
+          )}
+          <input
+            ref={(el) => {
+              const key = `${row.id}_steelSize${mobile ? '_mobile' : ''}`;
+              if (el) inputRefs.current.set(key, el);
+              else inputRefs.current.delete(key);
+            }}
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={cfg?.placeholder}
+            value={size.text}
+            onChange={(e) => updateRow(row.id, { steelSize: { ...size, text: e.target.value } })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                (getActiveInput(`${row.id}_lengthMetres`) || getActiveInput(`${row.id}_nos`))?.focus();
+              }
+            }}
+            className={
+              mobile
+                ? 'w-full h-10 px-3 text-sm font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-2 focus:ring-brand/20 text-ink bg-white'
+                : 'w-full min-w-0 py-1.5 px-2 text-xs font-semibold tabular-nums rounded-control border border-line-strong focus:border-brand focus:ring-1 focus:ring-brand text-ink bg-white'
+            }
+            title={cfg?.hint}
+            aria-label={`${cfg?.label} size in mm`}
+          />
+          {!mobile && <span className="text-[11px] text-muted shrink-0">mm</span>}
+        </div>
+        <div className="text-[11px] text-muted leading-snug">
+          {row.product ? (
+            <>
+              <span className="text-ink font-medium">{row.product.name}</span>
+              {kgm !== undefined && <span className="tabular-nums"> · {kgm} kg/m</span>}
+            </>
+          ) : (
+            cfg?.hint
+          )}
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-muted gap-2">
+          <span className="tabular-nums">HSN {row.product?.hsn ?? cfg?.hsn}</span>
+          <button
+            type="button"
+            onClick={() => updateRow(row.id, { steelSize: undefined, product: null, productSearch: '', isProductDropdownOpen: true })}
+            className="text-brand hover:underline font-semibold"
+          >
+            Catalog &rarr;
+          </button>
+        </div>
+        {showError && (
+          <div className={isRateHint(row) ? 'p-2 bg-brand-soft border border-brand/20 rounded-control text-brand-deep text-xs flex items-center gap-1.5' : 'flex items-center gap-1 text-[11px] text-danger font-medium'}>
+            <AlertCircle className="w-3 h-3 shrink-0" />
+            <span>{isRateHint(row) ? 'Enter the rate per kg to price this line.' : row.validationError}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const handleKeyDownProductSearch = (
     e: React.KeyboardEvent<HTMLInputElement>,
     row: EditableRowState,
@@ -524,6 +614,15 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           </button>
           <button
             type="button"
+            onClick={handleAddSteelSize}
+            className="flex-1 sm:flex-initial min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
+            title="Type a steel size, e.g. 40x40x1.3, and the weight is worked out"
+          >
+            <Plus className="w-3.5 h-3.5 text-brand" />
+            <span>Steel by size</span>
+          </button>
+          <button
+            type="button"
             onClick={onAddRow}
             className="flex-1 sm:flex-initial min-h-[38px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-control font-semibold text-xs shadow-xs transition"
           >
@@ -555,7 +654,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               const isSqm = row.product?.qtyMethod === 'SQM';
               const isWeightPerPiece = row.product?.qtyMethod === 'WEIGHT_PER_PIECE';
               const isSheet = row.product?.qtyMethod === 'SHEET_WEIGHT';
-              const isPipe = row.product?.qtyMethod === 'SECTION_WEIGHT';
+              const isPipe = row.product?.qtyMethod === 'SECTION_WEIGHT' || Boolean(row.steelSize);
               const isPiece = row.product?.qtyMethod === 'PIECE';
               const isFeetInches = isSheet || isLengthMethod(row.product?.qtyMethod);
               const takesColour = isSheetLike(row.product);
@@ -575,7 +674,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
 
                   {/* Product Search & Selection */}
                   <td className="py-3 px-3 align-top">
-                    {isCustom ? (
+                    {row.steelSize ? (
+                      renderSteelSize(row, false)
+                    ) : isCustom ? (
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-control bg-amber-50 text-amber-800 border border-amber-300 shrink-0">
@@ -1118,7 +1219,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           const isSqm = row.product?.qtyMethod === 'SQM';
           const isWeightPerPiece = row.product?.qtyMethod === 'WEIGHT_PER_PIECE';
           const isSheet = row.product?.qtyMethod === 'SHEET_WEIGHT';
-          const isPipe = row.product?.qtyMethod === 'SECTION_WEIGHT';
+          const isPipe = row.product?.qtyMethod === 'SECTION_WEIGHT' || Boolean(row.steelSize);
           const isFeetInches = isSheet || isLengthMethod(row.product?.qtyMethod);
           const takesColour = isSheetLike(row.product);
           const hasError = Boolean(row.validationError);
@@ -1136,7 +1237,11 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                   <span className="w-6 h-6 rounded-full bg-surface-2 border border-line-strong flex items-center justify-center font-mono text-[11px] font-bold text-ink shrink-0">
                     {index + 1}
                   </span>
-                  {isCustom ? (
+                  {row.steelSize ? (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-control bg-brand-soft text-brand border border-brand/20 shrink-0">
+                      Steel by size
+                    </span>
+                  ) : isCustom ? (
                     <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-control bg-amber-50 text-amber-800 border border-amber-300 shrink-0">
                       Custom Item
                     </span>
@@ -1185,7 +1290,9 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
               </div>
 
               {/* Product / Description Field */}
-              {isCustom ? (
+              {row.steelSize ? (
+                renderSteelSize(row, true)
+              ) : isCustom ? (
                 <div className="space-y-2">
                   <label className="block text-[10.5px] font-semibold text-faint uppercase tracking-wider">
                     Item Description <span className="text-danger">*</span>
@@ -1653,6 +1760,14 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           >
             <Plus className="w-4 h-4 text-brand" />
             <span>Custom Item</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleAddSteelSize}
+            className="w-full sm:w-auto min-h-[44px] sm:min-h-[36px] inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-surface-2 text-ink border border-line-strong rounded-control font-semibold text-xs shadow-xs transition"
+          >
+            <Plus className="w-4 h-4 text-brand" />
+            <span>Steel by size</span>
           </button>
         </div>
 
