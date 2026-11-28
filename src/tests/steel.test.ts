@@ -7,26 +7,26 @@ import {
 } from '../engine';
 import type { QuotationLineSnapshot } from '../types/quotation';
 
-describe('Steel kg/m — IS formulas vs published charts', () => {
-  it('round pipe (CHS): (OD − t) × t × 0.02466', () => {
-    expect(calculateSteelKgPerMetre('ROUND_PIPE', { odMm: 48.3, thicknessMm: 3.2 })).toBeCloseTo(3.56, 2);
-    expect(calculateSteelKgPerMetre('ROUND_PIPE', { odMm: 33.7, thicknessMm: 2.6 })).toBeCloseTo(1.99, 2);
+describe('Steel kg/m — same formulas as maiak-m.bg', () => {
+  it('round tube: (OD − t) × t × 0.024649', () => {
+    expect(calculateSteelKgPerMetre('ROUND_PIPE', { odMm: 48.3, thicknessMm: 3.2 })).toBe(3.557);
+    // maiak-m.bg shows 0.95 for 21.3 × 2
+    expect(calculateSteelKgPerMetre('ROUND_PIPE', { odMm: 21.3, thicknessMm: 2 })).toBeCloseTo(0.95, 2);
   });
 
-  it('square pipe (SHS, IS 4923) matches chart within 0.01 kg/m', () => {
-    expect(calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 60, thicknessMm: 3.2 })).toBeCloseTo(5.5, 2);
-    expect(calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 150, thicknessMm: 5 })).toBeCloseTo(22.26, 2);
-    expect(calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 25, thicknessMm: 1.6 })).toBeCloseTo(1.12, 2);
-    const kg = calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 50, thicknessMm: 2.6 })!;
-    expect(Math.abs(kg - 3.74)).toBeLessThanOrEqual(0.011);
+  it('square tube: t × (0.0314 × A − 0.044877 × t)', () => {
+    expect(calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 60, thicknessMm: 3.2 })).toBe(5.569);
+    expect(calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 25, thicknessMm: 1.6 })).toBe(1.141);
+    // maiak-m.bg default example: 15 × 1.5 → 0.61 kg/m
+    expect(calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 15, thicknessMm: 1.5 })).toBeCloseTo(0.61, 2);
   });
 
   it('rectangular pipe (RHS) equals square pipe when B = H', () => {
     expect(calculateSteelKgPerMetre('RECT_PIPE', { widthMm: 60, heightMm: 60, thicknessMm: 3.2 })).toBe(
       calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 60, thicknessMm: 3.2 })
     );
-    // 80 × 40 × 3.2 chart ≈ 5.50 kg/m (same perimeter as 60 × 60)
-    expect(calculateSteelKgPerMetre('RECT_PIPE', { widthMm: 80, heightMm: 40, thicknessMm: 3.2 })).toBeCloseTo(5.5, 2);
+    // same perimeter as 60 × 60 → same weight
+    expect(calculateSteelKgPerMetre('RECT_PIPE', { widthMm: 80, heightMm: 40, thicknessMm: 3.2 })).toBe(5.569);
   });
 
   it('plate / flat: W × t × 0.00785', () => {
@@ -40,9 +40,9 @@ describe('Steel kg/m — IS formulas vs published charts', () => {
     expect(calculateSteelKgPerMetre('CHEQUERED_PLATE', { widthMm: 1250, thicknessMm: 5, kgPerSqm: 42.5 })).toBeCloseTo(53.125, 3);
   });
 
-  it('round bar d² × 0.00617, square bar a² × 0.00785', () => {
-    expect(calculateSteelKgPerMetre('ROUND_BAR', { diameterMm: 12 })).toBeCloseTo(0.888, 3);
-    expect(calculateSteelKgPerMetre('ROUND_BAR', { diameterMm: 25 })).toBeCloseTo(3.856, 3);
+  it('round bar d² × 0.0061654, square bar a² × 0.00785', () => {
+    expect(calculateSteelKgPerMetre('ROUND_BAR', { diameterMm: 12 })).toBe(0.888);
+    expect(calculateSteelKgPerMetre('ROUND_BAR', { diameterMm: 25 })).toBe(3.853);
     expect(calculateSteelKgPerMetre('SQUARE_BAR', { sideMm: 20 })).toBeCloseTo(3.14, 3);
   });
 
@@ -77,13 +77,13 @@ describe('Steel quotation line — everything billed in Kgs', () => {
     gstRate: 18,
   });
 
-  it('6 m × 10 nos of 60×60×3.2 → 330 kg', () => {
+  it('6 m × 10 nos of 60×60×3.2 → 334.1 kg', () => {
     const kgm = calculateSteelKgPerMetre('SQUARE_PIPE', { sideMm: 60, thicknessMm: 3.2 })!;
     const line = calculateQuotationLine({ snapshot: snapshot(kgm), length: { metres: 6 }, nos: 10 }, 'intra');
     expect(line.unit).toBe('Kgs');
-    expect(line.perPieceQuantity).toBeCloseTo(33.0, 2);
-    expect(line.quantity).toBeCloseTo(330.0, 1);
-    expect(line.taxableAmount).toBeCloseTo(330.0 * 68, 0);
+    expect(line.perPieceQuantity).toBe(33.41);
+    expect(line.quantity).toBe(334.1);
+    expect(line.taxableAmount).toBeCloseTo(334.1 * 68, 2);
   });
 
   it('chequered plate 1250 × 5 at 2.5 m × 4 nos → plate kg = L × W × t × 7.85', () => {

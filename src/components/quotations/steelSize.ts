@@ -4,12 +4,12 @@
  * out kg per metre, builds a one-off steel product for the line, and it is sold by weight:
  * kg = length (m) × kg/m × Nos. Nothing needs to be pre-loaded in Products.
  *
- * Formulas: mild steel 7.85 g/cm³ (0.00785 kg per metre per mm²). Tubes follow IS 4923 /
- * IS 1161 (see engine/steel.ts). Angles use RR's weight card when the size is on it,
+ * Formulas: mild steel 7.85 g/cm³ (0.00785 kg per metre per mm²). Tube and bar formulas match
+ * RR's reference calculator, maiak-m.bg (see engine/steel.ts). Angles use RR's weight card when the size is on it,
  * otherwise t × (A + B − t) × 0.00785. Channels and beams are picked from RR's weight card.
  */
 import type { Product } from '../../types/product';
-import { calculateSteelKgPerMetre, STEEL_DENSITY_KG_PER_M_PER_MM2 } from '../../engine/steel';
+import { calculateSteelKgPerMetreRaw, STEEL_DENSITY_KG_PER_M_PER_MM2 } from '../../engine/steel';
 import { ANGLES, BEAMS, CHANNELS, CHEQUERED_PLATES } from '../../data/steelCatalogue';
 import { Decimal } from 'decimal.js';
 
@@ -48,10 +48,9 @@ const G = STEEL_DENSITY_KG_PER_M_PER_MM2;
 const f = (n: number | string) => String(n);
 const n = (v: number | string) => Number(v);
 
-const engine = (shape: Parameters<typeof calculateSteelKgPerMetre>[0], dims: Parameters<typeof calculateSteelKgPerMetre>[1]) => {
-  const kg = calculateSteelKgPerMetre(shape, dims);
-  return kg === null ? null : new Decimal(kg);
-};
+// Exact kg/m (not rounded), so length × kg/m matches the reference calculator to the paisa
+const engine = (shape: Parameters<typeof calculateSteelKgPerMetreRaw>[0], dims: Parameters<typeof calculateSteelKgPerMetreRaw>[1]) =>
+  calculateSteelKgPerMetreRaw(shape, dims);
 
 const T: SteelSizeField = { key: 't', label: 'Thickness', short: 't' };
 
@@ -212,7 +211,7 @@ export function parseSteelSize(input: SteelSizeInput): SteelSizeResult {
   const res = cfg.compute(values);
   if ('error' in res) return { ok: false, error: res.error };
   if (!res.kgPerMetre || !res.kgPerMetre.isFinite() || res.kgPerMetre.lte(0)) return { ok: false, error: 'Check the sizes.' };
-  return { ok: true, name: res.name, hsn: res.hsn, kgPerMetre: res.kgPerMetre.toDecimalPlaces(3, Decimal.ROUND_HALF_UP).toNumber() };
+  return { ok: true, name: res.name, hsn: res.hsn, kgPerMetre: res.kgPerMetre.toDecimalPlaces(6, Decimal.ROUND_HALF_UP).toNumber() };
 }
 
 /** Old lines saved with one size box ("40x40x1.3", square pipe only) → separate boxes. */

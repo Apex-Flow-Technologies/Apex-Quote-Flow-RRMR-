@@ -1,4 +1,5 @@
 import type { QuotationLine } from '../types/quotation';
+import { formatKgPerMetre } from '../engine/steel';
 
 /** A steel (by-weight) line where the salesperson typed the kg instead of a number of lengths. */
 export function isSteelByKg(line: Pick<QuotationLine, 'isManualQuantity' | 'snapshot'>): boolean {
@@ -17,7 +18,7 @@ export function describeSteelLine(line: QuotationLine, sep = '·'): string {
     line.lengthFeet !== undefined && line.lengthFeet !== null
       ? `${line.lengthFeet}'${line.lengthInches ? ` ${line.lengthInches}"` : ''}`
       : `${line.lengthM || 0}m`;
-  const kgm = `${line.snapshot.kgPerMetre} kg/m`;
+  const kgm = `${formatKgPerMetre(line.snapshot.kgPerMetre)} kg/m`;
   if (isSteelByKg(line)) {
     const n = approxLengths(Number(line.quantity), Number(line.perPieceQuantity));
     return n !== null ? `By weight ${sep} ≈ ${n} lengths of ${len} ${sep} ${kgm}` : `By weight ${sep} ${kgm}`;

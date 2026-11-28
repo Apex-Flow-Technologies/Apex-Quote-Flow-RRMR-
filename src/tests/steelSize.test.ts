@@ -10,19 +10,19 @@ const kg = (shape: SteelSizeKind, dims: Record<string, string>) => {
 
 describe('Steel by size: weight per metre for each type', () => {
   const cases: [SteelSizeKind, Record<string, string>, number, string][] = [
-    ['SQUARE_PIPE', { a: '40', t: '1.3' }, 1.546, 'MS Square Tube 40 × 40 × 1.3 mm'],
-    ['SQUARE_PIPE', { a: '60', t: '3.2' }, 5.5, 'MS Square Tube 60 × 60 × 3.2 mm'],
-    ['RECT_PIPE', { a: '80', b: '40', t: '3' }, 5.187, 'MS Rectangular Tube 80 × 40 × 3 mm'],
-    ['ROUND_PIPE', { d: '21.3', t: '2' }, 0.952, 'MS Round Tube 21.3 OD × 2 mm'], // Maiak-M shows 0.95
-    ['PLATE', { t: '5', w: '1250' }, 49.063, 'MS Plate 5 mm (1250 wide)'],
+    ['SQUARE_PIPE', { a: '40', t: '1.3' }, 1.556958, 'MS Square Tube 40 × 40 × 1.3 mm'],
+    ['SQUARE_PIPE', { a: '60', t: '3.2' }, 5.56926, 'MS Square Tube 60 × 60 × 3.2 mm'],
+    ['RECT_PIPE', { a: '80', b: '40', t: '3' }, 5.248107, 'MS Rectangular Tube 80 × 40 × 3 mm'],
+    ['ROUND_PIPE', { d: '21.3', t: '2' }, 0.951451, 'MS Round Tube 21.3 OD × 2 mm'], // maiak-m.bg shows 0.95
+    ['PLATE', { t: '5', w: '1250' }, 49.0625, 'MS Plate 5 mm (1250 wide)'],
     ['CHEQUERED_PLATE', { t: '6', w: '1250' }, 65.375, 'Chequered Plate 6 mm (1250 wide)'], // RR card 52.3 kg/m²
     ['CHEQUERED_PLATE', { t: '8', w: '1250' }, 78.5, 'Chequered Plate 8 mm (1250 wide)'], // not on the card: formula
-    ['ROUND_BAR', { d: '16' }, 1.58, 'MS Round Bar 16 mm'],
-    ['SQUARE_BAR', { a: '12' }, 1.13, 'MS Square Bar 12 mm'],
+    ['ROUND_BAR', { d: '16' }, 1.578342, 'MS Round Bar 16 mm'],
+    ['SQUARE_BAR', { a: '12' }, 1.1304, 'MS Square Bar 12 mm'],
     ['FLAT', { w: '50', t: '6' }, 2.355, 'MS Flat 50 × 6 mm'],
     ['EQUAL_ANGLE', { a: '50', t: '6' }, 4.5, 'MS Angle 50 × 50 × 6 mm'], // RR card
-    ['EQUAL_ANGLE', { a: '55', t: '5' }, 4.121, 'MS Angle 55 × 55 × 5 mm'], // formula
-    ['UNEQUAL_ANGLE', { a: '75', b: '50', t: '6' }, 5.605, 'MS Angle 75 × 50 × 6 mm'],
+    ['EQUAL_ANGLE', { a: '55', t: '5' }, 4.12125, 'MS Angle 55 × 55 × 5 mm'], // formula
+    ['UNEQUAL_ANGLE', { a: '75', b: '50', t: '6' }, 5.6049, 'MS Angle 75 × 50 × 6 mm'],
     ['CHANNEL', { size: '100x50' }, 9.6, 'MS Channel ISMC 100 × 50'],
     ['BEAM', { size: '200x100' }, 25.9, 'MS Beam ISMB 200 × 100'],
   ];
@@ -60,13 +60,19 @@ describe('Steel by size: mistakes are explained', () => {
 });
 
 describe('Steel by size: on a quote line', () => {
+  it('80 × 40 × 2 rectangular tube, 6 m: 21.53 kg as on maiak-m.bg', () => {
+    const row = applySteelSize({ ...createSteelSizeRow('RECT_PIPE'), id: 'r0', steelSize: { shape: 'RECT_PIPE', dims: { a: '80', b: '40', t: '2' } }, nos: '1', rate: '70' });
+    const line = computeRowCalculation(row, 'intra', 1.06, 0.305).calculatedLine!;
+    expect(line.perPieceQuantity).toBe(21.53);
+  });
+
   it('6 m × 10 lengths of 40 × 40 × 1.3 at ₹70/kg', () => {
     const row = applySteelSize({ ...createSteelSizeRow(), id: 'r1', steelSize: { shape: 'SQUARE_PIPE', dims: { a: '40', t: '1.3' } }, nos: '10', rate: '70' });
     const { calculatedLine, validationError } = computeRowCalculation(row, 'intra', 1.06, 0.305);
     expect(validationError).toBeNull();
-    // weight per length 6 × 1.546 = 9.276 → 9.28 kg; × 10 = 92.8 kg
-    expect(calculatedLine!.quantity).toBe(92.8);
-    expect(calculatedLine!.taxableAmount).toBe(6496);
+    // weight per length 6 × 1.556958 = 9.3417 → 9.34 kg; × 10 = 93.4 kg
+    expect(calculatedLine!.quantity).toBe(93.4);
+    expect(calculatedLine!.taxableAmount).toBe(6538);
     expect(calculatedLine!.snapshot.steelSizeDims).toEqual({ a: '40', t: '1.3' });
   });
 

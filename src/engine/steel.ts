@@ -31,8 +31,12 @@ export interface SteelDims {
 }
 
 export const STEEL_DENSITY_KG_PER_M_PER_MM2 = new Decimal('0.00785'); // 7.85 g/cm³
-export const ROUND_PIPE_FACTOR = new Decimal('0.02466'); // π × 0.00785
-export const ROUND_BAR_FACTOR = new Decimal('0.00617'); // π/4 × 0.00785 (IS d²/162)
+// Factors as used by RR's reference calculator (maiak-m.bg), so RR's weights match it:
+export const ROUND_PIPE_FACTOR = new Decimal('0.024649'); // 3.14 × 0.00785 (Maiak-M: 0.0314 × 0.00785 × 100)
+export const ROUND_BAR_FACTOR = new Decimal('0.0061654'); // π/4 × 0.00785
+// Square / rectangular tubes (EN 10219, as Maiak-M): kg/m = t × (0.0157 × (B + H) − 0.044877 × t)
+export const TUBE_SIDE_FACTOR = new Decimal('0.0157'); // 2 × 0.00785
+export const TUBE_CORNER_FACTOR = new Decimal('0.044877');
 export const DEFAULT_STEEL_LENGTH_M = 6;
 export const DEFAULT_CHEQUERED_PLATE_LENGTH_M = 2.5;
 
@@ -98,10 +102,8 @@ export function calculateSteelKgPerMetreRaw(shape: SteelShape, dims: SteelDims):
       const b = shape === 'SQUARE_PIPE' ? pos(dims.sideMm) : pos(dims.widthMm);
       const h = shape === 'SQUARE_PIPE' ? pos(dims.sideMm) : pos(dims.heightMm);
       if (!b || !h || !t || t.times(2).gte(Decimal.min(b, h))) return null;
-      // IS 4923: A = 2t(B + H − 2t) − (4 − π)(ro² − ri²), with ro = 2t, ri = t → (4 − π)·3t²
-      const flat = t.times(2).times(b.plus(h).minus(t.times(2)));
-      const corner = new Decimal(4).minus(Decimal.acos(-1)).times(t.pow(2).times(3));
-      return flat.minus(corner).times(STEEL_DENSITY_KG_PER_M_PER_MM2);
+      // EN 10219 (as Maiak-M): t × (0.0157 × (B + H) − 0.044877 × t)
+      return t.times(TUBE_SIDE_FACTOR.times(b.plus(h)).minus(TUBE_CORNER_FACTOR.times(t)));
     }
 
     case 'PLATE':
@@ -139,6 +141,13 @@ export function calculateSteelKgPerMetreRaw(shape: SteelShape, dims: SteelDims):
 }
 
 /** kg/m rounded to 3 decimals (stored on the product as kgPerMetre). */
+/** kg/m for display: up to 3 decimals, e.g. 3.588 (the line itself keeps the exact value). */
+export function formatKgPerMetre(kgPerMetre: number | string | undefined | null): string {
+  const v = Number(kgPerMetre);
+  if (!isFinite(v)) return '';
+  return String(Number(v.toFixed(3)));
+}
+
 export function calculateSteelKgPerMetre(shape: SteelShape, dims: SteelDims): number | null {
   const raw = calculateSteelKgPerMetreRaw(shape, dims);
   return raw ? raw.toDecimalPlaces(3, Decimal.ROUND_HALF_UP).toNumber() : null;

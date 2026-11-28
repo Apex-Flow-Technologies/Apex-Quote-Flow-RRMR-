@@ -44,6 +44,7 @@ import {
   createSteelSizeRow,
   applySteelSize,
 } from './quotationRows';
+import { formatKgPerMetre } from '../../engine/steel';
 import { STEEL_SIZE_KINDS, STEEL_SIZE_KIND_ORDER, parseSteelSize, type SteelSizeKind } from './steelSize';
 import { approxLengths } from '../../utils/steelLine';
 
@@ -539,7 +540,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
           {row.product ? (
             <>
               <span className="text-ink font-medium">{row.product.name}</span>
-              {kgm !== undefined && <span className="tabular-nums"> · {kgm} kg/m</span>}
+              {kgm !== undefined && <span className="tabular-nums"> · {formatKgPerMetre(kgm)} kg/m</span>}
             </>
           ) : sizeError ? (
             <span className="text-danger font-medium">{sizeError}</span>
@@ -844,7 +845,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                             )}
                             {isPipe && 'kgPerMetre' in row.product && (
                               <div className="text-[10px] text-faint">
-                                Section: {row.product.kgPerMetre} kg/m
+                                Section: {formatKgPerMetre(row.product.kgPerMetre)} kg/m
                               </div>
                             )}
                             {isWeightPerPiece && 'kgPerPiece' in row.product && (
@@ -1434,7 +1435,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                           {isPipe && 'kgPerMetre' in row.product && (
                             <>
                               <span>&bull;</span>
-                              <span>{row.product.kgPerMetre} kg/m</span>
+                              <span>{formatKgPerMetre(row.product.kgPerMetre)} kg/m</span>
                             </>
                           )}
                           {isWeightPerPiece && 'kgPerPiece' in row.product && (
@@ -2011,7 +2012,7 @@ export const EditableQuotationTable: React.FC<EditableQuotationTableProps> = ({
                       <span>{p.category}</span>
                       <span>&bull;</span>
                       {p.qtyMethod === 'SECTION_WEIGHT' && 'kgPerMetre' in p && p.kgPerMetre ? (
-                        <span className="font-mono">{p.kgPerMetre} kg/m</span>
+                        <span className="font-mono">{formatKgPerMetre(p.kgPerMetre)} kg/m</span>
                       ) : (
                         <span className="font-mono">HSN {p.hsn}</span>
                       )}
